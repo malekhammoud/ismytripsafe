@@ -98,9 +98,14 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
     return wsum === 0 ? null : Math.round(sum / wsum)
   }
 
-  // Advisories — driven by the official State Dept advisory signal.
+  // Advisories — colour by the advisory LEVEL itself, not a raw score, because
+  // an advisory is categorical: Level 1 = normal precautions (green), Level 2 =
+  // "exercise increased caution" (yellow — neither good nor bad), Level 3 =
+  // reconsider (orange), Level 4 = do not travel (red). No advisory ≈ green.
   const adv = byKey.get("advisory")
-  const advScore = adv?.score ?? (adv ? 88 : null) // no advisory issued ≈ good
+  const advLevel = (adv?.value ?? null) as number | null
+  const advScore =
+    advLevel == null ? 90 : advLevel <= 1 ? 90 : advLevel === 2 ? 62 : advLevel === 3 ? 45 : 15
   const advNote = adv
     ? adv.value == null
       ? "No advisory issued"
