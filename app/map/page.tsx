@@ -45,10 +45,20 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
 }
 
 export default function MapPage() {
-  const { bundle, intel, status } = useReport()
+  const { bundle, intel, status, run } = useReport()
   const geo = bundle?.geo ?? null
   const [zones, setZones] = useState<MapZonePoint[]>([])
   const [selected, setSelected] = useState<string | null>(null)
+
+  // Re-hydrate from the URL — landing here directly, on a reload, or via the
+  // browser's back/forward button finds an empty store; replay from cache
+  // using the place carried in `?place=` instead of bouncing to "no destination".
+  useEffect(() => {
+    if (status !== "idle") return
+    const place = new URLSearchParams(window.location.search).get("place")
+    if (place) run({ place })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Build the zone list from the AI's mapZones (preferred) or, for older cached
   // reports, fall back to the safe / avoid area lists.

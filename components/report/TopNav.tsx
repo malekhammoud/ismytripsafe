@@ -11,6 +11,8 @@ export function TopNav({ active }: { active: "report" | "map" }) {
   const reset = useReport((s) => s.reset)
   const generatedAt = useReport((s) => s.generatedAt)
   const cached = useReport((s) => s.cached)
+  const place = useReport((s) => s.query?.place)
+  const placeParam = place ? `?place=${encodeURIComponent(place)}` : ""
 
   const tab = (href: string, label: string, icon: React.ReactNode, on: boolean) => (
     <Link
@@ -40,8 +42,8 @@ export function TopNav({ active }: { active: "report" | "map" }) {
       </button>
 
       <div className="flex items-center gap-1 rounded-full border border-[var(--hairline)] bg-white/60 p-1">
-        {tab("/", "Report", <FileText size={13} />, active === "report")}
-        {tab("/map", "Map", <MapIcon size={13} />, active === "map")}
+        {tab(`/${placeParam}`, "Report", <FileText size={13} />, active === "report")}
+        {tab(`/map${placeParam}`, "Map", <MapIcon size={13} />, active === "map")}
       </div>
 
       <div className="hidden text-right leading-tight sm:block">

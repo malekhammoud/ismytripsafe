@@ -1,11 +1,14 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { TrafficReport } from "@/components/report/TrafficReport"
 import { TopNav } from "@/components/report/TopNav"
 import { useReport } from "@/lib/store"
+import type { SafetyQuery } from "@/lib/types"
 
 export default function Home() {
   const {
@@ -20,9 +23,25 @@ export default function Home() {
     run,
     reset,
   } = useReport()
+  const router = useRouter()
 
   const loading = status === "loading"
   const started = status !== "idle"
+
+  // Re-hydrate from the URL — a reload, a direct link, or the browser's back/
+  // forward button lands here with an empty store, so replay from cache using
+  // the place carried in `?place=`.
+  useEffect(() => {
+    if (status !== "idle") return
+    const place = new URLSearchParams(window.location.search).get("place")
+    if (place) run({ place })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const search = (q: SafetyQuery) => {
+    router.replace(`/?place=${encodeURIComponent(q.place)}`)
+    run(q)
+  }
 
   // ─── Landing ───────────────────────────────────────────────
   if (!started) {
@@ -58,7 +77,7 @@ export default function Home() {
         </div>
 
         <div className="w-full rise-in" style={{ animationDelay: "0.24s" }}>
-          <SearchBar onSubmit={run} loading={loading} />
+          <SearchBar onSubmit={search} loading={loading} />
         </div>
 
         <p className="mt-6 text-center text-[0.72rem] text-[var(--ink-faint)] rise-in" style={{ animationDelay: "0.32s" }}>
