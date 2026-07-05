@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import "leaflet/dist/leaflet.css"
-import type { Map as LMap, LayerGroup } from "leaflet"
+import type { Map as LMap, FeatureGroup } from "leaflet"
 import type { ZoneLevel } from "@/lib/types"
 
 export interface MapZonePoint {
@@ -11,6 +11,7 @@ export interface MapZonePoint {
   name: string
   level: ZoneLevel
   note: string
+  geojson?: unknown | null // real OSM boundary polygon, when available
 }
 
 const ZONE_COLOR: Record<ZoneLevel, string> = {
@@ -26,10 +27,11 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * A real OpenStreetMap map (Leaflet) centred on the destination, overlaying the
- * AI-rated districts as colour-coded zones — green (safe), yellow (caution),
- * red (avoid). Clicking a zone reports it back via onSelect so the side panel
- * can show its detail. Leaflet is loaded in the browser only.
+ * A clean OpenStreetMap map (CartoDB Voyager basemap — light, readable street
+ * labels) centred on the destination, overlaying the AI-rated districts as
+ * colour-coded zones: green (safe), yellow (caution), red (avoid). Real OSM
+ * boundary polygons are used where available, otherwise a small circle.
+ * Clicking a zone reports it via onSelect. Scroll to zoom. Browser-only.
  */
 export function CityMap({
   center,
@@ -48,7 +50,7 @@ export function CityMap({
 }) {
   const elRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<LMap | null>(null)
-  const layerRef = useRef<LayerGroup | null>(null)
+  const layerRef = useRef<FeatureGroup | null>(null)
   const fittedRef = useRef(false)
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
@@ -61,12 +63,20 @@ export function CityMap({
       if (cancelled || !elRef.current) return
 
       if (!mapRef.current) {
-        const map = L.map(elRef.current, { scrollWheelZoom: false }).setView(center, zoom)
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: "&copy; OpenStreetMap contributors",
-        }).addTo(map)
-        layerRef.current = L.layerGroup().addTo(map)
+        const map = L.map(elRef.current, {
+          scrollWheelZoom: true, // zoom with the scroll wheel
+          zoomControl: true,
+        }).setView(center, zoom)
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          {
+            subdomains: "abcd",
+            maxZoom: 20,
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          }
+        ).addTo(map)
+        layerRef.current = L.featureGroup().addTo(map)
         mapRef.current = map
         setTimeout(() => map.invalidateSize(), 150)
       }
@@ -87,27 +97,36 @@ export function CityMap({
         .bindTooltip(city, { direction: "top" })
         .addTo(layer)
 
-      // Coloured zone blobs
+      // Zones — real polygon where we have one, else a small circle.
       for (const z of zones) {
         const active = selected === z.name
         const color = ZONE_COLOR[z.level]
-        const circle = L.circle([z.lat, z.lon], {
-          radius: 850,
+        const style = {
           color,
-          weight: active ? 3.5 : 1.8,
+          weight: active ? 3 : 1.6,
           fillColor: color,
-          fillOpacity: active ? 0.42 : 0.22,
-        })
-        circle.bindPopup(`<strong>${escapeHtml(z.name)}</strong><br/>${escapeHtml(z.note)}`)
-        circle.on("click", () => onSelectRef.current?.(z))
-        circle.addTo(layer)
+          fillOpacity: active ? 0.4 : 0.2,
+        }
+        const popup = `<strong>${escapeHtml(z.name)}</strong><br/>${escapeHtml(z.note)}`
+        let shape
+        if (z.geojson) {
+          shape = L.geoJSON(z.geojson as GeoJSON.GeoJsonObject, { style })
+        } else {
+          shape = L.circle([z.lat, z.lon], { radius: 500, ...style })
+        }
+        shape.bindPopup(popup)
+        shape.on("click", () => onSelectRef.current?.(z))
+        shape.addTo(layer)
       }
 
-      // Frame all zones once, the first time they load.
+      // Frame everything once, the first time zones load.
       if (!fittedRef.current && zones.length) {
-        const pts: [number, number][] = [center, ...zones.map((z) => [z.lat, z.lon] as [number, number])]
-        map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 })
-        fittedRef.current = true
+        try {
+          map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 14 })
+          fittedRef.current = true
+        } catch {
+          /* bounds not ready */
+        }
       }
     })()
     return () => {

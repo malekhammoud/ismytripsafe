@@ -34,11 +34,18 @@ export function CategoryTiles({ categories }: { categories: CategoryScore[] }) {
   return (
     <div className="grid grid-cols-2 gap-px sm:grid-cols-4" style={{ background: "rgba(20,25,34,0.08)" }}>
       {categories.map((c) => (
-        <button
+        <div
           key={c.key}
-          type="button"
+          role="button"
+          tabIndex={0}
           onClick={() => jump(c.key)}
-          className="group relative flex flex-col items-start gap-1 px-4 py-4 text-left transition-colors hover:bg-[rgba(255,255,255,0.55)]"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              jump(c.key)
+            }
+          }}
+          className="group relative flex cursor-pointer flex-col items-start gap-1 px-4 py-4 text-left transition-colors hover:bg-[rgba(255,255,255,0.55)]"
           style={{ background: "rgba(255,255,255,0.35)" }}
         >
           <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: c.color }} />
@@ -73,7 +80,7 @@ export function CategoryTiles({ categories }: { categories: CategoryScore[] }) {
           <span className="mt-0.5 line-clamp-1 text-[0.66rem]" style={{ color: "var(--ink-faint)" }}>
             {c.note}
           </span>
-        </button>
+        </div>
       ))}
     </div>
   )

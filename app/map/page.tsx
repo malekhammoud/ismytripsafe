@@ -63,27 +63,29 @@ export default function MapPage() {
     ]
   }, [intel])
 
-  // Geocode the zones so we can plot them.
+  // Resolve each zone to real coordinates + OSM boundary polygon so we can
+  // plot accurate shapes.
   useEffect(() => {
     if (!geo || !rawZones.length) return
     const items = rawZones.filter((z) => z.name.length > 1).slice(0, 12)
     let cancelled = false
     ;(async () => {
-      const queries = items.map((it) => `${it.name}, ${geo.city}, ${geo.country}`)
-      const res = await fetch("/api/geocode", {
+      const res = await fetch("/api/zones", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ queries }),
+        body: JSON.stringify({ city: geo.city, country: geo.country, zones: items }),
       })
         .then((r) => r.json())
         .catch(() => null)
       if (cancelled || !res?.results) return
       const pts: MapZonePoint[] = []
-      res.results.forEach((r: { lat: number | null; lon: number | null }, i: number) => {
-        if (r.lat != null && r.lon != null && haversineKm(r.lat, r.lon, geo.lat, geo.lon) < 70) {
-          pts.push({ lat: r.lat, lon: r.lon, ...items[i] })
+      res.results.forEach(
+        (r: { lat: number | null; lon: number | null; name: string; level: ZoneLevel; note: string; geojson: unknown | null }) => {
+          if (r.lat != null && r.lon != null && haversineKm(r.lat, r.lon, geo.lat, geo.lon) < 70) {
+            pts.push({ lat: r.lat, lon: r.lon, name: r.name, level: r.level, note: r.note, geojson: r.geojson })
+          }
         }
-      })
+      )
       setZones(pts)
     })()
     return () => {
