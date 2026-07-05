@@ -219,6 +219,189 @@ function healthSignal(notices: HealthNotice[]): SafetySignal {
   }
 }
 
+// ─── Nearby hospitals (OpenStreetMap / Overpass) ─────────────────────
+
+function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
+  const R = 6371
+  const dLat = ((bLat - aLat) * Math.PI) / 180
+  const dLon = ((bLon - aLon) * Math.PI) / 180
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((aLat * Math.PI) / 180) *
+      Math.cos((bLat * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(s))
+}
+
+const OVERPASS_ENDPOINTS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+]
+
+/** Count hospitals within ~15 km of the destination and the nearest distance. */
+async function fetchHospitals(
+  geo: GeoPoint
+): Promise<{ count: number; nearestKm: number | null } | null> {
+  const q =
+    `[out:json][timeout:12];(` +
+    `node["amenity"="hospital"](around:15000,${geo.lat},${geo.lon});` +
+    `way["amenity"="hospital"](around:15000,${geo.lat},${geo.lon});` +
+    `relation["amenity"="hospital"](around:15000,${geo.lat},${geo.lon});` +
+    `);out center 80;`
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    const raw = await fetchText(`${endpoint}?data=${encodeURIComponent(q)}`, 12000)
+    if (!raw) continue
+    try {
+      const data = JSON.parse(raw) as {
+        elements?: Array<{ lat?: number; lon?: number; center?: { lat: number; lon: number } }>
+      }
+      const els = data.elements ?? []
+      let nearest = Infinity
+      for (const e of els) {
+        const lat = e.lat ?? e.center?.lat
+        const lon = e.lon ?? e.center?.lon
+        if (lat == null || lon == null) continue
+        nearest = Math.min(nearest, haversineKm(geo.lat, geo.lon, lat, lon))
+      }
+      return {
+        count: els.length,
+        nearestKm: Number.isFinite(nearest) ? Math.round(nearest * 10) / 10 : null,
+      }
+    } catch {
+      /* try next endpoint */
+    }
+  }
+  return null
+}
+
+function hospitalsSignal(
+  h: { count: number; nearestKm: number | null } | null
+): SafetySignal {
+  const score =
+    h == null
+      ? null
+      : h.count === 0
+        ? 22
+        : h.count === 1
+          ? 52
+          : h.count <= 2
+            ? 66
+            : h.count <= 4
+              ? 78
+              : h.count <= 9
+                ? 88
+                : 95
+  const display =
+    h == null
+      ? "No data"
+      : h.count === 0
+        ? "None mapped within 15 km"
+        : `${h.count} within 15 km${h.nearestKm != null ? ` · nearest ~${h.nearestKm} km` : ""}`
+  return {
+    key: "hospitals",
+    label: "Hospitals nearby",
+    group: "Health & environment",
+    source: "OpenStreetMap",
+    value: h?.count ?? null,
+    display,
+    year: null,
+    score,
+    lowerIsBetter: false,
+    note: "Hospitals mapped within 15 km of the destination — a proxy for how quickly you can reach emergency care if something goes wrong.",
+  }
+}
+
+// ─── Seasonal / extreme weather (Open-Meteo forecast) ─────────────────
+
+function fmtTemp(c: number): string {
+  return `${Math.round(c)}°C`
+}
+
+async function fetchWeather(geo: GeoPoint): Promise<{
+  heatMax: number
+  coldMin: number
+  precipTotal: number
+  gustMax: number
+} | null> {
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${geo.lat}&longitude=${geo.lon}` +
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_gusts_10m_max` +
+    `&forecast_days=16&timezone=auto`
+  const raw = await fetchText(url, 7000)
+  if (!raw) return null
+  try {
+    const data = JSON.parse(raw) as {
+      daily?: {
+        temperature_2m_max?: number[]
+        temperature_2m_min?: number[]
+        precipitation_sum?: number[]
+        wind_gusts_10m_max?: number[]
+      }
+    }
+    const d = data.daily
+    if (!d?.temperature_2m_max?.length) return null
+    const max = (a?: number[]) => (a?.length ? Math.max(...a.filter((n) => n != null)) : 0)
+    const min = (a?: number[]) => (a?.length ? Math.min(...a.filter((n) => n != null)) : 0)
+    const sum = (a?: number[]) => (a?.length ? a.reduce((x, y) => x + (y ?? 0), 0) : 0)
+    return {
+      heatMax: max(d.temperature_2m_max),
+      coldMin: min(d.temperature_2m_min),
+      precipTotal: sum(d.precipitation_sum),
+      gustMax: max(d.wind_gusts_10m_max),
+    }
+  } catch {
+    return null
+  }
+}
+
+function weatherSignal(
+  w: { heatMax: number; coldMin: number; precipTotal: number; gustMax: number } | null
+): SafetySignal {
+  const month = new Date().toLocaleString("en-US", { month: "long" })
+  if (w == null) {
+    return {
+      key: "weather",
+      label: "Extreme weather",
+      group: "Everyday hazards",
+      source: "Open-Meteo",
+      value: null,
+      display: "No data",
+      year: null,
+      score: null,
+      lowerIsBetter: false,
+      note: "Seasonal extreme-weather outlook for the weeks ahead (heat, cold, storms, high wind).",
+    }
+  }
+
+  let score = 100
+  const hazards: string[] = []
+  if (w.heatMax >= 42) { score -= 55; hazards.push("dangerous heat") }
+  else if (w.heatMax >= 38) { score -= 38; hazards.push("extreme heat") }
+  else if (w.heatMax >= 34) { score -= 20; hazards.push("high heat") }
+  if (w.coldMin <= -20) { score -= 50; hazards.push("severe cold") }
+  else if (w.coldMin <= -12) { score -= 32; hazards.push("hard freeze") }
+  else if (w.coldMin <= -5) { score -= 16; hazards.push("freezing temps") }
+  if (w.gustMax >= 90) { score -= 30; hazards.push("damaging winds") }
+  else if (w.gustMax >= 70) { score -= 18; hazards.push("strong winds") }
+  if (w.precipTotal >= 120) { score -= 18; hazards.push("heavy rain / flooding") }
+  else if (w.precipTotal >= 60) { score -= 8; hazards.push("wet spell") }
+
+  score = clamp(score)
+  const cond = hazards.length ? hazards.slice(0, 2).join(", ") : "no weather extremes"
+  return {
+    key: "weather",
+    label: "Extreme weather",
+    group: "Everyday hazards",
+    source: "Open-Meteo",
+    value: Math.round(w.heatMax),
+    display: `${month}: highs ~${fmtTemp(w.heatMax)} · ${cond}`,
+    year: null,
+    score: Math.round(score),
+    lowerIsBetter: false,
+    note: "Seasonal extreme-weather outlook for the weeks ahead — peak heat/cold, heavy rain and wind gusts near your destination.",
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 export interface EnvironmentResult {
@@ -226,14 +409,21 @@ export interface EnvironmentResult {
   health: HealthNotice[]
 }
 
-/** Air-quality + CDC health signals for a place, fetched in parallel. */
+/** Air-quality + CDC health + hospitals + weather signals, fetched in parallel. */
 export async function getEnvironment(geo: GeoPoint): Promise<EnvironmentResult> {
-  const [air, health] = await Promise.all([
+  const [air, health, hospitals, weather] = await Promise.all([
     fetchAirQuality(geo),
     fetchHealthNotices(geo),
+    fetchHospitals(geo),
+    fetchWeather(geo),
   ])
   return {
-    signals: [airQualitySignal(air), healthSignal(health)],
+    signals: [
+      airQualitySignal(air),
+      healthSignal(health),
+      hospitalsSignal(hospitals),
+      weatherSignal(weather),
+    ],
     health,
   }
 }

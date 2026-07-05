@@ -98,26 +98,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     note: "Road traffic fatalities per 100,000 — the most common cause of injury death for visitors.",
   },
   {
-    key: "battle",
-    label: "Armed-conflict deaths",
-    group: "Conflict & terrorism",
-    source: WB_WDI,
-    wb: { indicator: "VC.BTL.DETH" },
-    unit: "deaths/yr",
-    lowerIsBetter: true,
-    format: (v) => (v < 1 ? "None reported" : `${Math.round(v).toLocaleString()}/yr`),
-    score: (v) =>
-      bandLowerBetter(v, [
-        [0, 100],
-        [1, 70],
-        [25, 45],
-        [100, 25],
-        [1000, 8],
-        [5000, 1],
-      ]),
-    note: "Battle-related deaths per year — direct indicator of active armed conflict.",
-  },
-  {
     key: "stability",
     label: "Political stability & no terrorism",
     group: "Conflict & terrorism",
@@ -220,40 +200,6 @@ async function fetchWB(
   }
 }
 
-/** Recent significant earthquakes near the city (USGS, last 90 days, M4.5+). */
-async function fetchEarthquakes(
-  lat: number,
-  lon: number
-): Promise<{ count: number; maxMag: number } | null> {
-  try {
-    const url =
-      `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson` +
-      `&latitude=${lat}&longitude=${lon}&maxradiuskm=300&minmagnitude=4.5` +
-      `&starttime=now-90days&limit=200`
-    const data = (await fetchJson(url, 7000)) as {
-      features?: Array<{ properties: { mag: number } }>
-    }
-    const feats = data.features ?? []
-    const maxMag = feats.reduce((m, f) => Math.max(m, f.properties.mag ?? 0), 0)
-    return { count: feats.length, maxMag }
-  } catch {
-    return null
-  }
-}
-
-function quakeScore(count: number, maxMag: number): number {
-  if (count === 0) return 100
-  // More frequent and stronger quakes lower the score.
-  const magPenalty = bandLowerBetter(maxMag, [
-    [4.5, 20],
-    [5.5, 35],
-    [6.5, 55],
-    [7.5, 75],
-  ])
-  const freqPenalty = Math.min(25, count * 2)
-  return clamp(100 - magPenalty - freqPenalty)
-}
-
 // ─── Public API ──────────────────────────────────────────────────────
 
 export interface SignalsResult {
@@ -272,9 +218,8 @@ export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
     fetchWB(iso2, d.wb!.indicator, d.wb!.source)
   )
 
-  const [wbResults, quakes, comparisons, environment] = await Promise.all([
+  const [wbResults, comparisons, environment] = await Promise.all([
     Promise.all(wbPromises),
-    fetchEarthquakes(geo.lat, geo.lon),
     fetchComparisons(iso2),
     getEnvironment(geo),
   ])
@@ -297,25 +242,7 @@ export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
     })
   })
 
-  // Seismic hazard
-  signals.push({
-    key: "seismic",
-    label: "Recent earthquakes",
-    group: "Everyday hazards",
-    source: "USGS Earthquake Catalog",
-    value: quakes?.count ?? null,
-    display: quakes
-      ? quakes.count === 0
-        ? "None (90 days)"
-        : `${quakes.count} quakes · max M${quakes.maxMag.toFixed(1)}`
-      : "No data",
-    year: null,
-    score: quakes ? Math.round(quakeScore(quakes.count, quakes.maxMag)) : null,
-    lowerIsBetter: true,
-    note: "Magnitude 4.5+ earthquakes within 300 km in the last 90 days.",
-  })
-
-  // Air quality + CDC health notices (direct from source)
+  // Air quality + CDC health + hospitals + weather (direct from source)
   signals.push(...environment.signals)
 
   return { signals, comparisons, health: environment.health }

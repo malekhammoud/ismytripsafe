@@ -32,7 +32,7 @@ export function AssessmentProgress({
     {
       key: "data",
       label: "Querying safety databases",
-      detail: "World Bank · Governance · USGS · Air quality · CDC",
+      detail: "World Bank · Governance · Hospitals · Air quality · Weather · CDC",
       state: hasData ? "done" : geo ? "active" : "pending",
     },
     {

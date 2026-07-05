@@ -111,6 +111,21 @@ export interface SafetyReport {
 
 // ─── AI enrichment (safety-only) ────────────────────────────────────
 
+export type RiskLevel = "Low" | "Moderate" | "High" | "Severe"
+
+/** A qualitative, AI-assessed risk for a specific threat (robbery, pickpocketing). */
+export interface RiskRating {
+  level: RiskLevel
+  note: string // one-line, city-specific explanation
+}
+
+/** How visitors/locals actually feel about day-to-day safety (map page). */
+export interface ConsumerSentiment {
+  score: number // 0–100 (100 = travellers feel very safe & positive)
+  label: string // e.g. "Mostly positive"
+  summary: string // 1–2 sentences
+}
+
 export interface SafetyEnrichment {
   verdict: string // direct answer, e.g. "Yes — generally safe for visitors"
   summary: string // 2–3 sentences interpreting the real data
@@ -118,6 +133,11 @@ export interface SafetyEnrichment {
   avoidAreas: string[]
   scams: string[] // common scams targeting visitors
   tips: string[] // practical safety tips
+  // ── added: qualitative, AI-assessed detail (optional; may be absent) ──
+  robbery?: RiskRating // mugging / armed robbery risk to visitors
+  pickpocket?: RiskRating // pickpocketing / bag-snatching risk
+  consumerSentiment?: ConsumerSentiment // how safe visitors feel (map page)
+  watchOuts?: string[] // current things to watch out for (map page)
 }
 
 // ─── Bundle / inputs / stream ───────────────────────────────────────

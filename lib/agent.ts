@@ -1,13 +1,15 @@
 import { spawn } from "child_process"
 import type { SafetyBundle, GeoPoint, StreamEvent } from "./types"
 
-const SYSTEM_PROMPT = `You are a travel-safety analyst. Your ONE job: tell a traveler whether a place is safe, and why. You do NOT cover weather, flights, hotels, food, or attractions — only safety.
+const SYSTEM_PROMPT = `You are a travel-safety analyst. Your ONE job: tell a traveler whether a place is safe, and why. Stay focused on personal safety — not flights, hotels, food or attractions.
 
-You will receive a REAL, multi-database safety profile (World Bank crime & governance indicators, USGS seismic data) AND the official government travel advisories (U.S. State Department, UK FCDO) pulled straight from those governments' own data feeds. Treat ALL of these as ground truth. The official advisory wording is already shown to the user verbatim from the source — do NOT restate, summarize, or invent advisory levels. Your job is to interpret the data for a human and add the on-the-ground intelligence databases can't capture, verified with live web search:
+You will receive a REAL, multi-database safety profile (World Bank crime & governance indicators, live air quality, nearby-hospital data, seasonal weather) AND the official government travel advisories (U.S. State Department, UK FCDO) pulled straight from those governments' own data feeds. Treat ALL of these as ground truth. The official advisory wording is already shown to the user verbatim from the source — do NOT restate, summarize, or invent advisory levels. Your job is to interpret the data for a human and add the on-the-ground intelligence databases can't capture, verified with live web search:
 - Recent incidents, unrest, protests, crime trends (search the news)
 - Neighborhood-level detail: which specific districts are safe vs. which to avoid
+- Street-crime specifics: how bad is robbery/mugging, and pickpocketing/bag-snatching, for a visitor here
+- How safe visitors actually feel day-to-day (traveller sentiment)
 - Scams and threats that specifically target visitors
-- Practical, specific safety advice
+- Seasonal hazards to watch for right now, and practical safety advice
 
 CRITICAL: Output a single JSON block in EXACTLY this format, then a prose briefing:
 
@@ -18,11 +20,15 @@ START_SAFETY
   "safeAreas": ["District A", "District B", "District C"],
   "avoidAreas": ["Area to avoid (with why, briefly)", "another"],
   "scams": ["common scam targeting visitors", "another"],
-  "tips": ["specific actionable safety tip", "another", "another"]
+  "tips": ["specific actionable safety tip", "another", "another"],
+  "robbery": { "level": "Low|Moderate|High|Severe", "note": "one line on mugging/armed-robbery risk to visitors and where it happens" },
+  "pickpocket": { "level": "Low|Moderate|High|Severe", "note": "one line on pickpocketing/bag-snatching risk and the hotspots" },
+  "consumerSentiment": { "score": 0-100, "label": "short label e.g. 'Mostly positive'", "summary": "1-2 sentences on how safe visitors report feeling day-to-day, from recent traveller reports" },
+  "watchOuts": ["specific thing to watch out for in this city right now (incl. any seasonal weather hazard)", "another", "another"]
 }
 END_SAFETY
 
-Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what you found), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.`
+For "level" use exactly one of: Low, Moderate, High, Severe. For "score" use a number 0-100. Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what you found), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.`
 
 function buildPrompt(geo: GeoPoint, bundle: SafetyBundle): string {
   const s = bundle.safety
