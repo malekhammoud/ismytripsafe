@@ -3,18 +3,20 @@
 import { useEffect, useRef } from "react"
 import "leaflet/dist/leaflet.css"
 import type { Map as LMap, LayerGroup } from "leaflet"
+import type { ZoneLevel } from "@/lib/types"
 
-export interface MapMarker {
+export interface MapZonePoint {
   lat: number
   lon: number
-  label: string
-  kind: "safe" | "avoid" | "city"
+  name: string
+  level: ZoneLevel
+  note: string
 }
 
-const COLORS: Record<MapMarker["kind"], string> = {
+const ZONE_COLOR: Record<ZoneLevel, string> = {
   safe: "#2f9e6f",
+  caution: "#e0a13b",
   avoid: "#d4503a",
-  city: "#1f74cf",
 }
 
 function escapeHtml(s: string): string {
@@ -24,23 +26,32 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * A real OpenStreetMap map (Leaflet) centred on the destination, with coloured
- * markers for the city and the AI-named safe / avoid areas. Leaflet is loaded
- * imperatively in the browser only, and markers are circle markers so there are
- * no image assets to configure.
+ * A real OpenStreetMap map (Leaflet) centred on the destination, overlaying the
+ * AI-rated districts as colour-coded zones — green (safe), yellow (caution),
+ * red (avoid). Clicking a zone reports it back via onSelect so the side panel
+ * can show its detail. Leaflet is loaded in the browser only.
  */
 export function CityMap({
   center,
   zoom = 12,
-  markers,
+  city,
+  zones,
+  selected,
+  onSelect,
 }: {
   center: [number, number]
   zoom?: number
-  markers: MapMarker[]
+  city: string
+  zones: MapZonePoint[]
+  selected?: string | null
+  onSelect?: (zone: MapZonePoint) => void
 }) {
   const elRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<LMap | null>(null)
   const layerRef = useRef<LayerGroup | null>(null)
+  const fittedRef = useRef(false)
+  const onSelectRef = useRef(onSelect)
+  onSelectRef.current = onSelect
 
   useEffect(() => {
     let cancelled = false
@@ -60,27 +71,50 @@ export function CityMap({
         setTimeout(() => map.invalidateSize(), 150)
       }
 
+      const map = mapRef.current
       const layer = layerRef.current
-      if (!layer) return
+      if (!map || !layer) return
       layer.clearLayers()
-      for (const m of markers) {
-        const cm = L.circleMarker([m.lat, m.lon], {
-          radius: m.kind === "city" ? 9 : 7,
-          color: "#ffffff",
-          weight: 2,
-          fillColor: COLORS[m.kind],
-          fillOpacity: 0.95,
+
+      // City centre marker
+      L.circleMarker(center, {
+        radius: 6,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: "#1f74cf",
+        fillOpacity: 1,
+      })
+        .bindTooltip(city, { direction: "top" })
+        .addTo(layer)
+
+      // Coloured zone blobs
+      for (const z of zones) {
+        const active = selected === z.name
+        const color = ZONE_COLOR[z.level]
+        const circle = L.circle([z.lat, z.lon], {
+          radius: 850,
+          color,
+          weight: active ? 3.5 : 1.8,
+          fillColor: color,
+          fillOpacity: active ? 0.42 : 0.22,
         })
-        cm.bindPopup(`<strong>${escapeHtml(m.label)}</strong>`)
-        cm.addTo(layer)
+        circle.bindPopup(`<strong>${escapeHtml(z.name)}</strong><br/>${escapeHtml(z.note)}`)
+        circle.on("click", () => onSelectRef.current?.(z))
+        circle.addTo(layer)
+      }
+
+      // Frame all zones once, the first time they load.
+      if (!fittedRef.current && zones.length) {
+        const pts: [number, number][] = [center, ...zones.map((z) => [z.lat, z.lon] as [number, number])]
+        map.fitBounds(pts, { padding: [40, 40], maxZoom: 14 })
+        fittedRef.current = true
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [center, zoom, markers])
+  }, [center, zoom, city, zones, selected])
 
-  // Tear the map down on unmount.
   useEffect(
     () => () => {
       mapRef.current?.remove()
@@ -90,5 +124,5 @@ export function CityMap({
     []
   )
 
-  return <div ref={elRef} className="h-full w-full" style={{ minHeight: 440 }} />
+  return <div ref={elRef} className="h-full w-full" style={{ minHeight: 460 }} />
 }

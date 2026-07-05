@@ -126,6 +126,15 @@ export interface ConsumerSentiment {
   summary: string // 1–2 sentences
 }
 
+export type ZoneLevel = "safe" | "caution" | "avoid"
+
+/** A named district plotted as a colour-coded zone on the map. */
+export interface MapZone {
+  name: string // district / neighbourhood name (geocodable)
+  level: ZoneLevel // safe (green) · caution (yellow) · avoid (red)
+  note: string // one line: why it's rated this way
+}
+
 export interface SafetyEnrichment {
   verdict: string // direct answer, e.g. "Yes — generally safe for visitors"
   summary: string // 2–3 sentences interpreting the real data
@@ -138,6 +147,7 @@ export interface SafetyEnrichment {
   pickpocket?: RiskRating // pickpocketing / bag-snatching risk
   consumerSentiment?: ConsumerSentiment // how safe visitors feel (map page)
   watchOuts?: string[] // current things to watch out for (map page)
+  mapZones?: MapZone[] // districts to plot as coloured zones on the map
 }
 
 // ─── Bundle / inputs / stream ───────────────────────────────────────

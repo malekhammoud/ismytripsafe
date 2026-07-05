@@ -3,21 +3,35 @@
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { MapPin, Search, CircleCheck, CircleAlert, Smile, Eye, Lightbulb } from "lucide-react"
+import { MapPin, Search, CircleCheck, CircleAlert, Smile, Eye, Lightbulb, MousePointerClick } from "lucide-react"
 import { useReport } from "@/lib/store"
 import { TopNav } from "@/components/report/TopNav"
 import { InfoTip } from "@/components/report/InfoTip"
 import { scoreColor } from "@/lib/safety-display"
-import type { MapMarker } from "@/components/map/CityMap"
+import type { ZoneLevel } from "@/lib/types"
+import type { MapZonePoint } from "@/components/map/CityMap"
 
 const CityMap = dynamic(() => import("@/components/map/CityMap").then((m) => m.CityMap), {
   ssr: false,
-  loading: () => <div className="skeleton h-full w-full" style={{ minHeight: 440 }} />,
+  loading: () => <div className="skeleton h-full w-full" style={{ minHeight: 460 }} />,
 })
 
-/** Strip an avoid-area's parenthetical / em-dash reason, leaving the place name. */
+const ZONE_META: Record<ZoneLevel, { color: string; label: string }> = {
+  safe: { color: "#2f9e6f", label: "Safer" },
+  caution: { color: "#e0a13b", label: "Caution" },
+  avoid: { color: "#d4503a", label: "Avoid" },
+}
+
 function cleanArea(s: string): string {
   return s.split(/[(—–-]/)[0].replace(/\bafter dark\b/i, "").trim() || s.trim()
+}
+
+function avoidReason(s: string): string {
+  const paren = s.match(/\(([^)]+)\)/)
+  if (paren) return paren[1].trim().replace(/^\w/, (c) => c.toUpperCase())
+  const parts = s.split(/\s[—–-]\s/)
+  if (parts.length > 1) return parts.slice(1).join(" ").trim()
+  return "Flagged to avoid by local intelligence."
 }
 
 function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
@@ -33,17 +47,26 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
 export default function MapPage() {
   const { bundle, intel, status } = useReport()
   const geo = bundle?.geo ?? null
-  const [areaPts, setAreaPts] = useState<MapMarker[]>([])
+  const [zones, setZones] = useState<MapZonePoint[]>([])
+  const [selected, setSelected] = useState<string | null>(null)
 
-  // Geocode the AI-named safe / avoid areas so we can drop markers.
+  // Build the zone list from the AI's mapZones (preferred) or, for older cached
+  // reports, fall back to the safe / avoid area lists.
+  const rawZones = useMemo(() => {
+    if (!intel) return []
+    if (intel.mapZones?.length) {
+      return intel.mapZones.map((z) => ({ name: cleanArea(z.name), level: z.level, note: z.note }))
+    }
+    return [
+      ...(intel.safeAreas ?? []).map((a) => ({ name: cleanArea(a), level: "safe" as ZoneLevel, note: "Considered safer for visitors." })),
+      ...(intel.avoidAreas ?? []).map((a) => ({ name: cleanArea(a), level: "avoid" as ZoneLevel, note: avoidReason(a) })),
+    ]
+  }, [intel])
+
+  // Geocode the zones so we can plot them.
   useEffect(() => {
-    if (!geo || !intel) return
-    const items = [
-      ...(intel.safeAreas ?? []).map((a) => ({ name: cleanArea(a), kind: "safe" as const })),
-      ...(intel.avoidAreas ?? []).map((a) => ({ name: cleanArea(a), kind: "avoid" as const })),
-    ].filter((it) => it.name.length > 1)
-    if (!items.length) return
-
+    if (!geo || !rawZones.length) return
+    const items = rawZones.filter((z) => z.name.length > 1).slice(0, 12)
     let cancelled = false
     ;(async () => {
       const queries = items.map((it) => `${it.name}, ${geo.city}, ${geo.country}`)
@@ -55,28 +78,22 @@ export default function MapPage() {
         .then((r) => r.json())
         .catch(() => null)
       if (cancelled || !res?.results) return
-      const pts: MapMarker[] = []
-      res.results.forEach(
-        (r: { lat: number | null; lon: number | null }, i: number) => {
-          // Only keep sensible geocodes (within ~70 km of the city centre).
-          if (r.lat != null && r.lon != null && haversineKm(r.lat, r.lon, geo.lat, geo.lon) < 70) {
-            pts.push({ lat: r.lat, lon: r.lon, label: items[i].name, kind: items[i].kind })
-          }
+      const pts: MapZonePoint[] = []
+      res.results.forEach((r: { lat: number | null; lon: number | null }, i: number) => {
+        if (r.lat != null && r.lon != null && haversineKm(r.lat, r.lon, geo.lat, geo.lon) < 70) {
+          pts.push({ lat: r.lat, lon: r.lon, ...items[i] })
         }
-      )
-      setAreaPts(pts)
+      })
+      setZones(pts)
     })()
     return () => {
       cancelled = true
     }
-  }, [geo, intel])
+  }, [geo, rawZones])
 
-  const markers = useMemo<MapMarker[]>(() => {
-    if (!geo) return []
-    return [{ lat: geo.lat, lon: geo.lon, label: geo.city, kind: "city" }, ...areaPts]
-  }, [geo, areaPts])
+  const center = useMemo<[number, number]>(() => (geo ? [geo.lat, geo.lon] : [0, 0]), [geo])
+  const activeZone = zones.find((z) => z.name === selected) ?? null
 
-  // No report yet (e.g. hard refresh) — send them to search.
   if (!geo) {
     return (
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-6 sm:px-6">
@@ -100,99 +117,134 @@ export default function MapPage() {
   const tips = intel?.tips ?? []
 
   return (
-    <main className="relative z-10 mx-auto max-w-5xl px-4 py-6 sm:px-6">
+    <main className="relative z-10 mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <TopNav active="map" />
 
-      <div className="mx-auto max-w-[1000px]">
-        <header className="mb-4 flex items-end justify-between gap-3">
-          <div>
-            <p className="eyebrow">Safety Map</p>
-            <h1 className="font-display text-[1.8rem] font-medium leading-none tracking-tight text-[var(--ink)]">
-              {geo.city} {bundle?.country?.flag}
-            </h1>
-            <p className="mt-1.5 flex items-center gap-1.5 text-[0.8rem] text-[var(--ink-soft)]">
-              <MapPin size={12} /> {geo.country}
+      <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="eyebrow">Safety Map</p>
+          <h1 className="font-display text-[1.8rem] font-medium leading-none tracking-tight text-[var(--ink)]">
+            {geo.city} {bundle?.country?.flag}
+          </h1>
+          <p className="mt-1.5 flex items-center gap-1.5 text-[0.8rem] text-[var(--ink-soft)]">
+            <MapPin size={12} /> {geo.country}
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-[0.72rem] font-medium text-[var(--ink-soft)]">
+          <span className="flex items-center gap-1"><Dot c="#1f74cf" /> City</span>
+          {(["safe", "caution", "avoid"] as ZoneLevel[]).map((l) => (
+            <span key={l} className="flex items-center gap-1"><Dot c={ZONE_META[l].color} /> {ZONE_META[l].label}</span>
+          ))}
+        </div>
+      </header>
+
+      {/* split: map | panels */}
+      <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
+        <div className="card overflow-hidden" style={{ minHeight: 460 }}>
+          <CityMap center={center} city={geo.city} zones={zones} selected={selected} onSelect={(z) => setSelected(z.name)} />
+        </div>
+
+        <div className="space-y-4">
+          {/* selected zone detail — updates on click */}
+          <div className="card p-5">
+            <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
+              <MousePointerClick size={13} /> Area detail
             </p>
-          </div>
-          <div className="flex items-center gap-3 text-[0.72rem] font-medium text-[var(--ink-soft)]">
-            <span className="flex items-center gap-1"><Dot c="#1f74cf" /> City</span>
-            <span className="flex items-center gap-1"><Dot c="#2f9e6f" /> Safer</span>
-            <span className="flex items-center gap-1"><Dot c="#d4503a" /> Avoid</span>
-          </div>
-        </header>
-
-        <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-          {/* map */}
-          <div className="card overflow-hidden" style={{ minHeight: 440 }}>
-            <CityMap center={[geo.lat, geo.lon]} markers={markers} />
-          </div>
-
-          {/* panels */}
-          <div className="space-y-4">
-            {/* consumer sentiment */}
-            <div className="card p-5">
-              <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
-                <Smile size={13} /> Consumer sentiment
-                <InfoTip text="How safe visitors report actually feeling day-to-day, gathered from recent traveller reports and reviews." align="left" color="var(--ink-faint)" />
+            {activeZone ? (
+              <>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="font-display text-[1.15rem] font-medium text-[var(--ink)]">{activeZone.name}</span>
+                  <span className="rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.1em]" style={{ color: ZONE_META[activeZone.level].color, background: `color-mix(in oklab, ${ZONE_META[activeZone.level].color} 16%, transparent)` }}>
+                    {ZONE_META[activeZone.level].label}
+                  </span>
+                </div>
+                <p className="mt-2 text-[0.84rem] leading-relaxed text-[var(--ink-soft)]">{activeZone.note}</p>
+              </>
+            ) : (
+              <p className="mt-2 text-[0.82rem] italic text-[var(--ink-faint)]">
+                {zones.length ? "Click a coloured zone on the map for details." : intel ? "No mappable districts for this place." : "Locating districts…"}
               </p>
-              {sentiment ? (
-                <>
-                  <div className="mt-2 flex items-end gap-2">
-                    <span className="tnum font-display text-[2rem] font-medium leading-none" style={{ color: scoreColor(sentiment.score) }}>
-                      {sentiment.score}
-                    </span>
-                    <span className="mb-1 text-[0.72rem] text-[var(--ink-faint)]">/100 · {sentiment.label}</span>
-                  </div>
-                  <div className="mt-2 h-[6px] w-full overflow-hidden rounded-full" style={{ background: "rgba(20,25,34,0.08)" }}>
-                    <div className="h-full rounded-full" style={{ width: `${sentiment.score}%`, background: scoreColor(sentiment.score) }} />
-                  </div>
-                  <p className="mt-2.5 text-[0.82rem] leading-relaxed text-[var(--ink-soft)]">{sentiment.summary}</p>
-                </>
-              ) : (
-                <p className="mt-2 text-[0.82rem] italic text-[var(--ink-faint)]">
-                  {intel ? "No sentiment read available for this place." : "Gathering traveller sentiment…"}
-                </p>
-              )}
-            </div>
-
-            {/* things to watch out for */}
-            <div className="card p-5">
-              <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
-                <Eye size={13} /> Watch out for
-              </p>
-              {watch.length ? (
-                <ul className="mt-2.5 space-y-2">
-                  {watch.slice(0, 6).map((w) => (
-                    <li key={w} className="flex items-start gap-2 text-[0.84rem] leading-relaxed text-[var(--ink-soft)]">
-                      <CircleAlert size={13} className="mt-[3px] shrink-0" style={{ color: "var(--caution)" }} />
-                      {w}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-[0.82rem] italic text-[var(--ink-faint)]">
-                  {intel ? "Nothing notable flagged right now." : "Researching current hazards…"}
-                </p>
-              )}
-            </div>
-
-            {/* tips */}
-            {!!tips.length && (
-              <div className="card p-5">
-                <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
-                  <Lightbulb size={13} /> Safety tips
-                </p>
-                <ul className="mt-2.5 space-y-2">
-                  {tips.slice(0, 6).map((t) => (
-                    <li key={t} className="flex items-start gap-2 text-[0.84rem] leading-relaxed text-[var(--ink-soft)]">
-                      <CircleCheck size={13} className="mt-[3px] shrink-0" style={{ color: "var(--safe)" }} />
-                      {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             )}
           </div>
+
+          {/* zone list */}
+          {!!zones.length && (
+            <div className="card p-5">
+              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">Districts ({zones.length})</p>
+              <div className="mt-2.5 space-y-1">
+                {zones.map((z) => (
+                  <button
+                    key={z.name}
+                    onClick={() => setSelected(z.name)}
+                    className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left transition-colors hover:bg-[var(--paper)]"
+                    style={selected === z.name ? { background: "var(--paper)" } : undefined}
+                  >
+                    <Dot c={ZONE_META[z.level].color} />
+                    <span className="flex-1 truncate text-[0.82rem] text-[var(--ink)]">{z.name}</span>
+                    <span className="text-[0.62rem] font-semibold uppercase tracking-[0.08em]" style={{ color: ZONE_META[z.level].color }}>{ZONE_META[z.level].label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* consumer sentiment */}
+          <div className="card p-5">
+            <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
+              <Smile size={13} /> Consumer sentiment
+              <InfoTip text="How safe visitors report actually feeling day-to-day, gathered from recent traveller reports and reviews." align="left" color="var(--ink-faint)" />
+            </p>
+            {sentiment ? (
+              <>
+                <div className="mt-2 flex items-end gap-2">
+                  <span className="tnum font-display text-[2rem] font-medium leading-none" style={{ color: scoreColor(sentiment.score) }}>{sentiment.score}</span>
+                  <span className="mb-1 text-[0.72rem] text-[var(--ink-faint)]">/100 · {sentiment.label}</span>
+                </div>
+                <div className="mt-2 h-[6px] w-full overflow-hidden rounded-full" style={{ background: "rgba(20,25,34,0.08)" }}>
+                  <div className="h-full rounded-full" style={{ width: `${sentiment.score}%`, background: scoreColor(sentiment.score) }} />
+                </div>
+                <p className="mt-2.5 text-[0.82rem] leading-relaxed text-[var(--ink-soft)]">{sentiment.summary}</p>
+              </>
+            ) : (
+              <p className="mt-2 text-[0.82rem] italic text-[var(--ink-faint)]">{intel ? "No sentiment read available." : "Gathering traveller sentiment…"}</p>
+            )}
+          </div>
+
+          {/* watch out for */}
+          <div className="card p-5">
+            <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
+              <Eye size={13} /> Watch out for
+            </p>
+            {watch.length ? (
+              <ul className="mt-2.5 space-y-2">
+                {watch.slice(0, 6).map((w) => (
+                  <li key={w} className="flex items-start gap-2 text-[0.84rem] leading-relaxed text-[var(--ink-soft)]">
+                    <CircleAlert size={13} className="mt-[3px] shrink-0" style={{ color: "var(--caution)" }} />
+                    {w}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-[0.82rem] italic text-[var(--ink-faint)]">{intel ? "Nothing notable flagged." : "Researching current hazards…"}</p>
+            )}
+          </div>
+
+          {/* tips */}
+          {!!tips.length && (
+            <div className="card p-5">
+              <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
+                <Lightbulb size={13} /> Safety tips
+              </p>
+              <ul className="mt-2.5 space-y-2">
+                {tips.slice(0, 6).map((t) => (
+                  <li key={t} className="flex items-start gap-2 text-[0.84rem] leading-relaxed text-[var(--ink-soft)]">
+                    <CircleCheck size={13} className="mt-[3px] shrink-0" style={{ color: "var(--safe)" }} />
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </main>

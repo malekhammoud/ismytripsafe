@@ -259,6 +259,14 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
   const homicideCmp = safety.comparisons.find((c) => /homicide/i.test(c.metric))
   const levelCfg = LEVELS[safety.level]
   const indexTone = toneForScore(safety.index)
+  // The "on the ground" block reflects how safe it actually is right now — the
+  // AI's current-sentiment read if present, otherwise the overall rating — so a
+  // "not safe right now" verdict never sits on a green panel.
+  const intelTone: Tone = intel?.consumerSentiment
+    ? toneForScore(intel.consumerSentiment.score)
+    : indexTone
+  const it = TONES[intelTone]
+  const toneWord: Record<Tone, string> = { safe: "Stable", moderate: "Moderate", caution: "Caution", risky: "Elevated" }
   const streaming = loading && prose.length > 0
 
   return (
@@ -436,12 +444,12 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
 
       {/* on the ground (AI) */}
       <Block
-        tone="safe"
+        tone={intelTone}
         eyebrow="06 · On the Ground"
         title="Local Intelligence"
         icon={<Newspaper size={13} strokeWidth={2.4} />}
-        statusWord={intel ? "Live research" : "Researching…"}
-        info="Synthesised by an AI analyst from live web search — current incidents, neighbourhood detail, scams and practical advice that databases can't capture."
+        statusWord={intel ? toneWord[intelTone] : "Researching…"}
+        info="Synthesised by an AI analyst from live web search — current incidents, neighbourhood detail, scams and practical advice that databases can't capture. This panel's colour reflects how safe it is on the ground right now."
         delay={480}
       >
         {intel ? (
@@ -471,8 +479,8 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
             {!!(intel.watchOuts?.length || intel.tips?.length) && (
               <ul className="mt-5 space-y-2">
                 {(intel.watchOuts?.length ? intel.watchOuts : intel.tips).slice(0, 5).map((n) => (
-                  <li key={n} className="flex items-start gap-2.5 text-[0.84rem] leading-relaxed" style={{ color: `${INK}cc`, borderTop: `1px solid ${TONES.safe.deep}22`, paddingTop: "0.55rem" }}>
-                    <ArrowUpRight size={13} strokeWidth={2.2} className="mt-[3px] shrink-0" style={{ color: TONES.safe.strong }} />
+                  <li key={n} className="flex items-start gap-2.5 text-[0.84rem] leading-relaxed" style={{ color: `${INK}cc`, borderTop: `1px solid ${it.deep}22`, paddingTop: "0.55rem" }}>
+                    <ArrowUpRight size={13} strokeWidth={2.2} className="mt-[3px] shrink-0" style={{ color: it.strong }} />
                     {n}
                   </li>
                 ))}
@@ -485,8 +493,8 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
 
         {/* streaming prose briefing */}
         {prose && (
-          <div className="mt-6 border-t pt-5" style={{ borderColor: `${TONES.safe.deep}22` }}>
-            <p className="mb-2 text-[0.64rem] font-semibold uppercase tracking-[0.14em]" style={{ color: `${TONES.safe.deep}bb` }}>Full briefing</p>
+          <div className="mt-6 border-t pt-5" style={{ borderColor: `${it.deep}22` }}>
+            <p className="mb-2 text-[0.64rem] font-semibold uppercase tracking-[0.14em]" style={{ color: `${it.deep}bb` }}>Full briefing</p>
             <div className={`prose-brief ${streaming ? "typing" : ""}`} style={{ fontSize: "0.9rem" }} dangerouslySetInnerHTML={{ __html: formatProse(prose) }} />
           </div>
         )}

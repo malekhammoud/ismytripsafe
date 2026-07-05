@@ -24,11 +24,14 @@ START_SAFETY
   "robbery": { "level": "Low|Moderate|High|Severe", "note": "one line on mugging/armed-robbery risk to visitors and where it happens" },
   "pickpocket": { "level": "Low|Moderate|High|Severe", "note": "one line on pickpocketing/bag-snatching risk and the hotspots" },
   "consumerSentiment": { "score": 0-100, "label": "short label e.g. 'Mostly positive'", "summary": "1-2 sentences on how safe visitors report feeling day-to-day, from recent traveller reports" },
-  "watchOuts": ["specific thing to watch out for in this city right now (incl. any seasonal weather hazard)", "another", "another"]
+  "watchOuts": ["specific thing to watch out for in this city right now (incl. any seasonal weather hazard)", "another", "another"],
+  "mapZones": [
+    { "name": "specific real district/neighbourhood name", "level": "safe|caution|avoid", "note": "one line: why it's this level for a visitor" }
+  ]
 }
 END_SAFETY
 
-For "level" use exactly one of: Low, Moderate, High, Severe. For "score" use a number 0-100. Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what you found), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.`
+For "level" use exactly one of: Low, Moderate, High, Severe. For "score" use a number 0-100. For "mapZones" list 5-8 REAL, individually named districts/neighbourhoods of this specific city (not the whole country) that can be found on a map, each rated "safe" (green), "caution" (yellow — okay but stay alert / avoid after dark) or "avoid" (red). Include a mix of levels where the city warrants it. Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what you found), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.`
 
 function buildPrompt(geo: GeoPoint, bundle: SafetyBundle): string {
   const s = bundle.safety

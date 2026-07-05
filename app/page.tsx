@@ -79,7 +79,9 @@ export default function Home() {
           <p className="mt-1 text-sm text-[var(--ink-soft)]">{error}</p>
           <button onClick={reset} className="btn mt-4 px-5 py-2.5 text-sm">Try again</button>
         </div>
-      ) : loading && !bundle ? (
+      ) : loading && !intel ? (
+        // Hold the whole report — including the Rating — until the local
+        // intelligence research is in, so nothing contradicts a late verdict.
         <div className="mx-auto max-w-[640px]">
           <AssessmentProgress
             geo={geo}
@@ -87,6 +89,7 @@ export default function Home() {
             hasIntel={!!intel}
             proseLength={prose.length}
             searchQueries={queries}
+            flag={bundle?.country?.flag}
           />
         </div>
       ) : bundle ? (
