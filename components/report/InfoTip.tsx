@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useLayoutEffect } from "react"
+import type { ReactNode, RefObject, MouseEvent as ReactMouseEvent } from "react"
 import { createPortal } from "react-dom"
 import { Info } from "lucide-react"
 
@@ -15,12 +16,15 @@ export function InfoTip({
   text,
   label = "What this means",
   color = "#141922",
+  children,
 }: {
   text: string
   label?: string
   color?: string
   /** deprecated — positioning is now automatic/viewport-clamped */
   align?: "left" | "center" | "right"
+  /** custom hover trigger (e.g. a colour pill) instead of the default "i" icon */
+  children?: ReactNode
 }) {
   const [visible, setVisible] = useState(false)
   const [pinned, setPinned] = useState(false)
@@ -28,7 +32,7 @@ export function InfoTip({
   const [ready, setReady] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  const btnRef = useRef<HTMLButtonElement>(null)
+  const btnRef = useRef<HTMLElement | null>(null)
   const tipRef = useRef<HTMLDivElement>(null)
   const rectRef = useRef<DOMRect | null>(null)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -93,31 +97,48 @@ export function InfoTip({
     }
   }, [pinned])
 
+  const onClick = (e: ReactMouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    if (pinned) {
+      setPinned(false)
+      setVisible(false)
+      setReady(false)
+    } else {
+      setPinned(true)
+      show()
+    }
+  }
+
   return (
     <>
-      <button
-        ref={btnRef}
-        type="button"
-        aria-label={label}
-        onMouseEnter={show}
-        onMouseLeave={scheduleHide}
-        onClick={(e) => {
-          e.stopPropagation()
-          e.preventDefault()
-          if (pinned) {
-            setPinned(false)
-            setVisible(false)
-            setReady(false)
-          } else {
-            setPinned(true)
-            show()
-          }
-        }}
-        className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full align-middle opacity-55 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none"
-        style={{ color }}
-      >
-        <Info size={12} strokeWidth={2.4} />
-      </button>
+      {children ? (
+        <span
+          ref={btnRef as RefObject<HTMLSpanElement>}
+          role="button"
+          tabIndex={0}
+          aria-label={label}
+          onMouseEnter={show}
+          onMouseLeave={scheduleHide}
+          onClick={onClick}
+          className="cursor-help"
+        >
+          {children}
+        </span>
+      ) : (
+        <button
+          ref={btnRef as RefObject<HTMLButtonElement>}
+          type="button"
+          aria-label={label}
+          onMouseEnter={show}
+          onMouseLeave={scheduleHide}
+          onClick={onClick}
+          className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full align-middle opacity-55 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none"
+          style={{ color }}
+        >
+          <Info size={12} strokeWidth={2.4} />
+        </button>
+      )}
 
       {mounted &&
         visible &&

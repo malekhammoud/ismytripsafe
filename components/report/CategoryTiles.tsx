@@ -22,6 +22,15 @@ const EXPLAIN: Record<CategoryKey, string> = {
     "World Bank governance basket — political stability, rule of law, control of corruption, government effectiveness, regulatory quality and voice. Higher = stronger institutions.",
 }
 
+// What each colour band on the tile actually means — shown on hovering the pill.
+const LEVEL_EXPLAIN: Record<string, string> = {
+  Good: "Score 70–100 — low risk, normal precautions apply",
+  Fair: "Score 55–69 — mostly fine, stay reasonably alert",
+  Caution: "Score 40–54 — meaningful risk, extra care advised",
+  Elevated: "Score 0–39 — high risk, serious caution needed",
+  "No data": "Not enough data available for this category",
+}
+
 /**
  * The four headline scores at the top of the report. Clicking a tile smooth-
  * scrolls to that category's detail section (id `sec-<key>`).
@@ -71,11 +80,15 @@ export function CategoryTiles({ categories }: { categories: CategoryScore[] }) {
               </span>
             )}
           </div>
-          <span
-            className="rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.1em]"
-            style={{ color: c.color, background: `color-mix(in oklab, ${c.color} 16%, transparent)` }}
-          >
-            {c.levelName}
+          <span onClick={(e) => e.stopPropagation()}>
+            <InfoTip text={LEVEL_EXPLAIN[c.levelName] ?? c.levelName} label={`What "${c.levelName}" means`}>
+              <span
+                className="inline-block rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.1em]"
+                style={{ color: c.color, background: `color-mix(in oklab, ${c.color} 16%, transparent)` }}
+              >
+                {c.levelName}
+              </span>
+            </InfoTip>
           </span>
           <span className="mt-0.5 line-clamp-1 text-[0.66rem]" style={{ color: "var(--ink-faint)" }}>
             {c.note}
