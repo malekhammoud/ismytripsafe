@@ -133,10 +133,29 @@ export default function MapPage() {
           </p>
         </div>
         <div className="flex items-center gap-3 text-[0.72rem] font-medium text-[var(--ink-soft)]">
-          <span className="flex items-center gap-1"><Dot c="#1f74cf" /> City</span>
-          {(["safe", "caution", "avoid"] as ZoneLevel[]).map((l) => (
-            <span key={l} className="flex items-center gap-1"><Dot c={ZONE_META[l].color} /> {ZONE_META[l].label}</span>
-          ))}
+          <span className="flex items-center gap-1 group relative cursor-help">
+            <Dot c="#1f74cf" />
+            City
+            <div className="pointer-events-none absolute bottom-full left-0 mb-2 hidden rounded-[6px] bg-[var(--ink)] px-2.5 py-1.5 text-[0.68rem] font-normal text-white whitespace-nowrap group-hover:block" style={{ zIndex: 1000 }}>
+              Destination centre
+            </div>
+          </span>
+          {(["safe", "caution", "avoid"] as ZoneLevel[]).map((l) => {
+            const tooltips: Record<ZoneLevel, string> = {
+              safe: "Generally safer; low reported crime & good services",
+              caution: "Elevated precautions advised; some risk present",
+              avoid: "High-risk areas; not recommended for visitors",
+            }
+            return (
+              <span key={l} className="flex items-center gap-1 group relative cursor-help">
+                <Dot c={ZONE_META[l].color} />
+                {ZONE_META[l].label}
+                <div className="pointer-events-none absolute bottom-full left-0 mb-2 hidden rounded-[6px] bg-[var(--ink)] px-2.5 py-1.5 text-[0.68rem] font-normal text-white whitespace-nowrap group-hover:block" style={{ zIndex: 1000 }}>
+                  {tooltips[l]}
+                </div>
+              </span>
+            )
+          })}
         </div>
       </header>
 
@@ -174,18 +193,30 @@ export default function MapPage() {
             <div className="card p-5">
               <p className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">Districts ({zones.length})</p>
               <div className="mt-2.5 space-y-1">
-                {zones.map((z) => (
-                  <button
-                    key={z.name}
-                    onClick={() => setSelected(z.name)}
-                    className="flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left transition-colors hover:bg-[var(--paper)]"
-                    style={selected === z.name ? { background: "var(--paper)" } : undefined}
-                  >
-                    <Dot c={ZONE_META[z.level].color} />
-                    <span className="flex-1 truncate text-[0.82rem] text-[var(--ink)]">{z.name}</span>
-                    <span className="text-[0.62rem] font-semibold uppercase tracking-[0.08em]" style={{ color: ZONE_META[z.level].color }}>{ZONE_META[z.level].label}</span>
-                  </button>
-                ))}
+                {zones.map((z) => {
+                  const levelTooltips: Record<ZoneLevel, string> = {
+                    safe: "Generally safer; low reported crime & good services",
+                    caution: "Elevated precautions advised; some risk present",
+                    avoid: "High-risk areas; not recommended for visitors",
+                  }
+                  return (
+                    <button
+                      key={z.name}
+                      onClick={() => setSelected(z.name)}
+                      className="group relative flex w-full items-center gap-2 rounded-[6px] px-2 py-1.5 text-left transition-colors hover:bg-[var(--paper)]"
+                      style={selected === z.name ? { background: "var(--paper)" } : undefined}
+                    >
+                      <div className="relative cursor-help">
+                        <Dot c={ZONE_META[z.level].color} />
+                        <div className="pointer-events-none absolute bottom-full left-1/2 mb-2 hidden -translate-x-1/2 rounded-[6px] bg-[var(--ink)] px-2.5 py-1.5 text-[0.65rem] font-normal text-white whitespace-nowrap group-hover:block" style={{ zIndex: 1000 }}>
+                          {levelTooltips[z.level]}
+                        </div>
+                      </div>
+                      <span className="flex-1 truncate text-[0.82rem] text-[var(--ink)]">{z.name}</span>
+                      <span className="text-[0.62rem] font-semibold uppercase tracking-[0.08em]" style={{ color: ZONE_META[z.level].color }}>{ZONE_META[z.level].label}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
