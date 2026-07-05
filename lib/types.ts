@@ -152,6 +152,7 @@ export interface SafetyBundle {
 export interface SafetyQuery {
   place: string
   placeGeo?: GeoPoint | null
+  refresh?: boolean // bypass the cache and regenerate
 }
 
 export type StreamEvent =
@@ -161,5 +162,5 @@ export type StreamEvent =
   | { type: "enrichment"; data: SafetyEnrichment }
   | { type: "text"; content: string }
   | { type: "searching"; query: string }
-  | { type: "done" }
+  | { type: "done"; cached?: boolean; cachedAt?: string }
   | { type: "error"; message: string }

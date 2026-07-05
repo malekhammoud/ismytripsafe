@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ShieldCheck, Map as MapIcon, FileText } from "lucide-react"
+import { ArrowLeft, ShieldCheck, Map as MapIcon, FileText, Zap } from "lucide-react"
 import { useReport } from "@/lib/store"
 
 /** Shared header for the report and map pages: reset + Report/Map tabs. */
@@ -10,6 +10,7 @@ export function TopNav({ active }: { active: "report" | "map" }) {
   const router = useRouter()
   const reset = useReport((s) => s.reset)
   const generatedAt = useReport((s) => s.generatedAt)
+  const cached = useReport((s) => s.cached)
 
   const tab = (href: string, label: string, icon: React.ReactNode, on: boolean) => (
     <Link
@@ -48,8 +49,9 @@ export function TopNav({ active }: { active: "report" | "map" }) {
           <ShieldCheck size={14} style={{ color: "var(--accent)" }} />
           Is It Safe<span style={{ color: "var(--accent)" }}>?</span>
         </div>
-        <div className="text-[0.62rem] uppercase tracking-wider text-[var(--ink-faint)]">
-          {generatedAt ? `Assessed ${generatedAt}` : "Independent assessment"}
+        <div className="flex items-center justify-end gap-1 text-[0.62rem] uppercase tracking-wider text-[var(--ink-faint)]">
+          {cached && <Zap size={9} style={{ color: "var(--accent)" }} />}
+          {generatedAt ? `${cached ? "Cached" : "Assessed"} ${generatedAt}` : "Independent assessment"}
         </div>
       </div>
     </header>
