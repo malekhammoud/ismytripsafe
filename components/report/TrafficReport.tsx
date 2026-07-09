@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type CSSProperties, type ReactNode } from "react"
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react"
 import {
   ShieldAlert,
   Landmark,
@@ -8,14 +8,11 @@ import {
   Newspaper,
   Gauge,
   MapPin,
-  ArrowUpRight,
   Wind,
   Building2,
   CloudSun,
   Siren,
   Eye,
-  CircleCheck,
-  CircleAlert,
   Search,
 } from "lucide-react"
 import type {
@@ -27,8 +24,10 @@ import type {
   Comparison,
 } from "@/lib/types"
 import { computeCategories, scoreColor, LEVELS, type CategoryKey } from "@/lib/safety-display"
+import { extractSourceLinksFromText, sourceUrlForName, sourceUrlForSearchQuery } from "@/lib/source-links"
 import { CategoryTiles } from "./CategoryTiles"
 import { InfoTip } from "./InfoTip"
+import { SourceLink } from "./SourceLink"
 
 const INK = "#141922"
 const RULE = "rgba(20, 25, 34, 0.4)"
@@ -122,6 +121,7 @@ function SignalRow({ signal, extra }: { signal: SafetySignal | undefined; extra?
   if (!signal) return null
   const has = signal.score != null
   const c = has ? scoreColor(signal.score as number) : "#8a8f98"
+  const src = sourceUrlForName(signal.source)
   return (
     <div className="py-2.5" style={{ borderTop: `1px solid rgba(20,25,34,0.1)` }}>
       <div className="flex items-baseline justify-between gap-3">
@@ -140,9 +140,10 @@ function SignalRow({ signal, extra }: { signal: SafetySignal | undefined; extra?
           {has ? signal.score : "—"}
         </span>
       </div>
-      <p className="mt-1 text-[0.66rem]" style={{ color: `${INK}88` }}>
+      <p className="mt-1 flex items-center gap-1 text-[0.66rem]" style={{ color: `${INK}88` }}>
         {signal.source}
         {signal.year ? ` · ${signal.year}` : ""}
+        {src && <SourceLink href={src} label={signal.source} color={`${INK}99`} />}
       </p>
     </div>
   )
@@ -192,13 +193,26 @@ function ContextHover({ comparison }: { comparison: Comparison | undefined }) {
 }
 
 /** Robbery / pickpocketing qualitative risk row (AI-assessed). */
-function RiskRow({ label, rating, note, loading }: { label: string; rating: RiskRating | undefined; note: string; loading: boolean }) {
+function RiskRow({
+  label,
+  rating,
+  note,
+  loading,
+  sourceHref,
+}: {
+  label: string
+  rating: RiskRating | undefined
+  note: string
+  loading: boolean
+  sourceHref?: string | null
+}) {
   return (
     <div className="py-2.5" style={{ borderTop: `1px solid rgba(20,25,34,0.1)` }}>
       <div className="flex items-baseline justify-between gap-3">
         <p className="flex items-center gap-1 text-[0.85rem] font-medium" style={{ color: INK }}>
           {label}
           <InfoTip text={note} color={INK} align="left" />
+          {sourceHref && <SourceLink href={sourceHref} label={`${label} source`} color={`${INK}99`} />}
         </p>
         {rating ? (
           <span className="shrink-0 rounded-full px-2 py-0.5 text-[0.64rem] font-bold uppercase tracking-[0.08em]" style={{ color: RISK_COLOR[rating.level], background: `color-mix(in oklab, ${RISK_COLOR[rating.level]} 16%, transparent)` }}>
@@ -211,8 +225,9 @@ function RiskRow({ label, rating, note, loading }: { label: string; rating: Risk
         )}
       </div>
       {rating?.note && (
-        <p className="mt-1 text-[0.74rem] leading-relaxed" style={{ color: `${INK}b0` }}>
+        <p className="mt-1 flex items-center gap-1 text-[0.74rem] leading-relaxed" style={{ color: `${INK}b0` }}>
           {rating.note}
+          {sourceHref && <SourceLink href={sourceHref} label={`${label} note source`} color={`${INK}99`} />}
         </p>
       )}
     </div>
@@ -221,6 +236,7 @@ function RiskRow({ label, rating, note, loading }: { label: string; rating: Risk
 
 function StatTile({ icon, k, signal }: { icon: ReactNode; k: string; signal: SafetySignal | undefined }) {
   const deep = TONES.safe.deep
+  const src = sourceUrlForName(signal?.source)
   return (
     <div className="px-3 py-3" style={{ background: TONES.safe.fill }}>
       <p className="flex items-center gap-1 text-[0.64rem] font-semibold uppercase tracking-[0.1em]" style={{ color: `${deep}bb` }}>
@@ -231,8 +247,9 @@ function StatTile({ icon, k, signal }: { icon: ReactNode; k: string; signal: Saf
       <p className="tnum mt-1.5 text-[0.98rem] font-semibold" style={{ color: INK }}>
         {signal?.display ?? "No data"}
       </p>
-      <p className="mt-0.5 text-[0.62rem]" style={{ color: `${INK}88` }}>
+      <p className="mt-0.5 flex items-center gap-1 text-[0.62rem]" style={{ color: `${INK}88` }}>
         {signal?.source ?? ""}
+        {src && <SourceLink href={src} label={`${k} source`} color={`${INK}99`} />}
       </p>
     </div>
   )
@@ -268,6 +285,9 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
   const it = TONES[intelTone]
   const toneWord: Record<Tone, string> = { safe: "Stable", moderate: "Moderate", caution: "Caution", risky: "Elevated" }
   const streaming = loading && prose.length > 0
+  const intelLinks = useMemo(() => extractSourceLinksFromText(prose), [prose])
+  const intelFallback = sourceUrlForSearchQuery(searchQueries[searchQueries.length - 1] ?? null)
+  const intelSourceHref = intelLinks[0] ?? intelFallback ?? null
 
   return (
     <div className="mx-auto max-w-[640px] overflow-hidden sm:rounded-[3px]" style={{ border: `1px solid ${RULE}`, boxShadow: "var(--shadow-float)" }}>
@@ -312,11 +332,28 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
           <p className="display-xl tnum" style={{ color: TONES[indexTone].deep, fontWeight: 560 }}>
             {safety.index}
             <span className="text-[0.34em] font-normal tracking-normal" style={{ color: `${TONES[indexTone].deep}99` }}> / 100</span>
+            {sourceUrlForName("World Bank Open Data") && (
+              <SourceLink
+                href={sourceUrlForName("World Bank Open Data")!}
+                label="composite index inputs"
+                color={`${TONES[indexTone].deep}aa`}
+                className="ml-1"
+              />
+            )}
           </p>
           <div className="pb-2 text-right">
             <p className="text-[0.95rem] font-semibold" style={{ color: INK }}>{levelCfg.answer}</p>
             {safety.saferThanPct != null && (
-              <p className="mt-0.5 text-[0.78rem]" style={{ color: `${INK}99` }}>Safer than ~{safety.saferThanPct}% of countries</p>
+              <p className="mt-0.5 flex items-center justify-end gap-1 text-[0.78rem]" style={{ color: `${INK}99` }}>
+                Safer than ~{safety.saferThanPct}% of countries
+                {sourceUrlForName("World Bank Governance Indicators") && (
+                  <SourceLink
+                    href={sourceUrlForName("World Bank Governance Indicators")!}
+                    label="safer than percentile"
+                    color={`${INK}99`}
+                  />
+                )}
+              </p>
             )}
           </div>
         </div>
@@ -345,7 +382,10 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
             {safety.advisories.map((a) => (
               <article key={a.source} className="rounded-[3px] px-4 py-3.5" style={{ background: "rgba(255,255,255,0.42)", borderLeft: `3px solid ${a.level && a.level >= 3 ? TONES.risky.strong : a.level === 2 ? TONES.caution.strong : TONES.safe.strong}` }}>
                 <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-[0.7rem] font-semibold uppercase tracking-[0.1em]" style={{ color: `${INK}99` }}>{a.source}</p>
+                  <p className="flex items-center gap-1 text-[0.7rem] font-semibold uppercase tracking-[0.1em]" style={{ color: `${INK}99` }}>
+                    {a.source}
+                    {a.url && <SourceLink href={a.url} label={a.source} color={`${INK}99`} />}
+                  </p>
                   <span className="tnum shrink-0 text-[0.7rem] font-bold uppercase tracking-[0.08em]" style={{ color: INK }}>
                     {a.level != null ? `Level ${a.level}` : a.sourceShort}
                   </span>
@@ -372,14 +412,33 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
         title="Crime"
         icon={<Siren size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "crime")?.levelName ?? ""}
-        info="Violent- and street-crime risk. The homicide rate and road-safety data are hard statistics; robbery and pickpocketing are assessed from current on-the-ground reporting."
+        info="Violent- and street-crime risk from homicide, night-safety and victimization surveys, trafficking and bribery indicators, business crime exposure, plus Numbeo crime/safety indices when available. Robbery and pickpocketing are assessed from current on-the-ground reporting."
         delay={240}
       >
         <div>
           <SignalRow signal={sig("homicide")} extra={<ContextHover comparison={homicideCmp} />} />
-          <RiskRow label="Robbery / mugging" rating={intel?.robbery} note="How likely a visitor is to face mugging or armed robbery, and where — assessed from recent local reporting." loading={loading} />
-          <RiskRow label="Pickpocketing" rating={intel?.pickpocket} note="Risk of pickpocketing and bag-snatching, and the usual hotspots (transit, markets, tourist crowds)." loading={loading} />
-          <SignalRow signal={sig("road")} />
+          <SignalRow signal={sig("safe_walking_dark")} />
+          <SignalRow signal={sig("violence_victimization")} />
+          <SignalRow signal={sig("human_trafficking_victims")} />
+          <SignalRow signal={sig("bribery_contact_rate")} />
+          <SignalRow signal={sig("numbeo_crime_index")} />
+          <SignalRow signal={sig("numbeo_safety_index")} />
+          <SignalRow signal={sig("firm_crime_losses")} />
+          <SignalRow signal={sig("crime_major_constraint")} />
+          <RiskRow
+            label="Robbery / mugging"
+            rating={intel?.robbery}
+            note="How likely a visitor is to face mugging or armed robbery, and where — assessed from recent local reporting."
+            loading={loading}
+            sourceHref={intelSourceHref}
+          />
+          <RiskRow
+            label="Pickpocketing"
+            rating={intel?.pickpocket}
+            note="Risk of pickpocketing and bag-snatching, and the usual hotspots (transit, markets, tourist crowds)."
+            loading={loading}
+            sourceHref={intelSourceHref}
+          />
         </div>
       </Block>
 
@@ -411,7 +470,10 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
                   <span className="shrink-0 rounded-sm px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.1em]" style={{ background: n.level >= 2 ? `${TONES.caution.strong}2b` : `${TONES.safe.strong}26`, color: n.level >= 2 ? TONES.caution.deep : TONES.safe.deep }}>
                     {n.levelLabel}
                   </span>
-                  <p className="text-[0.82rem]" style={{ color: INK }}>{n.title}{n.scope === "global" ? " (worldwide)" : ""}</p>
+                  <p className="flex items-center gap-1 text-[0.82rem]" style={{ color: INK }}>
+                    {n.title}{n.scope === "global" ? " (worldwide)" : ""}
+                    <SourceLink href={n.url} label={n.title} color={`${INK}99`} />
+                  </p>
                 </div>
               ))}
             </div>
@@ -444,6 +506,7 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
 
       {/* on the ground (AI) */}
       <Block
+        id="sec-local-intel"
         tone={intelTone}
         eyebrow="06 · On the Ground"
         title="Local Intelligence"
@@ -454,37 +517,31 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
       >
         {intel ? (
           <>
-            <p className="font-display text-[1.02rem] leading-[1.6]" style={{ color: INK }}>{intel.verdict}</p>
-            {intel.summary && <p className="mt-2 text-[0.86rem] leading-relaxed" style={{ color: `${INK}c8` }}>{intel.summary}</p>}
+            <p className="font-display flex items-center gap-1 text-[1.02rem] leading-[1.6]" style={{ color: INK }}>
+              {intel.verdict}
+              {intelSourceHref && <SourceLink href={intelSourceHref} label="local intelligence" color={`${INK}99`} />}
+            </p>
+            {intel.summary && (
+              <p className="mt-2 flex items-center gap-1 text-[0.86rem] leading-relaxed" style={{ color: `${INK}c8` }}>
+                {intel.summary}
+                {intelSourceHref && <SourceLink href={intelSourceHref} label="local intelligence summary" color={`${INK}99`} />}
+              </p>
+            )}
 
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              {!!intel.safeAreas?.length && (
-                <div className="rounded-[3px] px-4 py-3" style={{ background: "rgba(255,255,255,0.45)" }}>
-                  <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.12em]" style={{ color: TONES.safe.deep }}>
-                    <CircleCheck size={12} strokeWidth={2.4} /> Stay around
-                  </p>
-                  <p className="mt-1.5 text-[0.84rem] leading-relaxed" style={{ color: INK }}>{intel.safeAreas.join(" · ")}</p>
-                </div>
-              )}
-              {!!intel.avoidAreas?.length && (
-                <div className="rounded-[3px] px-4 py-3" style={{ background: "rgba(255,255,255,0.45)" }}>
-                  <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.12em]" style={{ color: TONES.risky.deep }}>
-                    <CircleAlert size={12} strokeWidth={2.4} /> Avoid
-                  </p>
-                  <p className="mt-1.5 text-[0.84rem] leading-relaxed" style={{ color: INK }}>{intel.avoidAreas.join(" · ")}</p>
-                </div>
-              )}
-            </div>
-
-            {!!(intel.watchOuts?.length || intel.tips?.length) && (
-              <ul className="mt-5 space-y-2">
-                {(intel.watchOuts?.length ? intel.watchOuts : intel.tips).slice(0, 5).map((n) => (
-                  <li key={n} className="flex items-start gap-2.5 text-[0.84rem] leading-relaxed" style={{ color: `${INK}cc`, borderTop: `1px solid ${it.deep}22`, paddingTop: "0.55rem" }}>
-                    <ArrowUpRight size={13} strokeWidth={2.2} className="mt-[3px] shrink-0" style={{ color: it.strong }} />
-                    {n}
-                  </li>
-                ))}
-              </ul>
+            {!!intel.scams?.length && (
+              <div className="mt-5 rounded-[3px] px-4 py-3" style={{ background: "rgba(255,255,255,0.45)" }}>
+                <p className="text-[0.66rem] font-semibold uppercase tracking-[0.12em]" style={{ color: TONES.caution.deep }}>
+                  Common scams
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {intel.scams.slice(0, 5).map((scam) => (
+                    <li key={scam} className="flex items-start gap-1 text-[0.84rem] leading-relaxed" style={{ color: INK }}>
+                      {scam}
+                      {intelSourceHref && <SourceLink href={intelSourceHref} label="scam insight" color={`${INK}99`} className="mt-[3px] shrink-0" />}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </>
         ) : (
@@ -493,9 +550,17 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
 
         {/* streaming prose briefing */}
         {prose && (
-          <div className="mt-6 border-t pt-5" style={{ borderColor: `${it.deep}22` }}>
+          <div id="sec-local-intel-sources" className="mt-6 border-t pt-5" style={{ borderColor: `${it.deep}22` }}>
             <p className="mb-2 text-[0.64rem] font-semibold uppercase tracking-[0.14em]" style={{ color: `${it.deep}bb` }}>Full briefing</p>
             <div className={`prose-brief ${streaming ? "typing" : ""}`} style={{ fontSize: "0.9rem" }} dangerouslySetInnerHTML={{ __html: formatProse(prose) }} />
+            {!!intelLinks.length && (
+              <div className="mt-3 flex items-center gap-1.5">
+                <p className="text-[0.64rem] font-semibold uppercase tracking-[0.12em]" style={{ color: `${it.deep}a8` }}>Sources</p>
+                {intelLinks.slice(0, 8).map((url) => (
+                  <SourceLink key={url} href={url} label="briefing source" color={`${it.deep}bb`} />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </Block>
@@ -509,6 +574,14 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
         <p className="mt-3 text-[0.66rem] leading-relaxed" style={{ color: "rgba(238,242,248,0.4)" }}>
           Sources: U.S. State Dept · UK FCDO · World Bank · WGI · OpenStreetMap · Open-Meteo · CDC. Composite index recomputed at request time.
         </p>
+        <div className="mt-2 flex items-center gap-1.5 text-[0.64rem]" style={{ color: "rgba(238,242,248,0.55)" }}>
+          <span>Links:</span>
+          {safety.sources.map((s) => {
+            const href = sourceUrlForName(s.name)
+            if (!href) return null
+            return <SourceLink key={s.name} href={href} label={s.name} color="rgba(238,242,248,0.72)" />
+          })}
+        </div>
       </footer>
     </div>
   )

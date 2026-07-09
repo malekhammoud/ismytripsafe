@@ -112,9 +112,11 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
       : adv.display
     : "No advisory issued"
 
-  const crimeNote = byKey.get("homicide")?.value != null
-    ? `Homicide ${byKey.get("homicide")!.display}`
-    : "Street & violent crime"
+  const crimeNote = byKey.get("numbeo_crime_index")?.value != null
+    ? `Crime index ${byKey.get("numbeo_crime_index")!.display}`
+    : byKey.get("homicide")?.value != null
+      ? `Homicide ${byKey.get("homicide")!.display}`
+      : "Street & violent crime"
   const healthNote = byKey.get("air_quality")?.value != null
     ? byKey.get("air_quality")!.display
     : "Air, disease & care"
@@ -133,11 +135,28 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
       key: "crime",
       label: "Crime",
       score: weightedMean([
-        ["homicide", 0.7],
-        ["road", 0.3],
+        ["homicide", 0.28],
+        ["safe_walking_dark", 0.18],
+        ["violence_victimization", 0.14],
+        ["numbeo_crime_index", 0.12],
+        ["numbeo_safety_index", 0.12],
+        ["human_trafficking_victims", 0.08],
+        ["bribery_contact_rate", 0.05],
+        ["firm_crime_losses", 0.02],
+        ["crime_major_constraint", 0.01],
       ]),
       note: crimeNote,
-      signalKeys: ["homicide", "road"],
+      signalKeys: [
+        "homicide",
+        "safe_walking_dark",
+        "violence_victimization",
+        "human_trafficking_victims",
+        "bribery_contact_rate",
+        "numbeo_crime_index",
+        "numbeo_safety_index",
+        "firm_crime_losses",
+        "crime_major_constraint",
+      ],
       levelName: "",
       color: "",
     },

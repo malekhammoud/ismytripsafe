@@ -7,7 +7,9 @@ import { MapPin, Search, CircleCheck, CircleAlert, Smile, Eye, Lightbulb, MouseP
 import { useReport } from "@/lib/store"
 import { TopNav } from "@/components/report/TopNav"
 import { InfoTip } from "@/components/report/InfoTip"
+import { SourceLink } from "@/components/report/SourceLink"
 import { scoreColor } from "@/lib/safety-display"
+import { extractSourceLinksFromText, sourceUrlForSearchQuery } from "@/lib/source-links"
 import type { ZoneLevel } from "@/lib/types"
 import type { MapZonePoint } from "@/components/map/CityMap"
 
@@ -45,7 +47,7 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
 }
 
 export default function MapPage() {
-  const { bundle, intel, status, run } = useReport()
+  const { bundle, intel, status, run, prose, queries, query } = useReport()
   const geo = bundle?.geo ?? null
   const [zones, setZones] = useState<MapZonePoint[]>([])
   const [selected, setSelected] = useState<string | null>(null)
@@ -127,6 +129,14 @@ export default function MapPage() {
   const sentiment = intel?.consumerSentiment
   const watch = intel?.watchOuts ?? []
   const tips = intel?.tips ?? []
+  const intelLinks = useMemo(() => extractSourceLinksFromText(prose), [prose])
+  const searchSource = useMemo(
+    () => sourceUrlForSearchQuery(queries[queries.length - 1] ?? null),
+    [queries]
+  )
+  const placeQuery = query?.place ?? (geo ? `${geo.city}, ${geo.country}` : "")
+  const reportSourceAnchor = `/?place=${encodeURIComponent(placeQuery)}#sec-local-intel-sources`
+  const intelSourceHref = intelLinks[0] ?? searchSource ?? reportSourceAnchor
 
   return (
     <main className="relative z-10 mx-auto max-w-6xl px-4 py-6 sm:px-6">
@@ -190,6 +200,9 @@ export default function MapPage() {
                   </span>
                 </div>
                 <p className="mt-2 text-[0.84rem] leading-relaxed text-[var(--ink-soft)]">{activeZone.note}</p>
+                <div className="mt-1">
+                  <SourceLink href={intelSourceHref} label={`${activeZone.name} intelligence`} />
+                </div>
               </>
             ) : (
               <p className="mt-2 text-[0.82rem] italic text-[var(--ink-faint)]">
@@ -223,6 +236,7 @@ export default function MapPage() {
                         </div>
                       </div>
                       <span className="flex-1 truncate text-[0.82rem] text-[var(--ink)]">{z.name}</span>
+                      <SourceLink href={intelSourceHref} label={`${z.name} district assessment`} />
                       <span className="text-[0.62rem] font-semibold uppercase tracking-[0.08em]" style={{ color: ZONE_META[z.level].color }}>{ZONE_META[z.level].label}</span>
                     </button>
                   )
@@ -236,6 +250,7 @@ export default function MapPage() {
             <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
               <Smile size={13} /> Consumer sentiment
               <InfoTip text="How safe visitors report actually feeling day-to-day, gathered from recent traveller reports and reviews." align="left" color="var(--ink-faint)" />
+              <SourceLink href={intelSourceHref} label="consumer sentiment" />
             </p>
             {sentiment ? (
               <>
@@ -246,7 +261,10 @@ export default function MapPage() {
                 <div className="mt-2 h-[6px] w-full overflow-hidden rounded-full" style={{ background: "rgba(20,25,34,0.08)" }}>
                   <div className="h-full rounded-full" style={{ width: `${sentiment.score}%`, background: scoreColor(sentiment.score) }} />
                 </div>
-                <p className="mt-2.5 text-[0.82rem] leading-relaxed text-[var(--ink-soft)]">{sentiment.summary}</p>
+                <p className="mt-2.5 flex items-center gap-1 text-[0.82rem] leading-relaxed text-[var(--ink-soft)]">
+                  {sentiment.summary}
+                  <SourceLink href={intelSourceHref} label="sentiment summary" />
+                </p>
               </>
             ) : (
               <p className="mt-2 text-[0.82rem] italic text-[var(--ink-faint)]">{intel ? "No sentiment read available." : "Gathering traveller sentiment…"}</p>
@@ -264,6 +282,7 @@ export default function MapPage() {
                   <li key={w} className="flex items-start gap-2 text-[0.84rem] leading-relaxed text-[var(--ink-soft)]">
                     <CircleAlert size={13} className="mt-[3px] shrink-0" style={{ color: "var(--caution)" }} />
                     {w}
+                    <SourceLink href={intelSourceHref} label="watchout source" className="mt-[3px] shrink-0" />
                   </li>
                 ))}
               </ul>
@@ -283,6 +302,7 @@ export default function MapPage() {
                   <li key={t} className="flex items-start gap-2 text-[0.84rem] leading-relaxed text-[var(--ink-soft)]">
                     <CircleCheck size={13} className="mt-[3px] shrink-0" style={{ color: "var(--safe)" }} />
                     {t}
+                    <SourceLink href={intelSourceHref} label="safety tip source" className="mt-[3px] shrink-0" />
                   </li>
                 ))}
               </ul>

@@ -2,7 +2,9 @@
 
 import { Globe, Siren, HeartPulse, Landmark } from "lucide-react"
 import type { CategoryScore, CategoryKey } from "@/lib/safety-display"
+import { sourceUrlForName } from "@/lib/source-links"
 import { InfoTip } from "./InfoTip"
+import { SourceLink } from "./SourceLink"
 
 const ICONS: Record<CategoryKey, React.ReactNode> = {
   advisories: <Globe size={14} strokeWidth={2.2} />,
@@ -15,7 +17,7 @@ const EXPLAIN: Record<CategoryKey, string> = {
   advisories:
     "Official government travel advisories (U.S. State Dept & UK FCDO). A higher score means fewer or lower-level warnings.",
   crime:
-    "Violent & street-crime risk, led by the intentional-homicide rate and road-safety data. Higher = safer.",
+    "Violent & street-crime risk from homicide, night-safety/victimization surveys, trafficking and bribery indicators, plus Numbeo crime/safety indices when available. Higher = safer.",
   health:
     "Air quality, active disease notices, nearby hospitals and the seasonal weather outlook, combined. Higher = healthier & safer.",
   stability:
@@ -29,6 +31,13 @@ const LEVEL_EXPLAIN: Record<string, string> = {
   Caution: "Score 40–54 — meaningful risk, extra care advised",
   Elevated: "Score 0–39 — high risk, serious caution needed",
   "No data": "Not enough data available for this category",
+}
+
+const CATEGORY_SOURCE: Record<CategoryKey, string> = {
+  advisories: "U.S. Department of State",
+  crime: "World Bank Open Data",
+  health: "CDC Travelers' Health",
+  stability: "World Bank Governance Indicators",
 }
 
 /**
@@ -65,6 +74,12 @@ export function CategoryTiles({ categories }: { categories: CategoryScore[] }) {
             >
               <span style={{ color: c.color }}>{ICONS[c.key]}</span>
               {c.label}
+              {sourceUrlForName(CATEGORY_SOURCE[c.key]) && (
+                <SourceLink
+                  href={sourceUrlForName(CATEGORY_SOURCE[c.key])!}
+                  label={`${c.label} category`}
+                />
+              )}
             </span>
             <span onClick={(e) => e.stopPropagation()}>
               <InfoTip text={EXPLAIN[c.key]} align="right" color="var(--ink-faint)" />
