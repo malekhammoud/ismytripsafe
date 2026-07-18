@@ -6,8 +6,16 @@ import type {
   HealthNotice,
 } from "../types"
 import { fetchJson } from "./geo"
-import { countryNameVariants, englishCountryName, normalizeCountryName } from "./country"
+import { countryNameVariants, englishCountryName, iso3Code, normalizeCountryName } from "./country"
 import { getEnvironment } from "./environment"
+import {
+  resolveMetric,
+  wbLatest,
+  wbRegionCode,
+  owidLatest,
+  ghoLatest,
+  type RefHit,
+} from "./refdata"
 
 // ─── Normalization helpers (everything → 0–100, 100 = safest) ────────
 
@@ -56,13 +64,16 @@ interface SignalDef {
   label: string
   group: SignalGroup
   source: string
-  wb?: { indicator: string; source?: number } // World Bank fetch
+  wb?: { indicator: string; source?: number } // primary World Bank fetch
   unit: string
   lowerIsBetter: boolean
   format: (v: number) => string
   score: (v: number) => number
   note: string
 }
+
+const GTD = "Global Terrorism Database"
+const WHO_GHO = "WHO Global Health Observatory"
 
 const WB_WDI = "World Bank Open Data"
 const WB_WGI = "World Bank Governance Indicators"
@@ -136,6 +147,48 @@ const SIGNAL_DEFS: SignalDef[] = [
         [65, 5],
       ]),
     note: "Share of firms naming crime, theft and disorder as their biggest obstacle — signals broad law-and-order strain.",
+  },
+  {
+    key: "terrorism_deaths",
+    label: "Terrorism deaths (latest year)",
+    group: "Conflict & terrorism",
+    source: GTD,
+    unit: "deaths",
+    lowerIsBetter: true,
+    format: (v) => (v === 0 ? "0 recorded" : `${Math.round(v)}`),
+    score: (v) =>
+      bandLowerBetter(v, [
+        [0, 96],
+        [1, 88],
+        [5, 80],
+        [25, 68],
+        [100, 52],
+        [500, 32],
+        [2000, 12],
+        [5000, 3],
+      ]),
+    note: "Deaths from terrorist attacks in the most recent recorded year (Global Terrorism Database). Countries with no recorded incidents count as zero.",
+  },
+  {
+    key: "road_deaths",
+    label: "Road traffic deaths",
+    group: "Everyday hazards",
+    source: WHO_GHO,
+    unit: "per 100k",
+    lowerIsBetter: true,
+    format: (v) => `${v.toFixed(1)} / 100k`,
+    score: (v) =>
+      bandLowerBetter(v, [
+        [2, 95],
+        [4, 88],
+        [8, 74],
+        [12, 62],
+        [18, 48],
+        [25, 34],
+        [35, 18],
+        [50, 6],
+      ]),
+    note: "Estimated road-traffic deaths per 100,000 people (WHO) — statistically one of the biggest physical risks to travellers.",
   },
   {
     key: "stability",
@@ -229,29 +282,138 @@ interface SDGDataPoint {
   timePeriodStart?: number
   value?: string
   dimensions?: Record<string, string>
+  seriesDescription?: string
 }
 
 interface SDGIndicatorData {
   data?: SDGDataPoint[]
 }
 
-/** Fetch most-recent non-null value for one World Bank indicator. */
-async function fetchWB(
+// All six WGI indicators in ONE World Bank request — one round-trip instead
+// of six halves the odds of the flaky API blanking the Stability section.
+const WGI_CODES: Record<string, string> = {
+  stability: "GOV_WGI_PV.SC",
+  rule_of_law: "GOV_WGI_RL.SC",
+  corruption: "GOV_WGI_CC.SC",
+  gov_effectiveness: "GOV_WGI_GE.SC",
+  regulatory: "GOV_WGI_RQ.SC",
+  voice: "GOV_WGI_VA.SC",
+}
+
+interface WBBatchRow extends WBRow {
+  indicator?: { id?: string }
+}
+
+const wgiBatchCache = new Map<string, Promise<Map<string, RefHit> | null>>()
+
+function wgiBatch(iso2: string): Promise<Map<string, RefHit> | null> {
+  let p = wgiBatchCache.get(iso2)
+  if (!p) {
+    p = (async () => {
+      try {
+        const codes = Object.values(WGI_CODES).join(";")
+        const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/${codes}?format=json&mrv=10&source=3&per_page=600`
+        const data = (await fetchJson(url, 14000)) as [unknown, WBBatchRow[] | null]
+        const rows = data?.[1]
+        if (!Array.isArray(rows)) return null
+        const out = new Map<string, RefHit>()
+        for (const r of rows) {
+          const id = r.indicator?.id
+          if (!id || r.value == null || out.has(id)) continue
+          out.set(id, { value: r.value, year: r.date })
+        }
+        return out.size ? out : null
+      } catch {
+        return null
+      }
+    })()
+    p.then((m) => {
+      if (!m) wgiBatchCache.delete(iso2)
+    })
+    wgiBatchCache.set(iso2, p)
+  }
+  return p
+}
+
+/**
+ * Fallback chains — the heart of "no metric goes missing". Each signal tries
+ * its primary source, then independent secondary databases, then a coarser
+ * geography (country → region), and finally the durable last-known-good
+ * store (see refdata.ts). Values from a non-primary source are labeled.
+ */
+function buildChains(
   iso2: string,
-  indicator: string,
-  source?: number
-): Promise<{ value: number; year: string } | null> {
-  try {
-    const src = source ? `&source=${source}` : ""
-    const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/${indicator}?format=json&mrv=15${src}`
-    const data = (await fetchJson(url, 7000)) as [unknown, WBRow[] | null]
-    const rows = data[1]
-    if (!Array.isArray(rows)) return null
-    const hit = rows.find((r) => r.value != null)
-    if (!hit || hit.value == null) return null
-    return { value: hit.value, year: hit.date }
-  } catch {
-    return null
+  iso3: string
+): Record<string, Array<() => Promise<RefHit | null>>> {
+  const regionFallback =
+    (indicator: string) => async (): Promise<RefHit | null> => {
+      const region = await wbRegionCode(iso2)
+      if (!region) return null
+      const hit = await wbLatest(region, indicator)
+      return (
+        hit && {
+          ...hit,
+          sourceOverride: "World Bank Open Data (regional average)",
+          displaySuffix: " · regional avg",
+        }
+      )
+    }
+
+  const wgiChains = Object.fromEntries(
+    Object.entries(WGI_CODES).map(([key, code]) => [
+      key,
+      [
+        async (): Promise<RefHit | null> => (await wgiBatch(iso2))?.get(code) ?? null,
+        () => wbLatest(iso2, code, 3),
+      ],
+    ])
+  )
+
+  return {
+    ...wgiChains,
+    homicide: [
+      () => wbLatest(iso2, "VC.IHR.PSRC.P5"),
+      async () => {
+        const h = await owidLatest("homicide-rate-unodc", iso3)
+        return h && { ...h, sourceOverride: "UNODC (via Our World in Data)" }
+      },
+      async () => {
+        const h = await ghoLatest("VIOLENCE_HOMICIDERATE", iso3)
+        return h && { ...h, sourceOverride: WHO_GHO }
+      },
+      regionFallback("VC.IHR.PSRC.P5"),
+    ],
+    rule_of_law: [
+      async (): Promise<RefHit | null> =>
+        (await wgiBatch(iso2))?.get(WGI_CODES.rule_of_law) ?? null,
+      () => wbLatest(iso2, "GOV_WGI_RL.SC", 3),
+      async () => {
+        // V-Dem's rule-of-law index runs 0–1; ×100 approximates a percentile.
+        const h = await owidLatest("rule-of-law-index", iso3)
+        return (
+          h && {
+            value: Math.round(h.value * 100),
+            year: h.year,
+            sourceOverride: "V-Dem Rule of Law Index",
+          }
+        )
+      },
+    ],
+    terrorism_deaths: [
+      async () => {
+        const h = await owidLatest("terrorism-deaths", iso3)
+        // The GTD only lists countries with recorded incidents — absence
+        // genuinely means zero recorded deaths, not missing data.
+        return h ?? { value: 0, year: null }
+      },
+    ],
+    road_deaths: [
+      () => ghoLatest("RS_198", iso3),
+      async () => {
+        const h = await owidLatest("death-rate-road-traffic-injuries", iso3)
+        return h && { ...h, sourceOverride: "UN SDG (via Our World in Data)" }
+      },
+    ],
   }
 }
 
@@ -302,18 +464,43 @@ function sdgPriority(point: SDGDataPoint): number {
   return rank
 }
 
+// One request per SDG indicator per country; series are filtered locally.
+const sdgDataCache = new Map<string, Promise<SDGDataPoint[] | null>>()
+
+function fetchSdgRows(areaCode: number, indicator: string): Promise<SDGDataPoint[] | null> {
+  const key = `${areaCode}:${indicator}`
+  let p = sdgDataCache.get(key)
+  if (!p) {
+    p = (async () => {
+      try {
+        const url =
+          `https://unstats.un.org/SDGAPI/v1/sdg/Indicator/Data` +
+          `?indicator=${encodeURIComponent(indicator)}&areaCode=${areaCode}&pageSize=1000`
+        const data = (await fetchJson(url, 12000)) as SDGIndicatorData
+        return Array.isArray(data.data) ? data.data : null
+      } catch {
+        return null
+      }
+    })()
+    p.then((rows) => {
+      // never cache a failure — the next request should retry
+      if (!rows) sdgDataCache.delete(key)
+    })
+    sdgDataCache.set(key, p)
+  }
+  return p
+}
+
 async function fetchSdgLatest(
   areaCode: number,
-  indicator: string
+  indicator: string,
+  seriesMatch?: RegExp
 ): Promise<{ value: number; year: string | null } | null> {
   try {
-    const url =
-      `https://unstats.un.org/SDGAPI/v1/sdg/Indicator/Data` +
-      `?indicator=${encodeURIComponent(indicator)}&areaCode=${areaCode}&pageSize=1000`
-    const data = (await fetchJson(url, 9000)) as SDGIndicatorData
-    const rows = data.data
+    const rows = await fetchSdgRows(areaCode, indicator)
     if (!Array.isArray(rows) || rows.length === 0) return null
     const clean = rows
+      .filter((r) => !seriesMatch || seriesMatch.test(r.seriesDescription ?? ""))
       .map((r) => ({
         value: Number(r.value),
         year: r.timePeriodStart != null ? String(Math.trunc(r.timePeriodStart)) : null,
@@ -333,13 +520,46 @@ async function fetchSdgLatest(
   }
 }
 
-async function fetchNumbeoCountry(
-  iso2: string
-): Promise<{ crimeIndex: number; safetyIndex: number } | null> {
+interface NumbeoHit {
+  crimeIndex: number
+  safetyIndex: number
+  scope: "city" | "country"
+}
+
+/** City-level Numbeo crime page — the finest-grained crime read we have. */
+async function fetchNumbeoCity(city: string): Promise<NumbeoHit | null> {
+  try {
+    const slug = city
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^A-Za-z0-9 ]/g, "")
+      .trim()
+      .replace(/\s+/g, "-")
+    if (!slug) return null
+    const html = await fetchText(
+      `https://r.jina.ai/http://www.numbeo.com/crime/in/${slug}`,
+      12000
+    )
+    if (!html) return null
+    const crime = html.match(/Crime Index:?\s*\|?\s*([0-9]+(?:\.[0-9]+)?)/i)
+    const safety = html.match(/Safety Index:?\s*\|?\s*([0-9]+(?:\.[0-9]+)?)/i)
+    if (!crime || !safety) return null
+    const crimeIndex = Number(crime[1])
+    const safetyIndex = Number(safety[1])
+    if (!Number.isFinite(crimeIndex) || !Number.isFinite(safetyIndex)) return null
+    // The page renders zeros when a city has too few contributors.
+    if (crimeIndex === 0 && safetyIndex === 0) return null
+    return { crimeIndex, safetyIndex, scope: "city" }
+  } catch {
+    return null
+  }
+}
+
+async function fetchNumbeoCountry(iso2: string): Promise<NumbeoHit | null> {
   try {
     const html = await fetchText(
       "https://r.jina.ai/http://www.numbeo.com/crime/rankings_by_country.jsp",
-      10000
+      12000
     )
     if (!html) return null
     const variants = countryNameVariants(iso2)
@@ -352,7 +572,7 @@ async function fetchNumbeoCountry(
       const crimeIndex = Number(m[2])
       const safetyIndex = Number(m[3])
       if (!Number.isFinite(crimeIndex) || !Number.isFinite(safetyIndex)) return null
-      return { crimeIndex, safetyIndex }
+      return { crimeIndex, safetyIndex, scope: "country" }
     }
     return null
   } catch {
@@ -360,26 +580,41 @@ async function fetchNumbeoCountry(
   }
 }
 
-async function fetchCrimeExtras(iso2: string): Promise<SafetySignal[]> {
+/** City first, then country — the "expand outward until data exists" ladder. */
+async function fetchNumbeo(iso2: string, city: string): Promise<NumbeoHit | null> {
+  const cityish = city && normalizeCountryName(city) !== normalizeCountryName(englishCountryName(iso2) ?? "")
+  if (cityish) {
+    const hit = await fetchNumbeoCity(city)
+    if (hit) return hit
+  }
+  return fetchNumbeoCountry(iso2)
+}
+
+async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySignal[]> {
   const [areaCode, numbeo] = await Promise.all([
     fetchSdgAreaCode(iso2),
-    fetchNumbeoCountry(iso2),
+    fetchNumbeo(iso2, city),
   ])
 
   const signals: SafetySignal[] = []
 
   if (numbeo) {
+    const scopeSuffix = numbeo.scope === "city" ? " · city-level" : ""
+    const scopeNote =
+      numbeo.scope === "city"
+        ? `Numbeo's crowdsourced index for ${city} itself (city-level).`
+        : "Numbeo's country-level crowdsourced index (no city-level data for this place)."
     signals.push({
       key: "numbeo_crime_index",
       label: "Crime index (crowdsourced)",
       group: "Violent crime",
       source: "Numbeo Crime Index",
       value: numbeo.crimeIndex,
-      display: `${numbeo.crimeIndex.toFixed(1)} / 100`,
+      display: `${numbeo.crimeIndex.toFixed(1)} / 100${scopeSuffix}`,
       year: null,
       score: Math.round(clamp(100 - numbeo.crimeIndex)),
       lowerIsBetter: true,
-      note: "Numbeo's country-level crowdsourced crime index. Higher index = more perceived crime.",
+      note: `${scopeNote} Higher index = more perceived crime.`,
     })
     signals.push({
       key: "numbeo_safety_index",
@@ -387,11 +622,11 @@ async function fetchCrimeExtras(iso2: string): Promise<SafetySignal[]> {
       group: "Violent crime",
       source: "Numbeo Crime Index",
       value: numbeo.safetyIndex,
-      display: `${numbeo.safetyIndex.toFixed(1)} / 100`,
+      display: `${numbeo.safetyIndex.toFixed(1)} / 100${scopeSuffix}`,
       year: null,
       score: Math.round(clamp(numbeo.safetyIndex)),
       lowerIsBetter: false,
-      note: "Numbeo's country-level crowdsourced safety sentiment (higher = residents/visitors feel safer).",
+      note: `${scopeNote} Higher = people report feeling safer.`,
     })
   }
 
@@ -402,6 +637,7 @@ async function fetchCrimeExtras(iso2: string): Promise<SafetySignal[]> {
     key: string
     label: string
     lowerIsBetter: boolean
+    seriesMatch?: RegExp
     score: (v: number) => number
     note: string
     display: (v: number) => string
@@ -426,8 +662,9 @@ async function fetchCrimeExtras(iso2: string): Promise<SafetySignal[]> {
     {
       indicator: "16.1.3",
       key: "violence_victimization",
-      label: "People reporting recent violence",
+      label: "Physical assault (past year)",
       lowerIsBetter: true,
+      seriesMatch: /physical violence/i,
       score: (v) =>
         bandLowerBetter(v, [
           [1, 97],
@@ -438,7 +675,26 @@ async function fetchCrimeExtras(iso2: string): Promise<SafetySignal[]> {
           [35, 18],
           [50, 5],
         ]),
-      note: "Population subjected to physical/psychological/sexual violence in the previous 12 months (SDG 16.1.3).",
+      note: "Share of people subjected to physical violence (assault) in the previous 12 months — UNODC-backed survey data (SDG 16.1.3).",
+      display: (v) => `${v.toFixed(1)}%`,
+    },
+    {
+      indicator: "16.1.3",
+      key: "sexual_violence",
+      label: "Sexual violence (past year)",
+      lowerIsBetter: true,
+      seriesMatch: /sexual violence/i,
+      score: (v) =>
+        bandLowerBetter(v, [
+          [0.5, 95],
+          [1, 88],
+          [2, 78],
+          [4, 62],
+          [7, 45],
+          [12, 25],
+          [20, 8],
+        ]),
+      note: "Share of people subjected to sexual violence in the previous 12 months — UNODC-backed survey data (SDG 16.1.3).",
       display: (v) => `${v.toFixed(1)}%`,
     },
     {
@@ -446,6 +702,9 @@ async function fetchCrimeExtras(iso2: string): Promise<SafetySignal[]> {
       key: "human_trafficking_victims",
       label: "Detected human-trafficking victims",
       lowerIsBetter: true,
+      // the indicator also publishes absolute victim counts — only the
+      // per-100k series is comparable across countries
+      seriesMatch: /per 100,?000/i,
       score: (v) =>
         bandLowerBetter(v, [
           [0, 98],
@@ -456,7 +715,7 @@ async function fetchCrimeExtras(iso2: string): Promise<SafetySignal[]> {
           [8, 18],
           [15, 5],
         ]),
-      note: "Detected victims of human trafficking per 100,000 population (SDG 16.2.2, UNODC-backed reporting).",
+      note: "Detected victims of human trafficking per 100,000 population (SDG 16.2.2) — the metric behind the UNODC Global Report on Trafficking in Persons.",
       display: (v) => `${v.toFixed(2)} / 100k`,
     },
     {
@@ -480,7 +739,7 @@ async function fetchCrimeExtras(iso2: string): Promise<SafetySignal[]> {
   ]
 
   const sdgHits = await Promise.all(
-    sdgDefs.map((d) => fetchSdgLatest(areaCode, d.indicator))
+    sdgDefs.map((d) => fetchSdgLatest(areaCode, d.indicator, d.seriesMatch))
   )
 
   sdgDefs.forEach((d, i) => {
@@ -513,31 +772,42 @@ export interface SignalsResult {
 /** Gather all safety signals for a place from every database, in parallel. */
 export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
   const iso2 = geo.countryCode
+  const iso3 = iso3Code(iso2) ?? iso2
+  const chains = buildChains(iso2, iso3)
 
-  // Fire every World Bank indicator + quakes + comparisons + environment at once.
-  const wbDefs = SIGNAL_DEFS.filter((d) => d.wb)
-  const wbPromises = wbDefs.map((d) =>
-    fetchWB(iso2, d.wb!.indicator, d.wb!.source)
-  )
+  // Every signal resolves through its fallback chain: primary source →
+  // secondary databases → regional aggregate → last-known-good store.
+  const defPromises = SIGNAL_DEFS.map((d) => {
+    // A def either has a bespoke multi-source chain (which already includes
+    // its primary fetch) or falls back to its plain World Bank fetch.
+    const chain =
+      chains[d.key] ??
+      (d.wb ? [() => wbLatest(iso2, d.wb!.indicator, d.wb!.source)] : [])
+    return resolveMetric(`${iso2}:${d.key}`, chain)
+  })
 
-  const [wbResults, comparisons, environment, crimeExtras] = await Promise.all([
-    Promise.all(wbPromises),
+  const [defResults, comparisons, environment, crimeExtras] = await Promise.all([
+    Promise.all(defPromises),
     fetchComparisons(iso2),
     getEnvironment(geo),
-    fetchCrimeExtras(iso2),
+    fetchCrimeExtras(iso2, geo.city),
   ])
 
   const signals: SafetySignal[] = []
 
-  wbDefs.forEach((d, i) => {
-    const res = wbResults[i]
+  SIGNAL_DEFS.forEach((d, i) => {
+    const res = defResults[i]
+    // Enterprise Surveys genuinely skip many (mostly high-income) countries —
+    // say so, rather than an ambiguous "No data".
+    const nullDisplay =
+      d.source === WB_ENTERPRISE ? "Not surveyed here" : "No data"
     signals.push({
       key: d.key,
       label: d.label,
       group: d.group,
-      source: d.source,
+      source: res?.sourceOverride ?? d.source,
       value: res?.value ?? null,
-      display: res ? d.format(res.value) : "No data",
+      display: res ? d.format(res.value) + (res.displaySuffix ?? "") : nullDisplay,
       year: res?.year ?? null,
       score: res ? Math.round(d.score(res.value)) : null,
       lowerIsBetter: d.lowerIsBetter,

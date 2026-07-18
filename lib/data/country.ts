@@ -29,6 +29,11 @@ export function englishCountryName(iso2: string): string | null {
   return nameByCode.get(iso2.toUpperCase()) ?? null
 }
 
+/** ISO3 code from an ISO2 code (e.g. "MX" → "MEX") — OWID/WHO key on ISO3. */
+export function iso3Code(iso2: string): string | null {
+  return byCode.get(iso2.toUpperCase())?.cca3 ?? null
+}
+
 /** Normalize a country name for fuzzy matching across data sources. */
 export function normalizeCountryName(name: string): string {
   return name

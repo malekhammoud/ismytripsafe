@@ -12,12 +12,12 @@ export { geocode }
  * `allSettled` so one slow source never blocks the bundle.
  */
 export async function gatherSafety(geo: GeoPoint): Promise<SafetyBundle> {
+  const country = getCountryFacts(geo.countryCode)
+
   const [safety, images] = await Promise.allSettled([
     getSafetyReport(geo),
-    getImages(geo.city, geo.country),
+    getImages(geo.city, geo.country, country?.capital ?? null),
   ])
-
-  const country = getCountryFacts(geo.countryCode)
 
   return {
     geo,

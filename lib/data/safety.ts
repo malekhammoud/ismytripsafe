@@ -11,10 +11,13 @@ import type { GeoPoint } from "../types"
 
 // Weights for the composite index (signals not present are skipped & renormalized).
 const WEIGHTS: Record<string, number> = {
-  homicide: 0.22,
+  homicide: 0.2,
   safe_walking_dark: 0.09,
   violence_victimization: 0.08,
-  human_trafficking_victims: 0.07,
+  sexual_violence: 0.06,
+  terrorism_deaths: 0.05,
+  road_deaths: 0.04,
+  human_trafficking_victims: 0.06,
   bribery_contact_rate: 0.06,
   numbeo_crime_index: 0.05,
   numbeo_safety_index: 0.05,

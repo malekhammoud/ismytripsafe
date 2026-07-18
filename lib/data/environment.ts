@@ -1,5 +1,6 @@
 import type { GeoPoint, SafetySignal, HealthNotice } from "../types"
-import { countryMatchNames } from "./country"
+import { countryMatchNames, iso3Code } from "./country"
+import { ghoLatest } from "./refdata"
 
 // ─────────────────────────────────────────────────────────────────────
 // Environmental & health hazards, pulled directly from source feeds:
@@ -122,6 +123,7 @@ function stripHtml(s: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/<[^>]+>/g, "") // entity-encoded tags (&lt;em&gt;…) decode into tags — strip again
     .replace(/&#39;|&rsquo;/g, "'")
     .replace(/&quot;/g, '"')
     .replace(/&nbsp;/g, " ")
@@ -236,6 +238,7 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
 ]
 
 /** Count hospitals within ~15 km of the destination and the nearest distance. */
@@ -248,7 +251,8 @@ async function fetchHospitals(
     `way["amenity"="hospital"](around:15000,${geo.lat},${geo.lon});` +
     `relation["amenity"="hospital"](around:15000,${geo.lat},${geo.lon});` +
     `);out center 80;`
-  for (const endpoint of OVERPASS_ENDPOINTS) {
+  // two rounds over the public mirrors — they rate-limit independently
+  for (const endpoint of [...OVERPASS_ENDPOINTS, ...OVERPASS_ENDPOINTS]) {
     const raw = await fetchText(`${endpoint}?data=${encodeURIComponent(q)}`, 12000)
     if (!raw) continue
     try {
@@ -274,9 +278,41 @@ async function fetchHospitals(
   return null
 }
 
+/** Country-level fallback when the map query fails: WHO hospital-bed density. */
+async function fetchHospitalBeds(
+  iso2: string
+): Promise<{ beds: number; year: string | null } | null> {
+  try {
+    const iso3 = iso3Code(iso2)
+    if (!iso3) return null
+    const hit = await ghoLatest("WHS6_102", iso3)
+    return hit ? { beds: hit.value, year: hit.year } : null
+  } catch {
+    return null
+  }
+}
+
 function hospitalsSignal(
-  h: { count: number; nearestKm: number | null } | null
+  h: { count: number; nearestKm: number | null } | null,
+  beds: { beds: number; year: string | null } | null
 ): SafetySignal {
+  if (h == null && beds != null) {
+    // WHO beds per 10,000 population — coarser, but never missing.
+    const b = beds.beds
+    const score = b >= 40 ? 92 : b >= 25 ? 80 : b >= 15 ? 65 : b >= 8 ? 48 : b >= 4 ? 30 : 15
+    return {
+      key: "hospitals",
+      label: "Hospitals nearby",
+      group: "Health & environment",
+      source: "WHO Global Health Observatory",
+      value: b,
+      display: `${b.toFixed(0)} beds / 10k · country avg`,
+      year: beds.year,
+      score,
+      lowerIsBetter: false,
+      note: "Live hospital lookup was unavailable, so this shows the country's hospital-bed density (WHO) — a coarser read on access to emergency care.",
+    }
+  }
   const score =
     h == null
       ? null
@@ -417,11 +453,12 @@ export async function getEnvironment(geo: GeoPoint): Promise<EnvironmentResult> 
     fetchHospitals(geo),
     fetchWeather(geo),
   ])
+  const beds = hospitals == null ? await fetchHospitalBeds(geo.countryCode) : null
   return {
     signals: [
       airQualitySignal(air),
       healthSignal(health),
-      hospitalsSignal(hospitals),
+      hospitalsSignal(hospitals, beds),
       weatherSignal(weather),
     ],
     health,

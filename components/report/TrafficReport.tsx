@@ -11,6 +11,7 @@ import {
   MapPin,
   Map as MapIcon,
   Radar,
+  CarFront,
   Wind,
   Building2,
   CloudSun,
@@ -498,13 +499,14 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
         title="Crime"
         icon={<Siren size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "crime")?.levelName ?? ""}
-        info="Violent- and street-crime risk from homicide, night-safety and victimization surveys, trafficking and bribery indicators, business crime exposure, plus Numbeo crime/safety indices when available. Robbery and pickpocketing are assessed from current on-the-ground reporting."
+        info="Violent- and street-crime risk from multiple databases: homicide (World Bank / UNODC / WHO), physical assault and sexual violence victimisation (UNODC via UN SDG), trafficking, bribery, business crime exposure, and Numbeo crowdsourced indices (city-level where available). When a country lacks data, the nearest wider geography (region) fills in — labeled as such. Robbery and pickpocketing are assessed from current on-the-ground reporting."
         delay={200}
       >
         <div>
           <SignalRow signal={sig("homicide")} extra={<ContextHover comparison={homicideCmp} />} />
           <SignalRow signal={sig("safe_walking_dark")} />
           <SignalRow signal={sig("violence_victimization")} />
+          <SignalRow signal={sig("sexual_violence")} />
           <SignalRow signal={sig("human_trafficking_victims")} />
           <SignalRow signal={sig("bribery_contact_rate")} />
           <SignalRow signal={sig("numbeo_crime_index")} />
@@ -536,13 +538,14 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
         title="Health & Air"
         icon={<HeartPulse size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "health")?.levelName ?? ""}
-        info="Live air quality, nearby hospitals, the seasonal extreme-weather outlook, and any active CDC disease notices for this destination."
+        info="Live air quality, nearby hospitals, the seasonal extreme-weather outlook, road-traffic death rates (WHO), and any active CDC disease notices for this destination."
         delay={280}
       >
-        <div className="grid grid-cols-3 gap-px" style={{ background: `${TONES.safe.deep}26` }}>
+        <div className="grid grid-cols-2 gap-px sm:grid-cols-4" style={{ background: `${TONES.safe.deep}26` }}>
           <StatTile icon={<Wind size={13} strokeWidth={2} />} k="Air quality" signal={sig("air_quality")} />
           <StatTile icon={<Building2 size={13} strokeWidth={2} />} k="Hospitals" signal={sig("hospitals")} />
           <StatTile icon={<CloudSun size={13} strokeWidth={2} />} k="Weather" signal={sig("weather")} />
+          <StatTile icon={<CarFront size={13} strokeWidth={2} />} k="Road safety" signal={sig("road_deaths")} />
         </div>
 
         <div className="mt-5">
@@ -577,11 +580,12 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
         title="Stability"
         icon={<Landmark size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "stability")?.levelName ?? ""}
-        info="The World Bank's Worldwide Governance Indicators — percentile ranks (vs every country) for the institutions that keep travellers safe when something goes wrong."
+        info="The World Bank's Worldwide Governance Indicators — percentile ranks (vs every country) for the institutions that keep travellers safe when something goes wrong — plus recorded terrorism deaths (Global Terrorism Database). Backed by fallback sources so the data is always populated."
         delay={360}
       >
         <div>
           <SignalRow signal={sig("stability")} />
+          <SignalRow signal={sig("terrorism_deaths")} />
           <SignalRow signal={sig("rule_of_law")} />
           <SignalRow signal={sig("corruption")} />
           <SignalRow signal={sig("gov_effectiveness")} />
@@ -693,7 +697,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           <p className="text-[0.68rem] tracking-[0.04em]" style={{ color: "rgba(238,242,248,0.55)" }}>Not legal or medical advice</p>
         </div>
         <p className="mt-3 text-[0.66rem] leading-relaxed" style={{ color: "rgba(238,242,248,0.4)" }}>
-          Sources: U.S. State Dept · UK FCDO · World Bank · WGI · OpenStreetMap · Open-Meteo · CDC. Composite index recomputed at request time.
+          Sources: U.S. State Dept · UK FCDO · World Bank · WGI · UNODC · WHO · UN SDG · Global Terrorism Database · Numbeo · OpenStreetMap · Open-Meteo · CDC. Composite index recomputed at request time.
         </p>
         <div className="mt-2 flex items-center gap-1.5 text-[0.64rem]" style={{ color: "rgba(238,242,248,0.55)" }}>
           <span>Links:</span>
