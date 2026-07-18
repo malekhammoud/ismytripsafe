@@ -130,6 +130,7 @@ export function InfoTip({
           ref={btnRef as RefObject<HTMLButtonElement>}
           type="button"
           aria-label={label}
+          data-noshare // interactive affordance — excluded from shared images
           onMouseEnter={show}
           onMouseLeave={scheduleHide}
           onClick={onClick}

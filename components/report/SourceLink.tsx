@@ -19,6 +19,7 @@ export function SourceLink({
       href={href}
       aria-label={`Open ${label} source`}
       title={`Open ${label} source`}
+      data-noshare // interactive affordance — excluded from shared images
       className={`inline-flex items-center align-middle opacity-80 transition-opacity hover:opacity-100 ${className}`}
       style={{ color }}
       target={external ? "_blank" : undefined}

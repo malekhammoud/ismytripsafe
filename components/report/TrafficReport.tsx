@@ -32,6 +32,7 @@ import { personalizeScore, profileSummary, type TravelerProfile } from "@/lib/pr
 import { extractSourceLinksFromText, sourceUrlForName, sourceUrlForSearchQuery } from "@/lib/source-links"
 import { CategoryTiles } from "./CategoryTiles"
 import { InfoTip } from "./InfoTip"
+import { ShareButton } from "./ShareButton"
 import { SourceLink } from "./SourceLink"
 
 const INK = "#141922"
@@ -344,7 +345,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
     <div className="mx-auto max-w-[640px] overflow-hidden sm:rounded-[3px]" style={{ border: `1px solid ${RULE}`, boxShadow: "var(--shadow-float)" }}>
       {/* masthead — the shareable hero: destination photo, centered score ring,
           verdict and scale in one screenshot */}
-      <section className="rise-in relative overflow-hidden px-5 py-6 sm:px-9 sm:py-8" style={{ background: INK }}>
+      <section id="report-hero" className="rise-in relative overflow-hidden px-5 py-6 sm:px-9 sm:py-8" style={{ background: INK }}>
         {heroPhoto && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -366,11 +367,14 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
         <div className="absolute inset-0" style={{ background: `radial-gradient(58% 44% at 50% 48%, ${TONES[indexTone].strong}38, transparent 72%)` }} />
 
         <div className="relative">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <p className="eyebrow" style={{ color: "rgba(238,242,248,0.65)" }}>Safety Report</p>
-            <p className="wordmark text-[0.82rem] text-white">
-              IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.5)" }}>.com</span>
-            </p>
+            <span className="flex items-center gap-2.5">
+              <p className="wordmark text-[0.82rem] text-white">
+                IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.5)" }}>.com</span>
+              </p>
+              <ShareButton targetId="report-hero" city={geo.city} score={personal.index} answer={levelCfg.answer} />
+            </span>
           </div>
 
           <h1 className="font-display mt-4 text-center text-[clamp(1.7rem,7.5vw,2.2rem)] font-medium leading-[1.08] tracking-tight text-white">
