@@ -1,4 +1,10 @@
-import type { SafetyLevel, SafetySignal } from "./types"
+import type {
+  SafetyLevel,
+  SafetySignal,
+  SafetyReport,
+  SafetyEnrichment,
+  RiskLevel,
+} from "./types"
 
 export interface LevelConfig {
   label: string
@@ -38,6 +44,61 @@ export const LEVELS: Record<SafetyLevel, LevelConfig> = {
     color: "#d4503a",
     answer: "Elevated risk — reconsider",
   },
+}
+
+/** Level band for a 0–100 safety index. */
+export function levelFromIndex(index: number): SafetyLevel {
+  if (index >= 80) return "VERY_SAFE"
+  if (index >= 66) return "SAFE"
+  if (index >= 50) return "MODERATE"
+  if (index >= 34) return "CAUTION"
+  return "HIGH_RISK"
+}
+
+// ─── Final published score (databases + field research) ──────────────
+
+/** 0–100 equivalents for the analyst's qualitative street-crime risk levels. */
+const RISK_LEVEL_SCORE: Record<RiskLevel, number> = {
+  Low: 88,
+  Moderate: 62,
+  High: 38,
+  Severe: 15,
+}
+
+export interface FinalScore {
+  index: number
+  level: SafetyLevel
+  /** true when the on-the-ground research contributed to the number */
+  includesFieldResearch: boolean
+}
+
+/**
+ * The headline score shown in the hero. The multi-database composite is the
+ * backbone (75%); once the field research finishes, its street-crime ratings
+ * and current traveller sentiment fold in (25%). The report is held until the
+ * research completes, so this final number always reflects everything in it.
+ */
+export function computeFinalScore(
+  safety: SafetyReport,
+  intel: SafetyEnrichment | null
+): FinalScore {
+  const ground: number[] = []
+  // Record lookup can miss at runtime if the model emits an off-schema level.
+  const riskScore = (r?: { level: RiskLevel }) => {
+    const v = r ? RISK_LEVEL_SCORE[r.level] : undefined
+    if (v != null) ground.push(v)
+  }
+  riskScore(intel?.robbery)
+  riskScore(intel?.pickpocket)
+  const sentiment = Number(intel?.consumerSentiment?.score)
+  if (Number.isFinite(sentiment)) ground.push(Math.max(0, Math.min(100, sentiment)))
+
+  if (!ground.length) {
+    return { index: safety.index, level: safety.level, includesFieldResearch: false }
+  }
+  const groundScore = ground.reduce((a, b) => a + b, 0) / ground.length
+  const index = Math.round(0.75 * safety.index + 0.25 * groundScore)
+  return { index, level: levelFromIndex(index), includesFieldResearch: true }
 }
 
 /** Color for a 0–100 signal score. */

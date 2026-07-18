@@ -25,13 +25,23 @@ START_SAFETY
   "pickpocket": { "level": "Low|Moderate|High|Severe", "note": "one line on pickpocketing/bag-snatching risk and the hotspots" },
   "consumerSentiment": { "score": 0-100, "label": "short label e.g. 'Mostly positive'", "summary": "1-2 sentences on how safe visitors report feeling day-to-day, from recent traveller reports" },
   "watchOuts": ["specific thing to watch out for in this city right now (incl. any seasonal weather hazard)", "another", "another"],
+  "recentIncidents": [
+    { "when": "Jun 2026", "what": "one line: a real recent incident, trend or development relevant to visitor safety", "source": "publication or site name" }
+  ],
   "mapZones": [
     { "name": "specific real district/neighbourhood name", "level": "safe|caution|avoid", "note": "one line: why it's this level for a visitor" }
   ]
 }
 END_SAFETY
 
-For "level" use exactly one of: Low, Moderate, High, Severe. For "score" use a number 0-100. For "mapZones" list 5-8 REAL, individually named districts/neighbourhoods of this specific city (not the whole country) that can be found on a map, each rated "safe" (green), "caution" (yellow — okay but stay alert / avoid after dark) or "avoid" (red). Include a mix of levels where the city warrants it. Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what you found), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.`
+For "level" use exactly one of: Low, Moderate, High, Severe. For "score" use a number 0-100. For "recentIncidents" list 2-4 REAL, dated items you actually found in your web search, most recent first ("when" is a month + year); use [] if genuinely nothing notable. For "mapZones" list 5-8 REAL, individually named districts/neighbourhoods of this specific city (not the whole country) that can be found on a map, each rated "safe" (green), "caution" (yellow — okay but stay alert / avoid after dark) or "avoid" (red). Include a mix of levels where the city warrants it.
+
+DIVISION OF LABOUR — these render on two different pages, so keep them strictly separate:
+- District-by-district safety judgments belong ONLY in mapZones / safeAreas / avoidAreas (shown on the map page). safeAreas and avoidAreas must agree with your mapZones ratings.
+- The prose briefing (shown on the report page) covers the overall picture: verdict, what the data means, the current situation, how to stay safe. Do NOT re-rate individual neighbourhoods in the prose, and never contradict your own mapZones.
+- Do NOT quote the numeric composite index in the prose — the published score is recomputed after your research lands and may differ.
+
+Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what you found), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.`
 
 function buildPrompt(geo: GeoPoint, bundle: SafetyBundle): string {
   const s = bundle.safety

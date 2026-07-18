@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react"
+import Link from "next/link"
 import {
   ShieldAlert,
   Landmark,
@@ -8,6 +9,8 @@ import {
   Newspaper,
   Gauge,
   MapPin,
+  Map as MapIcon,
+  Radar,
   Wind,
   Building2,
   CloudSun,
@@ -24,7 +27,8 @@ import type {
   Comparison,
   DestinationImages,
 } from "@/lib/types"
-import { computeCategories, scoreColor, LEVELS, type CategoryKey } from "@/lib/safety-display"
+import { computeCategories, computeFinalScore, scoreColor, LEVELS, type CategoryKey } from "@/lib/safety-display"
+import { personalizeScore, profileSummary, type TravelerProfile } from "@/lib/profile"
 import { extractSourceLinksFromText, sourceUrlForName, sourceUrlForSearchQuery } from "@/lib/source-links"
 import { CategoryTiles } from "./CategoryTiles"
 import { InfoTip } from "./InfoTip"
@@ -287,13 +291,14 @@ interface Props {
   bundle: SafetyBundle
   images: DestinationImages | null
   intel: SafetyEnrichment | null
+  profile?: TravelerProfile | null
   prose: string
   searchQueries: string[]
   loading: boolean
   generatedAt: string
 }
 
-export function TrafficReport({ bundle, images, intel, prose, searchQueries, loading, generatedAt }: Props) {
+export function TrafficReport({ bundle, images, intel, profile = null, prose, searchQueries, loading, generatedAt }: Props) {
   const safety = bundle.safety
   const geo = bundle.geo
   const flag = bundle.country?.flag
@@ -301,8 +306,14 @@ export function TrafficReport({ bundle, images, intel, prose, searchQueries, loa
   const categories = computeCategories(safety.signals)
   const catScore = (k: CategoryKey) => categories.find((c) => c.key === k)?.score ?? null
   const homicideCmp = safety.comparisons.find((c) => /homicide/i.test(c.metric))
-  const levelCfg = LEVELS[safety.level]
-  const indexTone = toneForScore(safety.index)
+  // The published score blends the database composite with the field research
+  // (street-crime ratings + traveller sentiment) — it's only final once the
+  // research is in, which is why the page holds the report until then. A
+  // traveller profile then deterministically re-weights it for who's going.
+  const final = computeFinalScore(safety, intel)
+  const personal = personalizeScore(final, categories, profile)
+  const levelCfg = LEVELS[personal.level]
+  const indexTone = toneForScore(personal.index)
   // The tone colours are tuned for light panels; lift them toward white so the
   // hero ring and pill stay vivid on the dark photo backdrop.
   const heroAccent = `color-mix(in oklab, ${TONES[indexTone].strong} 66%, #f4f7fb)`
@@ -327,6 +338,7 @@ export function TrafficReport({ bundle, images, intel, prose, searchQueries, loa
   const intelLinks = useMemo(() => extractSourceLinksFromText(prose), [prose])
   const intelFallback = sourceUrlForSearchQuery(searchQueries[searchQueries.length - 1] ?? null)
   const intelSourceHref = intelLinks[0] ?? intelFallback ?? null
+  const mapHref = `/map?place=${encodeURIComponent(`${geo.city}, ${geo.country}`)}`
 
   return (
     <div className="mx-auto max-w-[640px] overflow-hidden sm:rounded-[3px]" style={{ border: `1px solid ${RULE}`, boxShadow: "var(--shadow-float)" }}>
@@ -370,7 +382,7 @@ export function TrafficReport({ bundle, images, intel, prose, searchQueries, loa
           </p>
 
           <div className="mt-5">
-            <ScoreRing score={safety.index} accent={heroAccent} strong={TONES[indexTone].strong} />
+            <ScoreRing score={personal.index} accent={heroAccent} strong={TONES[indexTone].strong} />
           </div>
 
           <div className="mt-4 text-center">
@@ -385,11 +397,25 @@ export function TrafficReport({ bundle, images, intel, prose, searchQueries, loa
               <Gauge size={14} strokeWidth={2.4} className="shrink-0" style={{ color: heroAccent }} />
               {levelCfg.answer}
             </span>
+            {personal.personalized && profile && (
+              <p className="mt-2 flex items-center justify-center gap-1 text-[0.72rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
+                <span className="font-semibold uppercase tracking-[0.1em]" style={{ color: heroAccent }}>Personalised</span>
+                {profileSummary(profile)}
+                <InfoTip
+                  text={`Deterministically re-weighted for your group — same answers always give the same score. ${personal.drivers.join(", ")}. General score: ${personal.baseIndex}/100.`}
+                  color="rgba(238,242,248,0.7)"
+                />
+              </p>
+            )}
             {safety.saferThanPct != null && (
               <p className="mt-2 flex items-center justify-center gap-1 text-[0.75rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
                 Safer than ~{safety.saferThanPct}% of countries
                 <InfoTip
-                  text="A single 0–100 score blending every signal below (crime, governance, health, advisories, weather) by weight. 100 = safest."
+                  text={
+                    final.includesFieldResearch
+                      ? "A single 0–100 score. The database composite (crime, governance, health, advisories, weather) carries 75%; the live field research — street-crime ratings and current traveller sentiment — carries 25%. Computed once the research completes. 100 = safest."
+                      : "A single 0–100 score blending every signal below (crime, governance, health, advisories, weather) by weight. 100 = safest."
+                  }
                   color="rgba(238,242,248,0.7)"
                 />
                 {sourceUrlForName("World Bank Governance Indicators") && (
@@ -560,28 +586,50 @@ export function TrafficReport({ bundle, images, intel, prose, searchQueries, loa
         </div>
       </Block>
 
-      {/* on the ground (AI) */}
+      {/* current situation (live field research) */}
       <Block
         id="sec-local-intel"
         tone={intelTone}
-        eyebrow="05 · On the Ground"
-        title="Local Intelligence"
-        icon={<Newspaper size={13} strokeWidth={2.4} />}
+        eyebrow="05 · Field Research"
+        title="Current Situation"
+        icon={<Radar size={13} strokeWidth={2.4} />}
         statusWord={intel ? toneWord[intelTone] : "Researching…"}
-        info="Synthesised by an AI analyst from live web search — current incidents, neighbourhood detail, scams and practical advice that databases can't capture. This panel's colour reflects how safe it is on the ground right now."
+        info="What it's like on the ground right now — researched live from current news and traveller reports, independently of the databases above. District-by-district ratings live on the Safety Map page. This panel's colour reflects conditions right now."
         delay={440}
       >
         {intel ? (
           <>
             <p className="font-display flex items-center gap-1 text-[1.02rem] leading-[1.6]" style={{ color: INK }}>
               {intel.verdict}
-              {intelSourceHref && <SourceLink href={intelSourceHref} label="local intelligence" color={`${INK}99`} />}
+              {intelSourceHref && <SourceLink href={intelSourceHref} label="field research" color={`${INK}99`} />}
             </p>
             {intel.summary && (
               <p className="mt-2 flex items-center gap-1 text-[0.86rem] leading-relaxed" style={{ color: `${INK}c8` }}>
                 {intel.summary}
-                {intelSourceHref && <SourceLink href={intelSourceHref} label="local intelligence summary" color={`${INK}99`} />}
+                {intelSourceHref && <SourceLink href={intelSourceHref} label="field research summary" color={`${INK}99`} />}
               </p>
+            )}
+
+            {!!intel.recentIncidents?.length && (
+              <div className="mt-5 rounded-[3px] px-4 py-3" style={{ background: "rgba(255,255,255,0.45)" }}>
+                <p className="flex items-center gap-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.12em]" style={{ color: it.deep }}>
+                  <Newspaper size={12} strokeWidth={2.2} /> Recent developments
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {intel.recentIncidents.slice(0, 4).map((r) => (
+                    <li key={r.what} className="flex items-start gap-2.5 text-[0.84rem] leading-relaxed" style={{ color: INK }}>
+                      <span className="tnum mt-[2px] shrink-0 whitespace-nowrap rounded-sm px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.06em]" style={{ background: `${it.strong}22`, color: it.deep }}>
+                        {r.when}
+                      </span>
+                      <span>
+                        {r.what}
+                        {r.source && <span className="ml-1.5 text-[0.68rem]" style={{ color: `${INK}88` }}>— {r.source}</span>}
+                        {intelSourceHref && <SourceLink href={intelSourceHref} label="recent development source" color={`${INK}99`} className="ml-1" />}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {!!intel.scams?.length && (
@@ -599,6 +647,19 @@ export function TrafficReport({ bundle, images, intel, prose, searchQueries, loa
                 </ul>
               </div>
             )}
+
+            {/* neighbourhood ratings live on the map page, not here */}
+            <Link
+              href={mapHref}
+              className="mt-4 flex items-center justify-between gap-3 rounded-[3px] px-4 py-3 transition-opacity hover:opacity-75"
+              style={{ background: `${it.deep}12`, border: `1px solid ${it.deep}2e` }}
+            >
+              <span className="flex items-center gap-2 text-[0.82rem] font-medium" style={{ color: INK }}>
+                <MapIcon size={14} strokeWidth={2.2} className="shrink-0" style={{ color: it.deep }} />
+                Which areas are safe? District-by-district ratings are on the Safety Map
+              </span>
+              <span className="shrink-0 text-[0.85rem] font-semibold" style={{ color: it.deep }}>→</span>
+            </Link>
           </>
         ) : (
           <PendingLines queries={searchQueries} />

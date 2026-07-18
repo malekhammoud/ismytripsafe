@@ -1,13 +1,15 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
+import { ProfileSetup } from "@/components/ProfileSetup"
 import { TrafficReport } from "@/components/report/TrafficReport"
 import { TopNav } from "@/components/report/TopNav"
 import { useReport } from "@/lib/store"
+import { profileFromParams, profileToParams, type TravelerProfile } from "@/lib/profile"
 import type { SafetyQuery } from "@/lib/types"
 
 export default function Home() {
@@ -25,23 +27,59 @@ export default function Home() {
     reset,
   } = useReport()
   const router = useRouter()
+  // A search sits here while the traveller answers "who's going?" — the report
+  // only starts once the profile is confirmed (or skipped).
+  const [pending, setPending] = useState<SafetyQuery | null>(null)
+  const [profile, setProfile] = useState<TravelerProfile | null>(null)
 
   const loading = status === "loading"
   const started = status !== "idle"
 
   // Re-hydrate from the URL — a reload, a direct link, or the browser's back/
   // forward button lands here with an empty store, so replay from cache using
-  // the place carried in `?place=`.
+  // the place (and traveller profile) carried in the query string.
   useEffect(() => {
     if (status !== "idle") return
-    const place = new URLSearchParams(window.location.search).get("place")
-    if (place) run({ place })
+    const params = new URLSearchParams(window.location.search)
+    const place = params.get("place")
+    if (place) {
+      setProfile(profileFromParams(params))
+      run({ place })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const search = (q: SafetyQuery) => {
-    router.replace(`/?place=${encodeURIComponent(q.place)}`)
+    setPending(q)
+  }
+
+  const startReport = (q: SafetyQuery, p: TravelerProfile | null) => {
+    const params = new URLSearchParams({ place: q.place })
+    if (p) profileToParams(p, params)
+    router.replace(`/?${params.toString()}`)
+    setProfile(p)
+    setPending(null)
     run(q)
+  }
+
+  // ─── Personalise (between search and report) ───────────────
+  if (!started && pending) {
+    return (
+      <main className="relative z-10 mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-5 py-16">
+        <div
+          className="pointer-events-none fixed inset-0 -z-10"
+          style={{
+            background:
+              "radial-gradient(55% 50% at 80% 8%, rgba(31,116,207,0.12), transparent 70%), radial-gradient(45% 45% at 8% 92%, rgba(20,157,90,0.1), transparent 70%)",
+          }}
+        />
+        <ProfileSetup
+          place={pending.place}
+          onConfirm={(p) => startReport(pending, p)}
+          onSkip={() => startReport(pending, null)}
+        />
+      </main>
+    )
   }
 
   // ─── Landing ───────────────────────────────────────────────
@@ -100,8 +138,8 @@ export default function Home() {
           <button onClick={reset} className="btn mt-4 px-5 py-2.5 text-sm">Try again</button>
         </div>
       ) : loading && !intel ? (
-        // Hold the whole report — including the Rating — until the local
-        // intelligence research is in, so nothing contradicts a late verdict.
+        // Hold the whole report until the field research is in — the final
+        // score blends it, so nothing renders before it can be computed.
         <div className="mx-auto max-w-[640px]">
           <AssessmentProgress
             geo={geo}
@@ -117,6 +155,7 @@ export default function Home() {
           bundle={bundle}
           images={images}
           intel={intel}
+          profile={profile}
           prose={prose}
           searchQueries={queries}
           loading={loading}

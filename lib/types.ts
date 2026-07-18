@@ -128,6 +128,13 @@ export interface ConsumerSentiment {
 
 export type ZoneLevel = "safe" | "caution" | "avoid"
 
+/** A dated, recent development relevant to visitor safety (report page). */
+export interface RecentIncident {
+  when: string // e.g. "Jun 2026"
+  what: string // one line: the incident / trend and why a visitor should care
+  source?: string // publication or site name
+}
+
 /** A named district plotted as a colour-coded zone on the map. */
 export interface MapZone {
   name: string // district / neighbourhood name (geocodable)
@@ -148,6 +155,7 @@ export interface SafetyEnrichment {
   consumerSentiment?: ConsumerSentiment // how safe visitors feel (map page)
   watchOuts?: string[] // current things to watch out for (map page)
   mapZones?: MapZone[] // districts to plot as coloured zones on the map
+  recentIncidents?: RecentIncident[] // dated recent developments (report page)
 }
 
 // ─── Bundle / inputs / stream ───────────────────────────────────────

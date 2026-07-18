@@ -1,10 +1,10 @@
 import type {
   SafetyReport,
-  SafetyLevel,
   SafetySignal,
   SafetySource,
   OfficialAdvisory,
 } from "../types"
+import { levelFromIndex } from "../safety-display"
 import { gatherSignals } from "./signals"
 import { getOfficialAdvisories, stateDeptLevelScore } from "./advisories"
 import type { GeoPoint } from "../types"
@@ -31,14 +31,6 @@ const WEIGHTS: Record<string, number> = {
   air_quality: 0.03,
   regulatory: 0.03,
   voice: 0.03,
-}
-
-function levelFromIndex(index: number): SafetyLevel {
-  if (index >= 80) return "VERY_SAFE"
-  if (index >= 66) return "SAFE"
-  if (index >= 50) return "MODERATE"
-  if (index >= 34) return "CAUTION"
-  return "HIGH_RISK"
 }
 
 function compositeIndex(signals: SafetySignal[]): number {
