@@ -22,6 +22,7 @@ import type {
   RiskLevel,
   RiskRating,
   Comparison,
+  DestinationImages,
 } from "@/lib/types"
 import { computeCategories, scoreColor, LEVELS, type CategoryKey } from "@/lib/safety-display"
 import { extractSourceLinksFromText, sourceUrlForName, sourceUrlForSearchQuery } from "@/lib/source-links"
@@ -129,10 +130,10 @@ function SignalRow({ signal, extra }: { signal: SafetySignal | undefined; extra?
           {signal.label}
           <InfoTip text={signal.note} color={INK} align="left" />
         </p>
-        <p className="tnum flex shrink-0 items-center gap-1.5 text-[0.82rem]" style={{ color: "var(--ink-soft)" }}>
+        <div className="tnum flex shrink-0 items-center gap-1.5 text-[0.82rem]" style={{ color: "var(--ink-soft)" }}>
           {signal.display}
           {extra}
-        </p>
+        </div>
       </div>
       <div className="mt-1.5 flex items-center gap-3">
         <ScoreBar value={has ? (signal.score as number) : 0} color={c} track="rgba(20,25,34,0.08)" />
@@ -169,24 +170,26 @@ function ContextHover({ comparison }: { comparison: Comparison | undefined }) {
         className={`pointer-events-none absolute right-0 top-[calc(100%+7px)] z-30 w-[260px] rounded-[6px] p-3 shadow-[var(--shadow-float)] transition-opacity duration-150 group-hover:opacity-100 ${open ? "opacity-100" : "opacity-0"}`}
         style={{ background: "#fff", border: "1px solid var(--hairline)" }}
       >
-        <p className="mb-2 text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--ink-faint)" }}>
+        {/* spans (display-styled) rather than p/div — this tooltip can render
+            inside inline flow, where block elements break HTML nesting rules */}
+        <span className="mb-2 block text-[0.62rem] font-semibold uppercase tracking-[0.12em]" style={{ color: "var(--ink-faint)" }}>
           {comparison.metric} · {comparison.unit}
-        </p>
-        <div className="space-y-1">
+        </span>
+        <span className="block space-y-1">
           {comparison.entries.map((e) => (
-            <div key={e.name} className="flex items-center gap-2">
+            <span key={e.name} className="flex items-center gap-2">
               <span className="w-[5.6rem] shrink-0 truncate text-[0.68rem]" style={{ color: e.isTarget ? "var(--ink)" : "var(--ink-faint)", fontWeight: e.isTarget ? 700 : 400 }}>
                 {e.name}
               </span>
-              <div className="h-[6px] flex-1 rounded-sm" style={{ background: "rgba(20,25,34,0.06)" }}>
-                <div className="h-full rounded-sm" style={{ width: `${(e.value / max) * 100}%`, background: e.isTarget ? "#d4503a" : "rgba(212,80,58,0.4)" }} />
-              </div>
+              <span className="block h-[6px] flex-1 rounded-sm" style={{ background: "rgba(20,25,34,0.06)" }}>
+                <span className="block h-full rounded-sm" style={{ width: `${(e.value / max) * 100}%`, background: e.isTarget ? "#d4503a" : "rgba(212,80,58,0.4)" }} />
+              </span>
               <span className="tnum w-8 shrink-0 text-right text-[0.66rem]" style={{ color: e.isTarget ? "var(--ink)" : "var(--ink-faint)", fontWeight: e.isTarget ? 700 : 400 }}>
                 {e.value}
               </span>
-            </div>
+            </span>
           ))}
-        </div>
+        </span>
       </span>
     </span>
   )
@@ -257,8 +260,32 @@ function StatTile({ icon, k, signal }: { icon: ReactNode; k: string; signal: Saf
 
 // ————— main —————
 
+/** Circular 0–100 meter with the score centered inside — the hero's focal point. */
+function ScoreRing({ score, accent, strong }: { score: number; accent: string; strong: string }) {
+  const R = 54
+  const C = 2 * Math.PI * R
+  const filled = (Math.max(0, Math.min(100, score)) / 100) * C
+  return (
+    <div className="relative mx-auto h-[168px] w-[168px] sm:h-[192px] sm:w-[192px]">
+      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" style={{ filter: `drop-shadow(0 0 16px ${strong}66)` }}>
+        <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(238,242,248,0.16)" strokeWidth="6.5" />
+        <circle cx="60" cy="60" r={R} fill="none" stroke={accent} strokeWidth="6.5" strokeLinecap="round" strokeDasharray={`${filled} ${C}`} />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <p className="font-display leading-none text-white" style={{ fontSize: "clamp(2.9rem,12vw,3.5rem)", fontWeight: 560, letterSpacing: "-0.02em" }}>
+          {score}
+        </p>
+        <p className="mt-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.22em]" style={{ color: "rgba(238,242,248,0.6)" }}>
+          / 100
+        </p>
+      </div>
+    </div>
+  )
+}
+
 interface Props {
   bundle: SafetyBundle
+  images: DestinationImages | null
   intel: SafetyEnrichment | null
   prose: string
   searchQueries: string[]
@@ -266,7 +293,7 @@ interface Props {
   generatedAt: string
 }
 
-export function TrafficReport({ bundle, intel, prose, searchQueries, loading, generatedAt }: Props) {
+export function TrafficReport({ bundle, images, intel, prose, searchQueries, loading, generatedAt }: Props) {
   const safety = bundle.safety
   const geo = bundle.geo
   const flag = bundle.country?.flag
@@ -276,6 +303,18 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
   const homicideCmp = safety.comparisons.find((c) => /homicide/i.test(c.metric))
   const levelCfg = LEVELS[safety.level]
   const indexTone = toneForScore(safety.index)
+  // The tone colours are tuned for light panels; lift them toward white so the
+  // hero ring and pill stay vivid on the dark photo backdrop.
+  const heroAccent = `color-mix(in oklab, ${TONES[indexTone].strong} 66%, #f4f7fb)`
+  // Wikimedia lead images arrive at up to 3840px — request the 1280px thumb
+  // bucket instead so the hero paints fast; other hosts pass through untouched.
+  // On any load failure the <img> falls back to the original URL. Country pages
+  // often lead with a flag / coat of arms / map (SVG-derived) — skip those, the
+  // dark tone-glow backdrop looks better than a stretched flag.
+  const heroPhoto =
+    images?.hero && !/flag_of|coat_of_arms|locator|\.svg/i.test(images.hero)
+      ? images.hero.replace(/\/\d{3,4}px-([^/]+)$/, "/1280px-$1")
+      : null
   // The "on the ground" block reflects how safe it actually is right now — the
   // AI's current-sentiment read if present, otherwise the overall rating — so a
   // "not safe right now" verdict never sits on a green panel.
@@ -291,91 +330,108 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
 
   return (
     <div className="mx-auto max-w-[640px] overflow-hidden sm:rounded-[3px]" style={{ border: `1px solid ${RULE}`, boxShadow: "var(--shadow-float)" }}>
-      {/* masthead */}
-      <section className="rise-in px-7 py-7 sm:px-9" style={{ background: INK }}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="eyebrow" style={{ color: "rgba(238,242,248,0.55)" }}>Safety Report</p>
-            <h1 className="font-display mt-1.5 text-[2rem] font-medium leading-none tracking-tight text-white">
-              {geo.city} {flag && <span className="align-middle text-[1.4rem]">{flag}</span>}
-            </h1>
-            <p className="mt-2 flex items-center gap-1.5 text-[0.78rem]" style={{ color: "rgba(238,242,248,0.6)" }}>
-              <MapPin size={12} strokeWidth={2} />
-              {geo.country}{generatedAt ? ` · Assessed ${generatedAt}` : ""}
+      {/* masthead — the shareable hero: destination photo, centered score ring,
+          verdict and scale in one screenshot */}
+      <section className="rise-in relative overflow-hidden px-5 py-6 sm:px-9 sm:py-8" style={{ background: INK }}>
+        {heroPhoto && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={heroPhoto}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ objectPosition: "center 35%" }}
+            onError={(e) => {
+              const img = e.currentTarget
+              if (images?.hero && img.src !== images.hero) img.src = images.hero
+              else img.style.display = "none"
+            }}
+          />
+        )}
+        {/* ink scrim so type stays readable over any photo, plus a tone-coloured
+            glow behind the ring that carries the verdict colour */}
+        <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, ${INK}e8 0%, ${INK}a6 30%, ${INK}b0 62%, ${INK}f2 100%)` }} />
+        <div className="absolute inset-0" style={{ background: `radial-gradient(58% 44% at 50% 48%, ${TONES[indexTone].strong}38, transparent 72%)` }} />
+
+        <div className="relative">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <p className="eyebrow" style={{ color: "rgba(238,242,248,0.65)" }}>Safety Report</p>
+            <p className="wordmark text-[0.82rem] text-white">
+              IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.5)" }}>.com</span>
             </p>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1.5 pt-1">
-            <div className="flex gap-1.5">
-              {(["risky", "caution", "moderate", "safe"] as Tone[]).map((k) => (
-                <span key={k} className="h-2.5 w-2.5 rounded-full" style={{ background: TONES[k].strong, outline: k === indexTone ? "2px solid rgba(255,255,255,0.85)" : "none", outlineOffset: 1.5 }} />
-              ))}
-            </div>
-            <p className="text-[0.62rem] uppercase tracking-[0.14em]" style={{ color: "rgba(238,242,248,0.5)" }}>Read the colors</p>
-          </div>
-        </div>
-      </section>
 
-      {/* category tiles — top of the report, click to jump to a section */}
-      <CategoryTiles categories={categories} />
-
-      {/* composite index */}
-      <Block
-        tone={indexTone}
-        eyebrow="01 · Composite Index"
-        title="Rating"
-        icon={<Gauge size={13} strokeWidth={2.4} />}
-        statusWord={levelCfg.label}
-        info="A single 0–100 score blending every signal below (crime, governance, health, advisories, weather) by weight. 100 = safest."
-        delay={80}
-      >
-        <div className="flex items-end justify-between gap-6">
-          <p className="display-xl tnum" style={{ color: TONES[indexTone].deep, fontWeight: 560 }}>
-            {safety.index}
-            <span className="text-[0.34em] font-normal tracking-normal" style={{ color: `${TONES[indexTone].deep}99` }}> / 100</span>
-            {sourceUrlForName("World Bank Open Data") && (
-              <SourceLink
-                href={sourceUrlForName("World Bank Open Data")!}
-                label="composite index inputs"
-                color={`${TONES[indexTone].deep}aa`}
-                className="ml-1"
-              />
-            )}
+          <h1 className="font-display mt-4 text-center text-[clamp(1.7rem,7.5vw,2.2rem)] font-medium leading-[1.08] tracking-tight text-white">
+            {geo.city} {flag && <span className="align-middle text-[0.72em]">{flag}</span>}
+          </h1>
+          <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[0.76rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
+            <MapPin size={12} strokeWidth={2} className="shrink-0" />
+            {geo.country}{generatedAt ? ` · Assessed ${generatedAt}` : ""}
           </p>
-          <div className="pb-2 text-right">
-            <p className="text-[0.95rem] font-semibold" style={{ color: INK }}>{levelCfg.answer}</p>
+
+          <div className="mt-5">
+            <ScoreRing score={safety.index} accent={heroAccent} strong={TONES[indexTone].strong} />
+          </div>
+
+          <div className="mt-4 text-center">
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[0.88rem] font-semibold text-white"
+              style={{
+                background: `color-mix(in oklab, ${TONES[indexTone].strong} 42%, ${INK}cc)`,
+                border: `1px solid color-mix(in oklab, ${TONES[indexTone].strong} 65%, transparent)`,
+                boxShadow: `0 4px 20px -6px ${TONES[indexTone].strong}88`,
+              }}
+            >
+              <Gauge size={14} strokeWidth={2.4} className="shrink-0" style={{ color: heroAccent }} />
+              {levelCfg.answer}
+            </span>
             {safety.saferThanPct != null && (
-              <p className="mt-0.5 flex items-center justify-end gap-1 text-[0.78rem]" style={{ color: `${INK}99` }}>
+              <p className="mt-2 flex items-center justify-center gap-1 text-[0.75rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
                 Safer than ~{safety.saferThanPct}% of countries
+                <InfoTip
+                  text="A single 0–100 score blending every signal below (crime, governance, health, advisories, weather) by weight. 100 = safest."
+                  color="rgba(238,242,248,0.7)"
+                />
                 {sourceUrlForName("World Bank Governance Indicators") && (
                   <SourceLink
                     href={sourceUrlForName("World Bank Governance Indicators")!}
                     label="safer than percentile"
-                    color={`${INK}99`}
+                    color="rgba(238,242,248,0.6)"
                   />
                 )}
               </p>
             )}
           </div>
-        </div>
-        <div className="mt-5">
-          <ScoreBar value={safety.index} color={TONES[indexTone].strong} track={TONES[indexTone].track} style={{ height: 8 }} />
-          <div className="mt-1.5 flex justify-between text-[0.62rem] font-semibold uppercase tracking-[0.14em]" style={{ color: `${TONES[indexTone].deep}aa` }}>
+
+          <div
+            className="mt-5 flex items-center justify-center gap-2.5 text-[0.6rem] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: "rgba(238,242,248,0.6)" }}
+            aria-label="Report color scale"
+          >
             <span>High risk</span>
+            <span className="flex items-center gap-1.5">
+              {(["risky", "caution", "moderate", "safe"] as Tone[]).map((k) => (
+                <span key={k} className="h-2 w-2 rounded-full" style={{ background: TONES[k].strong, outline: k === indexTone ? "2px solid rgba(255,255,255,0.85)" : "none", outlineOffset: 1.5 }} />
+              ))}
+            </span>
             <span>Very safe</span>
           </div>
         </div>
-      </Block>
+      </section>
+
+      {/* category tiles — click to jump to a section */}
+      <CategoryTiles categories={categories} />
 
       {/* advisories */}
       <Block
         id="sec-advisories"
         tone={toneForScore(catScore("advisories"))}
-        eyebrow="02 · Official Guidance"
+        eyebrow="01 · Official Guidance"
         title="Advisories"
         icon={<ShieldAlert size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "advisories")?.levelName ?? ""}
         info="Travel advisories issued directly by governments — the U.S. State Department (Level 1–4) and the UK Foreign Office (FCDO). Shown verbatim from their feeds."
-        delay={160}
+        delay={120}
       >
         {safety.advisories.length ? (
           <div className="space-y-4">
@@ -408,12 +464,12 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
       <Block
         id="sec-crime"
         tone={toneForScore(catScore("crime"))}
-        eyebrow="03 · Evidence Signals"
+        eyebrow="02 · Evidence Signals"
         title="Crime"
         icon={<Siren size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "crime")?.levelName ?? ""}
         info="Violent- and street-crime risk from homicide, night-safety and victimization surveys, trafficking and bribery indicators, business crime exposure, plus Numbeo crime/safety indices when available. Robbery and pickpocketing are assessed from current on-the-ground reporting."
-        delay={240}
+        delay={200}
       >
         <div>
           <SignalRow signal={sig("homicide")} extra={<ContextHover comparison={homicideCmp} />} />
@@ -446,12 +502,12 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
       <Block
         id="sec-health"
         tone={toneForScore(catScore("health"))}
-        eyebrow="04 · Environment"
+        eyebrow="03 · Environment"
         title="Health & Air"
         icon={<HeartPulse size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "health")?.levelName ?? ""}
         info="Live air quality, nearby hospitals, the seasonal extreme-weather outlook, and any active CDC disease notices for this destination."
-        delay={320}
+        delay={280}
       >
         <div className="grid grid-cols-3 gap-px" style={{ background: `${TONES.safe.deep}26` }}>
           <StatTile icon={<Wind size={13} strokeWidth={2} />} k="Air quality" signal={sig("air_quality")} />
@@ -487,12 +543,12 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
       <Block
         id="sec-stability"
         tone={toneForScore(catScore("stability"))}
-        eyebrow="05 · Institutions"
+        eyebrow="04 · Institutions"
         title="Stability"
         icon={<Landmark size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "stability")?.levelName ?? ""}
         info="The World Bank's Worldwide Governance Indicators — percentile ranks (vs every country) for the institutions that keep travellers safe when something goes wrong."
-        delay={400}
+        delay={360}
       >
         <div>
           <SignalRow signal={sig("stability")} />
@@ -508,12 +564,12 @@ export function TrafficReport({ bundle, intel, prose, searchQueries, loading, ge
       <Block
         id="sec-local-intel"
         tone={intelTone}
-        eyebrow="06 · On the Ground"
+        eyebrow="05 · On the Ground"
         title="Local Intelligence"
         icon={<Newspaper size={13} strokeWidth={2.4} />}
         statusWord={intel ? toneWord[intelTone] : "Researching…"}
         info="Synthesised by an AI analyst from live web search — current incidents, neighbourhood detail, scams and practical advice that databases can't capture. This panel's colour reflects how safe it is on the ground right now."
-        delay={480}
+        delay={440}
       >
         {intel ? (
           <>

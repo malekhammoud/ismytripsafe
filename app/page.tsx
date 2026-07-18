@@ -14,6 +14,7 @@ export default function Home() {
   const {
     status,
     geo,
+    images,
     bundle,
     intel,
     prose,
@@ -114,6 +115,7 @@ export default function Home() {
       ) : bundle ? (
         <TrafficReport
           bundle={bundle}
+          images={images}
           intel={intel}
           prose={prose}
           searchQueries={queries}
