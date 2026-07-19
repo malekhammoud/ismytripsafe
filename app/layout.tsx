@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 import { Fraunces } from "next/font/google"
+import { SITE_URL } from "@/lib/site"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -15,9 +16,18 @@ const fraunces = Fraunces({
 })
 
 export const metadata: Metadata = {
-  title: "Is It Safe? — Travel Safety Intelligence",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "IsMyTripSafe — Is It Safe to Travel There? Data-Backed Safety Reports",
+    template: "%s | IsMyTripSafe",
+  },
   description:
-    "One honest safety verdict for any city or country, backed by 10+ real databases: crime, governance, health, air quality, nearby hospitals, weather and government advisory data.",
+    "One honest safety verdict for any city or country, backed by 15+ real databases: crime, governance, health, air quality, natural hazards, weather and official government advisories.",
+  openGraph: {
+    siteName: "IsMyTripSafe",
+    type: "website",
+  },
+  robots: { index: true, follow: true },
 }
 
 export default function RootLayout({

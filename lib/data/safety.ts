@@ -11,6 +11,7 @@ import type { GeoPoint } from "../types"
 
 // Weights for the composite index (signals not present are skipped & renormalized).
 const WEIGHTS: Record<string, number> = {
+  natural_hazards: 0.03,
   homicide: 0.2,
   safe_walking_dark: 0.09,
   violence_victimization: 0.08,
@@ -63,28 +64,56 @@ function saferThanPct(signals: SafetySignal[], index: number): number | null {
   return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
 }
 
-/** Build the "Official guidance" index signal from the US State Dept level. */
+/**
+ * Build the "Official guidance" index signal from every graded advisory.
+ * The US and Canadian levels share a 1–4 scale and are averaged; the UK's
+ * structured alert rank only stands in when neither is available.
+ */
 function advisorySignal(advisories: OfficialAdvisory[]): SafetySignal {
+  const graded = advisories.filter(
+    (a) => a.level != null && (a.sourceShort === "US" || a.sourceShort === "CA")
+  )
+  const pool = graded.length
+    ? graded
+    : advisories.filter((a) => a.level != null)
+
   const us = advisories.find((a) => a.sourceShort === "US" && a.level != null)
-  const score = us?.level != null ? stateDeptLevelScore(us.level) : null
+  const lead = us ?? pool[0]
+
+  const score = pool.length
+    ? Math.round(
+        pool.reduce((sum, a) => sum + stateDeptLevelScore(a.level as number), 0) /
+          pool.length
+      )
+    : null
+
+  const display = lead
+    ? `Level ${lead.level} — ${lead.levelLabel}` +
+      (pool.length > 1 ? ` · ${pool.length} govts` : "")
+    : "No advisory"
+
   return {
     key: "advisory",
     label: "Government travel advisory",
     group: "Official guidance",
-    source: "U.S. Department of State",
-    value: us?.level ?? null,
-    display: us ? `Level ${us.level} — ${us.levelLabel}` : "No advisory",
+    source: us
+      ? pool.length > 1
+        ? "US State Dept · Canada"
+        : "U.S. Department of State"
+      : (lead?.source ?? "U.S. Department of State"),
+    value: lead?.level ?? null,
+    display,
     year: null,
+    note:
+      lead?.summary ||
+      "Official government travel advisory levels (1 = normal precautions, 4 = do not travel), averaged across issuing governments.",
     score,
     lowerIsBetter: true,
-    note:
-      us?.summary ||
-      "U.S. State Department travel advisory level (1 = normal precautions, 4 = do not travel).",
   }
 }
 
 export async function getSafetyReport(geo: GeoPoint): Promise<SafetyReport> {
-  const [{ signals: baseSignals, comparisons, health }, advisories] =
+  const [{ signals: baseSignals, comparisons, health, hazardEvents, quakeSummary }, advisories] =
     await Promise.all([gatherSignals(geo), getOfficialAdvisories(geo)])
 
   // Fold the official advisory into the scored signals (drives the index).
@@ -111,5 +140,7 @@ export async function getSafetyReport(geo: GeoPoint): Promise<SafetyReport> {
     advisories,
     health,
     sources,
+    hazardEvents,
+    quakeSummary,
   }
 }

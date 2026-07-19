@@ -213,12 +213,59 @@ async function fetchFCDO(iso2: string): Promise<OfficialAdvisory | null> {
   }
 }
 
+// ─── Government of Canada ────────────────────────────────────────────
+
+const CANADA_JSON =
+  "https://data.international.gc.ca/travel-voyage/index-alpha-eng.json"
+
+interface CanadaEntry {
+  "country-iso"?: string
+  "advisory-state"?: number
+  "date-published"?: { asp?: string; date?: string }
+  eng?: { name?: string; "url-slug"?: string; "advisory-text"?: string }
+}
+
+/** Canada's advisory-state runs 0–3; map onto the familiar 1–4 scale. */
+const CANADA_LABEL: Record<number, string> = {
+  0: "Exercise normal security precautions",
+  1: "Exercise a high degree of caution",
+  2: "Avoid non-essential travel",
+  3: "Avoid all travel",
+}
+
+async function fetchCanada(iso2: string): Promise<OfficialAdvisory | null> {
+  const raw = await fetchText(CANADA_JSON, 9000)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as { data?: Record<string, CanadaEntry> }
+    const entry = parsed.data?.[iso2]
+    if (!entry || entry["advisory-state"] == null) return null
+    const state = entry["advisory-state"]
+    const label = entry.eng?.["advisory-text"] || CANADA_LABEL[state] || "See advisory"
+    const slug = entry.eng?.["url-slug"]
+    return {
+      source: "Government of Canada",
+      sourceShort: "CA",
+      level: state + 1, // 0–3 → 1–4, aligned with the US scale
+      levelLabel: label,
+      headline: label,
+      summary: `Canada's official risk level for ${entry.eng?.name ?? iso2}: ${label.toLowerCase()}.`,
+      url: slug
+        ? `https://travel.gc.ca/destinations/${slug}`
+        : "https://travel.gc.ca/travelling/advisories",
+      updated: entry["date-published"]?.asp || entry["date-published"]?.date || null,
+    }
+  } catch {
+    return null
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
  * Fetch official government travel advisories for a place, straight from the
- * issuing governments' data feeds. Sources run in parallel; any that fail are
- * simply omitted (never blocks the others).
+ * issuing governments' data feeds. Three independent sources (US, UK, Canada)
+ * run in parallel; any that fail are simply omitted (never blocks the others).
  */
 export async function getOfficialAdvisories(
   geo: GeoPoint
@@ -227,6 +274,7 @@ export async function getOfficialAdvisories(
   const results = await Promise.allSettled([
     fetchStateDept(iso2),
     fetchFCDO(iso2),
+    fetchCanada(iso2),
   ])
   return results
     .map((r) => (r.status === "fulfilled" ? r.value : null))

@@ -24,6 +24,8 @@ interface ReportState {
   error: string | null
   generatedAt: string
   cached: boolean
+  /** Canonical permanent page for the finished report (e.g. "/portugal/lisbon"). */
+  reportPath: string | null
   run: (q: SafetyQuery) => Promise<void>
   reset: () => void
 }
@@ -45,6 +47,7 @@ export const useReport = create<ReportState>((set, get) => ({
   error: null,
   generatedAt: "",
   cached: false,
+  reportPath: null,
 
   reset: () =>
     set({
@@ -58,6 +61,7 @@ export const useReport = create<ReportState>((set, get) => ({
       queries: [],
       error: null,
       cached: false,
+      reportPath: null,
     }),
 
   run: async (q: SafetyQuery) => {
@@ -75,6 +79,7 @@ export const useReport = create<ReportState>((set, get) => ({
       queries: [],
       error: null,
       cached: false,
+      reportPath: null,
       generatedAt: new Date().toLocaleDateString("en-US", {
         day: "numeric",
         month: "short",
@@ -135,6 +140,7 @@ export const useReport = create<ReportState>((set, get) => ({
               set((s) => ({
                 status: s.status === "error" ? "error" : "done",
                 cached: ev.cached ?? false,
+                reportPath: ev.path ?? s.reportPath,
                 generatedAt: ev.cachedAt
                   ? new Date(ev.cachedAt).toLocaleDateString("en-US", {
                       day: "numeric",

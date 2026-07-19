@@ -98,6 +98,16 @@ export interface HealthNotice {
   scope: "country" | "global"
 }
 
+/** An active natural-disaster alert near the destination (GDACS). */
+export interface HazardEvent {
+  kind: string // "Earthquake" | "Tropical cyclone" | "Flood" | …
+  severity: "green" | "orange" | "red"
+  title: string
+  distanceKm: number
+  url: string
+  date: string | null
+}
+
 export interface SafetyReport {
   index: number // 0–100 composite (100 = safest)
   level: SafetyLevel
@@ -107,6 +117,8 @@ export interface SafetyReport {
   advisories: OfficialAdvisory[] // official govt advisories (direct from source)
   health: HealthNotice[] // CDC travel health notices (direct from source)
   sources: SafetySource[]
+  hazardEvents?: HazardEvent[] // active nearby GDACS disaster alerts
+  quakeSummary?: string | null // one-line USGS seismic-history summary
 }
 
 // ─── AI enrichment (safety-only) ────────────────────────────────────
@@ -180,5 +192,5 @@ export type StreamEvent =
   | { type: "enrichment"; data: SafetyEnrichment }
   | { type: "text"; content: string }
   | { type: "searching"; query: string }
-  | { type: "done"; cached?: boolean; cachedAt?: string }
+  | { type: "done"; cached?: boolean; cachedAt?: string; path?: string }
   | { type: "error"; message: string }

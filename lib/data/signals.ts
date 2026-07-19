@@ -8,6 +8,7 @@ import type {
 import { fetchJson } from "./geo"
 import { countryNameVariants, englishCountryName, iso3Code, normalizeCountryName } from "./country"
 import { getEnvironment } from "./environment"
+import { getHazards, type HazardEvent } from "./hazards"
 import {
   resolveMetric,
   wbLatest,
@@ -767,6 +768,10 @@ export interface SignalsResult {
   signals: SafetySignal[]
   comparisons: Comparison[]
   health: HealthNotice[]
+  /** Active nearby GDACS disaster alerts — extra context for the agent. */
+  hazardEvents: HazardEvent[]
+  /** One-line USGS seismic-history summary, for the agent prompt. */
+  quakeSummary: string | null
 }
 
 /** Gather all safety signals for a place from every database, in parallel. */
@@ -786,11 +791,12 @@ export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
     return resolveMetric(`${iso2}:${d.key}`, chain)
   })
 
-  const [defResults, comparisons, environment, crimeExtras] = await Promise.all([
+  const [defResults, comparisons, environment, crimeExtras, hazards] = await Promise.all([
     Promise.all(defPromises),
     fetchComparisons(iso2),
     getEnvironment(geo),
     fetchCrimeExtras(iso2, geo.city),
+    getHazards(geo),
   ])
 
   const signals: SafetySignal[] = []
@@ -820,7 +826,16 @@ export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
   // Air quality + CDC health + hospitals + weather (direct from source)
   signals.push(...environment.signals)
 
-  return { signals, comparisons, health: environment.health }
+  // Live disaster alerts + seismic history (GDACS / USGS)
+  signals.push(hazards.signal)
+
+  return {
+    signals,
+    comparisons,
+    health: environment.health,
+    hazardEvents: hazards.events,
+    quakeSummary: hazards.quakeSummary,
+  }
 }
 
 const BENCHMARKS = "JP;CH;US;BR;ZA;WLD" // safe → risky + world

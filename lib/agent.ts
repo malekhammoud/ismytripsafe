@@ -1,15 +1,24 @@
 import { spawn } from "child_process"
 import type { SafetyBundle, GeoPoint, StreamEvent } from "./types"
+import type { WikivoyageSafety } from "./data/wikivoyage"
 
 const SYSTEM_PROMPT = `You are a travel-safety analyst. Your ONE job: tell a traveler whether a place is safe, and why. Stay focused on personal safety — not flights, hotels, food or attractions.
 
-You will receive a REAL, multi-database safety profile (World Bank crime & governance indicators, live air quality, nearby-hospital data, seasonal weather) AND the official government travel advisories (U.S. State Department, UK FCDO) pulled straight from those governments' own data feeds. Treat ALL of these as ground truth. The official advisory wording is already shown to the user verbatim from the source — do NOT restate, summarize, or invent advisory levels. Your job is to interpret the data for a human and add the on-the-ground intelligence databases can't capture, verified with live web search:
+You will receive a REAL, multi-database safety profile (World Bank crime & governance indicators, live air quality, nearby-hospital data, seasonal weather, live disaster alerts) AND the official government travel advisories (U.S. State Department, UK FCDO, Canada) pulled straight from those governments' own data feeds. You may also receive the Wikivoyage "Stay safe" section — traveller-maintained background that can be months old: treat it as leads to VERIFY with current search, not as current fact. Treat the databases and advisories as ground truth. The official advisory wording is already shown to the user verbatim from the source — do NOT restate, summarize, or invent advisory levels. Your job is to interpret the data for a human and add the on-the-ground intelligence databases can't capture, verified with live web search:
 - Recent incidents, unrest, protests, crime trends (search the news)
 - Neighborhood-level detail: which specific districts are safe vs. which to avoid
 - Street-crime specifics: how bad is robbery/mugging, and pickpocketing/bag-snatching, for a visitor here
 - How safe visitors actually feel day-to-day (traveller sentiment)
 - Scams and threats that specifically target visitors
 - Seasonal hazards to watch for right now, and practical safety advice
+
+SEARCH STRATEGY — run 4-7 targeted searches, not one generic one:
+1. "<city> safety tourists <current month + year>" — the current picture
+2. "<city> crime news" or "<city> robbery mugging tourist" — recent incidents; prefer local/national news outlets
+3. "<city> protest OR unrest OR strike <year>" — disruption a visitor would walk into
+4. "<city> neighborhoods avoid safe areas" and/or "<city> reddit safe" — district-level detail and unfiltered traveller sentiment
+5. If the Wikivoyage section or the data flags something specific (a scam, a district, an active disaster alert), search to confirm it is still true.
+Prefer sources from the last 6 months; always note WHEN something happened. If searches contradict each other, trust the more recent, more local source, and say so in the briefing.
 
 CRITICAL: Output a single JSON block in EXACTLY this format, then a prose briefing:
 
@@ -43,7 +52,11 @@ DIVISION OF LABOUR — these render on two different pages, so keep them strictl
 
 Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what you found), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.`
 
-function buildPrompt(geo: GeoPoint, bundle: SafetyBundle): string {
+function buildPrompt(
+  geo: GeoPoint,
+  bundle: SafetyBundle,
+  wikivoyage: WikivoyageSafety | null
+): string {
   const s = bundle.safety
   const signalLines = s.signals
     .map(
@@ -75,6 +88,19 @@ function buildPrompt(geo: GeoPoint, bundle: SafetyBundle): string {
         .join("\n")
     : "- (no active CDC health notices)"
 
+  const hazardLines = s.hazardEvents?.length
+    ? s.hazardEvents
+        .map(
+          (h) =>
+            `- [${h.severity.toUpperCase()}] ${h.kind}: ${h.title} (~${h.distanceKm} km away)`
+        )
+        .join("\n")
+    : "- (no active disaster alerts within 500 km)"
+
+  const wikivoyageBlock = wikivoyage
+    ? `\nWikivoyage "Stay safe" background for ${wikivoyage.pageTitle} (traveller-maintained, may be stale — VERIFY anything current with search before repeating it):\n"""\n${wikivoyage.text}\n"""\n`
+    : ""
+
   return `Assess the safety of ${geo.city}, ${geo.country} (${geo.countryCode}) for a traveler.
 
 === REAL MULTI-DATABASE SAFETY PROFILE (ground truth) ===
@@ -89,16 +115,20 @@ ${advisoryLines}
 CDC travel health notices (already shown to the user — do NOT repeat, but you may reference for health tips):
 ${healthLines}
 
+Live disaster alerts near the destination (GDACS):
+${hazardLines}
+${s.quakeSummary ? `Seismic history (USGS): ${s.quakeSummary}\n` : ""}
 How it compares:
 ${comparisonLines}
 ========================================================
-
+${wikivoyageBlock}
 Interpret this for the traveler and add neighborhood-level safety, current incidents (use web search), scams, and practical tips. ${geo.city} is the specific city — focus on it, not just the country. Output the START_SAFETY JSON block first, then your prose briefing.`
 }
 
 export async function* runSafetyAgent(
   geo: GeoPoint,
-  bundle: SafetyBundle
+  bundle: SafetyBundle,
+  wikivoyage: WikivoyageSafety | null = null
 ): AsyncGenerator<StreamEvent> {
   const proc = spawn(
     "/usr/bin/claude",
@@ -108,7 +138,7 @@ export async function* runSafetyAgent(
       "--output-format", "stream-json",
       "--allowedTools", "WebSearch,WebFetch",
       "--append-system-prompt", SYSTEM_PROMPT,
-      buildPrompt(geo, bundle),
+      buildPrompt(geo, bundle, wikivoyage),
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],

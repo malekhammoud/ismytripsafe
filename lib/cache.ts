@@ -11,7 +11,7 @@ import type { GeoPoint, SafetyBundle, SafetyEnrichment, DestinationImages } from
 // service restarts never wipe it.
 // ─────────────────────────────────────────────────────────────────────
 
-const CACHE_DIR = process.env.REPORT_CACHE_DIR || "/var/lib/ismytripsafe/reports"
+export const CACHE_DIR = process.env.REPORT_CACHE_DIR || "/var/lib/ismytripsafe/reports"
 const TTL_MS = (Number(process.env.REPORT_CACHE_TTL_HOURS) || 168) * 3600 * 1000 // 7 days
 
 const CACHE_VERSION = 1
@@ -20,7 +20,8 @@ export interface CachedReport {
   version: number
   key: string
   place: string
-  cachedAt: string // ISO timestamp
+  cachedAt: string // ISO timestamp of the latest data refresh
+  createdAt?: string // ISO timestamp of the FIRST build (survives refreshes)
   geo: GeoPoint
   images: DestinationImages
   bundle: SafetyBundle
@@ -28,7 +29,7 @@ export interface CachedReport {
   prose: string
 }
 
-function slug(s: string): string {
+export function slug(s: string): string {
   return s
     .toLowerCase()
     .normalize("NFKD")
@@ -55,12 +56,24 @@ function fileFor(key: string): string {
 
 /** Read a cached report if it exists and is still within its TTL. */
 export async function readCache(key: string): Promise<CachedReport | null> {
+  const data = await readCacheAnyAge(key)
+  if (!data) return null
+  const age = Date.now() - new Date(data.cachedAt).getTime()
+  if (!Number.isFinite(age) || age > TTL_MS) return null
+  return data
+}
+
+/**
+ * Read a cached report regardless of TTL. The permanent report pages (and the
+ * sitemap) serve every report we've ever completed, labeled with its real
+ * "last updated" date — the TTL only decides when the interactive flow
+ * regenerates.
+ */
+export async function readCacheAnyAge(key: string): Promise<CachedReport | null> {
   try {
     const raw = await fs.readFile(fileFor(key), "utf8")
     const data = JSON.parse(raw) as CachedReport
     if (data.version !== CACHE_VERSION || !data.enrichment || !data.bundle) return null
-    const age = Date.now() - new Date(data.cachedAt).getTime()
-    if (!Number.isFinite(age) || age > TTL_MS) return null
     return data
   } catch {
     return null // missing / unreadable / corrupt → treat as a miss
@@ -74,10 +87,15 @@ export async function writeCache(
 ): Promise<void> {
   try {
     await fs.mkdir(CACHE_DIR, { recursive: true })
+    // A refresh keeps the original publish date — cachedAt tracks the latest
+    // data refresh, createdAt the first build (for honest datePublished).
+    const prior = await readCacheAnyAge(key)
     const payload: CachedReport = {
       version: CACHE_VERSION,
       key,
       cachedAt: report.cachedAt || new Date().toISOString(),
+      createdAt:
+        prior?.createdAt || prior?.cachedAt || report.cachedAt || new Date().toISOString(),
       place: report.place,
       geo: report.geo,
       images: report.images,

@@ -298,9 +298,13 @@ interface Props {
   searchQueries: string[]
   loading: boolean
   generatedAt: string
+  /** "h1" in the SPA (default); "h2" on the permanent report pages, which provide their own h1. */
+  heroHeading?: "h1" | "h2"
+  /** Canonical permanent URL for this report — shown in the footer when set. */
+  permalink?: string | null
 }
 
-export function TrafficReport({ bundle, images, intel, profile = null, prose, searchQueries, loading, generatedAt }: Props) {
+export function TrafficReport({ bundle, images, intel, profile = null, prose, searchQueries, loading, generatedAt, heroHeading = "h1", permalink = null }: Props) {
   const safety = bundle.safety
   const geo = bundle.geo
   const flag = bundle.country?.flag
@@ -378,9 +382,12 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             </span>
           </div>
 
-          <h1 className="font-display mt-4 text-center text-[clamp(1.7rem,7.5vw,2.2rem)] font-medium leading-[1.08] tracking-tight text-white">
+          <Heading
+            as={heroHeading}
+            className="font-display mt-4 text-center text-[clamp(1.7rem,7.5vw,2.2rem)] font-medium leading-[1.08] tracking-tight text-white"
+          >
             {geo.city} {flag && <span className="align-middle text-[0.72em]">{flag}</span>}
-          </h1>
+          </Heading>
           <p className="mt-1.5 flex items-center justify-center gap-1.5 text-[0.76rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
             <MapPin size={12} strokeWidth={2} className="shrink-0" />
             {geo.country}{generatedAt ? ` · Assessed ${generatedAt}` : ""}
@@ -548,6 +555,32 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           <StatTile icon={<CarFront size={13} strokeWidth={2} />} k="Road safety" signal={sig("road_deaths")} />
         </div>
 
+        <div className="mt-2">
+          <SignalRow signal={sig("natural_hazards")} />
+        </div>
+
+        {!!safety.hazardEvents?.length && (
+          <div className="mt-3 space-y-2">
+            {safety.hazardEvents.slice(0, 3).map((h) => (
+              <div key={h.url || h.title} className="flex items-center gap-3 rounded-[3px] px-3.5 py-2.5" style={{ background: "rgba(255,255,255,0.45)" }}>
+                <span
+                  className="shrink-0 rounded-sm px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.1em]"
+                  style={{
+                    background: h.severity === "red" ? `${TONES.risky.strong}2b` : h.severity === "orange" ? `${TONES.caution.strong}2b` : `${TONES.safe.strong}26`,
+                    color: h.severity === "red" ? TONES.risky.deep : h.severity === "orange" ? TONES.caution.deep : TONES.safe.deep,
+                  }}
+                >
+                  {h.kind}
+                </span>
+                <p className="flex items-center gap-1 text-[0.82rem]" style={{ color: INK }}>
+                  {h.title} · ~{h.distanceKm} km away
+                  {h.url && <SourceLink href={h.url} label={h.title} color={`${INK}99`} />}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="mt-5">
           <p className="text-[0.66rem] font-semibold uppercase tracking-[0.14em]" style={{ color: `${TONES.safe.deep}bb` }}>
             CDC travel health notices · {safety.health.length ? `${safety.health.length} active` : "none active"}
@@ -696,6 +729,14 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           <p className="wordmark text-[0.95rem] text-white">IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.45)" }}>.com</span></p>
           <p className="text-[0.68rem] tracking-[0.04em]" style={{ color: "rgba(238,242,248,0.55)" }}>Not legal or medical advice</p>
         </div>
+        {permalink && (
+          <p className="mt-2 text-[0.68rem]" style={{ color: "rgba(238,242,248,0.55)" }}>
+            Permanent report:{" "}
+            <Link href={permalink} className="font-medium underline" style={{ color: "rgba(238,242,248,0.8)" }}>
+              ismytripsafe.com{permalink}
+            </Link>
+          </p>
+        )}
         <p className="mt-3 text-[0.66rem] leading-relaxed" style={{ color: "rgba(238,242,248,0.4)" }}>
           Sources: U.S. State Dept · UK FCDO · World Bank · WGI · UNODC · WHO · UN SDG · Global Terrorism Database · Numbeo · OpenStreetMap · Open-Meteo · CDC. Composite index recomputed at request time.
         </p>
@@ -709,6 +750,22 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
         </div>
       </footer>
     </div>
+  )
+}
+
+function Heading({
+  as,
+  className,
+  children,
+}: {
+  as: "h1" | "h2"
+  className: string
+  children: ReactNode
+}) {
+  return as === "h1" ? (
+    <h1 className={className}>{children}</h1>
+  ) : (
+    <h2 className={className}>{children}</h2>
   )
 }
 

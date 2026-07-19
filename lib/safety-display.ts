@@ -226,9 +226,9 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
     {
       key: "health",
       label: "Health & Air",
-      score: mean(["air_quality", "health", "hospitals", "weather", "road_deaths"]),
+      score: mean(["air_quality", "health", "hospitals", "weather", "road_deaths", "natural_hazards"]),
       note: healthNote,
-      signalKeys: ["air_quality", "health", "hospitals", "weather", "road_deaths"],
+      signalKeys: ["air_quality", "health", "hospitals", "weather", "road_deaths", "natural_hazards"],
       levelName: "",
       color: "",
     },
