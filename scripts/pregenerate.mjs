@@ -5,19 +5,26 @@
 //
 // Usage:
 //   node scripts/pregenerate.mjs places.txt            # one "City, Country" per line
-//   node scripts/pregenerate.mjs places.txt --host http://localhost:3001
+//   node scripts/pregenerate.mjs places.txt --host http://localhost:3000
 //
+// Reports are built and cached by the server that receives the request, so
+// the default targets production. Pass --host http://localhost:3000 when
+// running on the server itself to skip the reverse proxy (each report holds
+// a streaming connection open for a few minutes, which some proxies cut).
 // Lines starting with # are skipped. Run it under nohup/tmux for long lists.
 
 import { readFileSync } from "fs"
 
 const file = process.argv[2]
 if (!file) {
-  console.error("Usage: node scripts/pregenerate.mjs <places.txt> [--host http://localhost:3000]")
+  console.error("Usage: node scripts/pregenerate.mjs <places.txt> [--host https://ismytripsafe.com]")
   process.exit(1)
 }
 const hostIdx = process.argv.indexOf("--host")
-const host = hostIdx > -1 ? process.argv[hostIdx + 1] : "http://localhost:3000"
+const host =
+  (hostIdx > -1 && process.argv[hostIdx + 1]) ||
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  "https://ismytripsafe.com"
 
 const places = readFileSync(file, "utf8")
   .split("\n")
