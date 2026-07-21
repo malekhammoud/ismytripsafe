@@ -108,6 +108,15 @@ export default function MapPage() {
   const center = useMemo<[number, number]>(() => (geo ? [geo.lat, geo.lon] : [0, 0]), [geo])
   const activeZone = zones.find((z) => z.name === selected) ?? null
 
+  // Hooks must run on every render — keep these above the early return, or a
+  // direct load (?place= rehydration) crashes with a hook-order error once
+  // the report arrives and `geo` flips from null.
+  const intelLinks = useMemo(() => extractSourceLinksFromText(prose), [prose])
+  const searchSource = useMemo(
+    () => sourceUrlForSearchQuery(queries[queries.length - 1] ?? null),
+    [queries]
+  )
+
   if (!geo) {
     return (
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-6 sm:px-6">
@@ -129,11 +138,6 @@ export default function MapPage() {
   const sentiment = intel?.consumerSentiment
   const watch = intel?.watchOuts ?? []
   const tips = intel?.tips ?? []
-  const intelLinks = useMemo(() => extractSourceLinksFromText(prose), [prose])
-  const searchSource = useMemo(
-    () => sourceUrlForSearchQuery(queries[queries.length - 1] ?? null),
-    [queries]
-  )
   const placeQuery = query?.place ?? (geo ? `${geo.city}, ${geo.country}` : "")
   const reportSourceAnchor = `/?place=${encodeURIComponent(placeQuery)}#sec-local-intel-sources`
   const intelSourceHref = intelLinks[0] ?? searchSource ?? reportSourceAnchor
