@@ -4,8 +4,7 @@ import { notFound } from "next/navigation"
 import { cache } from "react"
 import { getCountryHub, listCountries } from "@/lib/reports"
 import { readCacheAnyAge, type CachedReport } from "@/lib/cache"
-import { LEVELS, scoreColor } from "@/lib/safety-display"
-import { sourceUrlForName } from "@/lib/source-links"
+import { LEVELS } from "@/lib/safety-display"
 import { absUrl, humanDate, monthYear } from "@/lib/site"
 import {
   breadcrumbNode,
@@ -17,11 +16,16 @@ import {
 } from "@/lib/seo/jsonld"
 import {
   Breadcrumbs,
-  FaqSection,
-  ReportLink,
+  DocSection,
+  FaqList,
+  RankedCityList,
+  ReportDoc,
+  SectionHeading,
   SeoFooter,
+  SignalTable,
   SiteHeader,
   scoreTint,
+  sectionNumberer,
   type Crumb,
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
@@ -55,7 +59,6 @@ const COUNTRY_SIGNAL_KEYS = [
   "violence_victimization",
   "stability",
   "rule_of_law",
-  "corruption",
   "road_deaths",
 ]
 
@@ -165,179 +168,173 @@ export default async function CountryHubPage({
         ])
   )
 
-  return (
-    <main className="relative z-10 mx-auto max-w-4xl px-4 py-6 sm:px-6">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <SiteHeader />
-      <div className="mx-auto max-w-[720px]">
-        <Breadcrumbs trail={trail} />
+  // With a full country report, its card carries sections 01–05 and the doc
+  // below continues at 06; without one, the doc starts the numbering itself.
+  const num = sectionNumberer(countryReport ? 5 : 0)
 
-        <h1 className="font-display text-[clamp(1.6rem,5vw,2.1rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
-          Is {hub.country} safe? {hub.flag}
-        </h1>
-        <p className="mt-1 text-[0.8rem] text-[var(--ink-faint)]">
-          {hub.region} · Updated <time dateTime={hub.updatedAt}>{humanDate(hub.updatedAt)}</time>
+  const faqItems = [
+    {
+      q: `Is ${hub.country} safe to visit right now?`,
+      a: (
+        <p>
+          {usAdv
+            ? `The U.S. State Department currently rates ${hub.country} Level ${usAdv.level} of 4 — ${usAdv.levelLabel}. `
+            : ""}
+          {headline
+            ? `On our composite index ${hub.country} ${hub.countryReport ? "scores" : "averages"} ${headline.score}/100. `
+            : ""}
+          See the destination reports above for city-level detail. (Updated {humanDate(hub.updatedAt)}.)
         </p>
-        <p className="mt-4 text-[1rem] leading-relaxed text-[var(--ink)]">{capsule}</p>
+      ),
+    },
+    best
+      ? {
+          q: `What is the safest place to visit in ${hub.country}?`,
+          a: (
+            <p>
+              Of the destinations we&apos;ve assessed, <Link href={best.path} className="font-medium text-[var(--accent-deep)] hover:underline">{best.city}</Link> currently
+              scores highest at {best.score}/100 ({LEVELS[best.level].label}).
+              {worst && worst.path !== best.path
+                ? ` ${worst.city} scores lowest at ${worst.score}/100.`
+                : ""}
+            </p>
+          ),
+        }
+      : { q: "", a: null },
+    {
+      q: `Where does this ${hub.country} safety data come from?`,
+      a: (
+        <p>
+          Directly from public sources: US, UK and Canadian government advisories, World
+          Bank and UNODC crime statistics, WHO health data, live air-quality, disaster
+          and earthquake feeds — plus AI field research over current local reporting.{" "}
+          <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
+            Read the full methodology
+          </Link>
+          .
+        </p>
+      ),
+    },
+  ]
 
-        {/* Country-level full report when one was generated */}
-        {countryReport && (
-          <div className="mt-7">
-            <TrafficReport
-              bundle={countryReport.bundle}
-              images={countryReport.images}
-              intel={countryReport.enrichment}
-              prose={countryReport.prose}
-              searchQueries={[]}
-              loading={false}
-              generatedAt={humanDate(countryReport.cachedAt)}
-              heroHeading="h2"
-            />
-          </div>
-        )}
+  return (
+    <>
+      <SiteHeader />
+      <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+        <div className="mx-auto max-w-[640px]">
+          <Breadcrumbs trail={trail} />
 
-        {/* Official advisories, always shown at country level */}
-        {!countryReport && advisories.length > 0 && (
-          <section className="mt-8">
-            <h2 className="font-display text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">
-              What government advisories say about {hub.country}
-            </h2>
-            <div className="mt-3 space-y-3">
-              {advisories.map((a) => (
-                <div key={a.source} className="card px-4 py-3.5">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-[var(--ink-faint)]">
-                      {a.source}
-                    </p>
-                    {a.level != null && (
-                      <span className="tnum text-[0.72rem] font-bold text-[var(--ink)]">Level {a.level}</span>
-                    )}
+          <h1 className="font-display text-[clamp(1.7rem,5vw,2.3rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
+            Is {hub.country} safe? {hub.flag}
+          </h1>
+          <p className="mt-1.5 text-[0.8rem] text-[var(--ink-faint)]">
+            {hub.region} · Updated <time dateTime={hub.updatedAt}>{humanDate(hub.updatedAt)}</time>
+          </p>
+          <p className="mt-4 text-[1rem] leading-[1.75] text-[var(--ink)]">{capsule}</p>
+
+          {/* Country-level full report when one was generated */}
+          {countryReport && (
+            <div className="mt-7">
+              <TrafficReport
+                bundle={countryReport.bundle}
+                images={countryReport.images}
+                intel={countryReport.enrichment}
+                prose={countryReport.prose}
+                searchQueries={[]}
+                loading={false}
+                generatedAt={humanDate(countryReport.cachedAt)}
+                heroHeading="h2"
+              />
+            </div>
+          )}
+
+          <div className={countryReport ? "mt-8" : "mt-7"}>
+            <ReportDoc>
+              {/* Official advisories — only when no full report shows them already */}
+              {!countryReport && advisories.length > 0 && (
+                <DocSection
+                  num={num()}
+                  kicker="Official Guidance"
+                  title="Government advisories"
+                  pill={usAdv ? `US Level ${usAdv.level}` : undefined}
+                  first
+                >
+                  <div className="space-y-3">
+                    {advisories.map((a) => (
+                      <article
+                        key={a.source}
+                        className="rounded-[3px] px-4 py-3.5"
+                        style={{
+                          background: "rgba(20,25,34,0.03)",
+                          borderLeft: `3px solid ${
+                            a.level && a.level >= 3 ? "var(--risky)" : a.level === 2 ? "var(--caution)" : "var(--safe)"
+                          }`,
+                        }}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <p className="text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-[var(--ink-faint)]">
+                            {a.source}
+                          </p>
+                          {a.level != null && (
+                            <span className="tnum shrink-0 text-[0.7rem] font-bold text-[var(--ink)]">Level {a.level}</span>
+                          )}
+                        </div>
+                        <p className="mt-1 text-[0.92rem] font-semibold text-[var(--ink)]">{a.levelLabel || a.headline}</p>
+                        {a.summary && <p className="mt-1 text-[0.82rem] leading-relaxed text-[var(--ink-soft)]">{a.summary}</p>}
+                        <a
+                          href={a.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-1.5 inline-block text-[0.72rem] font-semibold text-[var(--accent-deep)] hover:underline"
+                        >
+                          Full advisory →
+                        </a>
+                      </article>
+                    ))}
                   </div>
-                  <p className="mt-1 text-[0.92rem] font-semibold text-[var(--ink)]">{a.levelLabel || a.headline}</p>
-                  {a.summary && <p className="mt-1 text-[0.82rem] leading-relaxed text-[var(--ink-soft)]">{a.summary}</p>}
-                  <a
-                    href={a.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1.5 inline-block text-[0.72rem] font-semibold text-[var(--accent-deep)] hover:underline"
-                  >
-                    Full advisory →
-                  </a>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
+                </DocSection>
+              )}
 
-        {/* City reports — every city page gets its hub inlink here */}
-        {hub.cities.length > 0 && (
-          <section className="mt-8">
-            <h2 className="font-display text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">
-              {hub.country} destinations by safety score
-            </h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {hub.cities.map((m) => (
-                <ReportLink key={m.path} meta={m} anchor={`Is ${m.city} safe?`} />
-              ))}
-            </div>
-          </section>
-        )}
+              {/* City reports, ranked — every city page gets its hub inlink here */}
+              {hub.cities.length > 0 && (
+                <DocSection
+                  num={num()}
+                  kicker="Destinations"
+                  title={`${hub.country} destinations by safety score`}
+                  pill={`${hub.cities.length} assessed`}
+                  first={!!countryReport || advisories.length === 0}
+                >
+                  <RankedCityList items={hub.cities} />
+                  <p className="mt-4 text-[0.82rem] text-[var(--ink-soft)]">
+                    Missing a place?{" "}
+                    <Link href="/" className="font-medium text-[var(--accent-deep)] hover:underline">
+                      Generate its report in about a minute
+                    </Link>
+                    .
+                  </p>
+                </DocSection>
+              )}
 
-        {/* Country-level data table */}
-        {!countryReport && signals.length > 0 && (
-          <section className="mt-10">
-            <h2 className="font-display text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">
-              {hub.country} safety data
-            </h2>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full border-collapse text-[0.85rem]">
-                <thead>
-                  <tr className="border-b border-[var(--hairline)] text-left text-[0.7rem] uppercase tracking-[0.1em] text-[var(--ink-faint)]">
-                    <th className="py-2 pr-3 font-semibold">Indicator</th>
-                    <th className="py-2 pr-3 font-semibold">Value</th>
-                    <th className="py-2 pr-3 font-semibold">Safety score</th>
-                    <th className="py-2 font-semibold">Source</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {signals.map((s) => (
-                    <tr key={s.key} className="border-b border-[var(--hairline)]">
-                      <td className="py-2 pr-3 font-medium text-[var(--ink)]">{s.label}</td>
-                      <td className="tnum py-2 pr-3 text-[var(--ink-soft)]">{s.display}</td>
-                      <td className="tnum py-2 pr-3 font-semibold" style={{ color: scoreColor(s.score as number) }}>
-                        {s.score}/100
-                      </td>
-                      <td className="py-2 text-[0.78rem] text-[var(--ink-faint)]">
-                        {sourceUrlForName(s.source) ? (
-                          <a href={sourceUrlForName(s.source) as string} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--accent)] hover:underline">
-                            {s.source}
-                          </a>
-                        ) : (
-                          s.source
-                        )}
-                        {s.year ? ` (${s.year})` : ""}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+              {/* Country-level data table — only when no full report renders it */}
+              {!countryReport && signals.length > 0 && (
+                <DocSection num={num()} kicker="Evidence Signals" title={`${hub.country} safety data`}>
+                  <SignalTable signals={signals} />
+                </DocSection>
+              )}
 
-        <FaqSection
-          title={`${hub.country} safety FAQ`}
-          items={[
-            {
-              q: `Is ${hub.country} safe to visit right now?`,
-              a: (
-                <p>
-                  {usAdv
-                    ? `The U.S. State Department currently rates ${hub.country} Level ${usAdv.level} of 4 — ${usAdv.levelLabel}. `
-                    : ""}
-                  {headline
-                    ? `On our composite index ${hub.country} ${hub.countryReport ? "scores" : "averages"} ${headline.score}/100. `
-                    : ""}
-                  See the destination reports above for city-level detail. (Updated {humanDate(hub.updatedAt)}.)
-                </p>
-              ),
-            },
-            best
-              ? {
-                  q: `What is the safest place to visit in ${hub.country}?`,
-                  a: (
-                    <p>
-                      Of the destinations we&apos;ve assessed, <Link href={best.path} className="font-medium text-[var(--accent-deep)] hover:underline">{best.city}</Link> currently
-                      scores highest at {best.score}/100 ({LEVELS[best.level].label}).
-                      {worst && worst.path !== best.path
-                        ? ` ${worst.city} scores lowest at ${worst.score}/100.`
-                        : ""}
-                    </p>
-                  ),
-                }
-              : { q: "", a: null },
-            {
-              q: `Where does this ${hub.country} safety data come from?`,
-              a: (
-                <p>
-                  Directly from public sources: US, UK and Canadian government advisories, World
-                  Bank and UNODC crime statistics, WHO health data, live air-quality, disaster
-                  and earthquake feeds — plus AI field research over current local reporting.{" "}
-                  <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
-                    Read the full methodology
-                  </Link>
-                  .
-                </p>
-              ),
-            },
-          ].filter((i) => i.q)}
-        />
+              <DocSection num={num()} kicker="Questions" title={`${hub.country} safety FAQ`}>
+                <FaqList items={faqItems} />
+              </DocSection>
+            </ReportDoc>
+          </div>
 
-        <RegionLinks currentSlug={hub.countrySlug} region={hub.region} />
+          <RegionLinks currentSlug={hub.countrySlug} region={hub.region} />
 
-        <SeoFooter updatedAt={hub.updatedAt} />
-      </div>
-    </main>
+          <SeoFooter updatedAt={hub.updatedAt} />
+        </div>
+      </main>
+    </>
   )
 }
 
@@ -347,11 +344,9 @@ async function RegionLinks({ currentSlug, region }: { currentSlug: string; regio
   const items = sameRegion.length ? sameRegion : all.slice(0, 6)
   if (!items.length) return null
   return (
-    <section className="mt-10">
-      <h2 className="font-display text-[1.2rem] font-medium tracking-tight text-[var(--ink)]">
-        {sameRegion.length ? `More of ${region}` : "Other countries"}
-      </h2>
-      <div className="mt-3 flex flex-wrap gap-2">
+    <section className="mt-9">
+      <SectionHeading>{sameRegion.length ? `More of ${region}` : "Other countries"}</SectionHeading>
+      <div className="mt-3.5 flex flex-wrap gap-2">
         {items.map((c) => (
           <Link
             key={c.countrySlug}

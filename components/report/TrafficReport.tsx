@@ -243,6 +243,27 @@ function RiskRow({
   )
 }
 
+/** Long-tail indicators, collapsed by default — the data stays on the page
+ *  (and in the crawlable HTML) without burying the rows travellers care about. */
+function MoreSignals({ signals }: { signals: (SafetySignal | undefined)[] }) {
+  const present = signals.filter((s): s is SafetySignal => !!s && s.score != null)
+  if (!present.length) return null
+  return (
+    <details className="group">
+      <summary
+        className="cursor-pointer list-none py-2.5 text-[0.72rem] font-semibold uppercase tracking-[0.12em] opacity-55 transition-opacity hover:opacity-90 [&::-webkit-details-marker]:hidden"
+        style={{ color: INK, borderTop: `1px solid rgba(20,25,34,0.1)` }}
+      >
+        <span className="group-open:hidden">▸ {present.length} more indicator{present.length === 1 ? "" : "s"}</span>
+        <span className="hidden group-open:inline">▾ Hide extra indicators</span>
+      </summary>
+      {present.map((s) => (
+        <SignalRow key={s.key} signal={s} />
+      ))}
+    </details>
+  )
+}
+
 function StatTile({ icon, k, signal }: { icon: ReactNode; k: string; signal: SafetySignal | undefined }) {
   const deep = TONES.safe.deep
   const src = sourceUrlForName(signal?.source)
@@ -513,13 +534,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           <SignalRow signal={sig("homicide")} extra={<ContextHover comparison={homicideCmp} />} />
           <SignalRow signal={sig("safe_walking_dark")} />
           <SignalRow signal={sig("violence_victimization")} />
-          <SignalRow signal={sig("sexual_violence")} />
-          <SignalRow signal={sig("human_trafficking_victims")} />
-          <SignalRow signal={sig("bribery_contact_rate")} />
           <SignalRow signal={sig("numbeo_crime_index")} />
-          <SignalRow signal={sig("numbeo_safety_index")} />
-          <SignalRow signal={sig("firm_crime_losses")} />
-          <SignalRow signal={sig("crime_major_constraint")} />
           <RiskRow
             label="Robbery / mugging"
             rating={intel?.robbery}
@@ -533,6 +548,16 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             note="Risk of pickpocketing and bag-snatching, and the usual hotspots (transit, markets, tourist crowds)."
             loading={loading}
             sourceHref={intelSourceHref}
+          />
+          <MoreSignals
+            signals={[
+              sig("sexual_violence"),
+              sig("human_trafficking_victims"),
+              sig("bribery_contact_rate"),
+              sig("numbeo_safety_index"),
+              sig("firm_crime_losses"),
+              sig("crime_major_constraint"),
+            ]}
           />
         </div>
       </Block>
@@ -581,28 +606,42 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           </div>
         )}
 
-        <div className="mt-5">
-          <p className="text-[0.66rem] font-semibold uppercase tracking-[0.14em]" style={{ color: `${TONES.safe.deep}bb` }}>
-            CDC travel health notices · {safety.health.length ? `${safety.health.length} active` : "none active"}
-          </p>
-          {safety.health.length ? (
-            <div className="mt-2 space-y-2">
-              {safety.health.slice(0, 5).map((n) => (
-                <div key={n.title} className="flex items-center gap-3 rounded-[3px] px-3.5 py-2.5" style={{ background: "rgba(255,255,255,0.45)" }}>
-                  <span className="shrink-0 rounded-sm px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.1em]" style={{ background: n.level >= 2 ? `${TONES.caution.strong}2b` : `${TONES.safe.strong}26`, color: n.level >= 2 ? TONES.caution.deep : TONES.safe.deep }}>
-                    {n.levelLabel}
-                  </span>
-                  <p className="flex items-center gap-1 text-[0.82rem]" style={{ color: INK }}>
-                    {n.title}{n.scope === "global" ? " (worldwide)" : ""}
-                    <SourceLink href={n.url} label={n.title} color={`${INK}99`} />
-                  </p>
+        {(() => {
+          // Destination-specific notices get cards; the standing worldwide
+          // notices (polio, dengue, measles…) collapse to one muted line so
+          // they don't read as local risks on every report.
+          const local = safety.health.filter((n) => n.scope !== "global")
+          const global = safety.health.filter((n) => n.scope === "global")
+          return (
+            <div className="mt-5">
+              <p className="text-[0.66rem] font-semibold uppercase tracking-[0.14em]" style={{ color: `${TONES.safe.deep}bb` }}>
+                CDC travel health notices · {local.length ? `${local.length} for this destination` : "none for this destination"}
+              </p>
+              {local.length > 0 && (
+                <div className="mt-2 space-y-2">
+                  {local.slice(0, 5).map((n) => (
+                    <div key={n.title} className="flex items-center gap-3 rounded-[3px] px-3.5 py-2.5" style={{ background: "rgba(255,255,255,0.45)" }}>
+                      <span className="shrink-0 rounded-sm px-1.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.1em]" style={{ background: n.level >= 2 ? `${TONES.caution.strong}2b` : `${TONES.safe.strong}26`, color: n.level >= 2 ? TONES.caution.deep : TONES.safe.deep }}>
+                        {n.levelLabel}
+                      </span>
+                      <p className="flex items-center gap-1 text-[0.82rem]" style={{ color: INK }}>
+                        {n.title}
+                        <SourceLink href={n.url} label={n.title} color={`${INK}99`} />
+                      </p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+              {global.length > 0 && (
+                <p className="mt-2 flex items-center gap-1 text-[0.72rem]" style={{ color: `${INK}88` }}>
+                  Worldwide notices (not specific to this trip):{" "}
+                  {global.map((n) => n.title.replace(/^Global\s+/i, "")).join(", ")}
+                  <SourceLink href={global[0].url} label="CDC worldwide notices" color={`${INK}88`} />
+                </p>
+              )}
             </div>
-          ) : (
-            <p className="mt-2 text-[0.82rem]" style={{ color: `${INK}b3` }}>No active CDC health notices for this destination.</p>
-          )}
-        </div>
+          )
+        })()}
       </Block>
 
       {/* stability */}
@@ -621,9 +660,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           <SignalRow signal={sig("terrorism_deaths")} />
           <SignalRow signal={sig("rule_of_law")} />
           <SignalRow signal={sig("corruption")} />
-          <SignalRow signal={sig("gov_effectiveness")} />
-          <SignalRow signal={sig("regulatory")} />
-          <SignalRow signal={sig("voice")} />
+          <MoreSignals signals={[sig("gov_effectiveness"), sig("regulatory"), sig("voice")]} />
         </div>
       </Block>
 

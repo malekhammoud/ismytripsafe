@@ -43,9 +43,10 @@ export default function MethodologyPage() {
   })
 
   return (
-    <main className="relative z-10 mx-auto max-w-4xl px-4 py-6 sm:px-6">
+    <>
+    <SiteHeader />
+    <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <SiteHeader />
       <div className="mx-auto max-w-[720px]">
         <Breadcrumbs trail={trail} />
         <h1 className="font-display text-[clamp(1.6rem,5vw,2.1rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
@@ -140,5 +141,6 @@ export default function MethodologyPage() {
         <SeoFooter />
       </div>
     </main>
+    </>
   )
 }

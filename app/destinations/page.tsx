@@ -1,9 +1,17 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { listCountries } from "@/lib/reports"
+import { listCountries, type CountryHub } from "@/lib/reports"
+import { LEVELS } from "@/lib/safety-display"
 import { absUrl, humanDate } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
-import { Breadcrumbs, ReportLink, SeoFooter, SiteHeader, scoreTint } from "@/components/seo/shared"
+import {
+  Breadcrumbs,
+  ScoreBadge,
+  SectionHeading,
+  SeoFooter,
+  SiteHeader,
+  scoreTint,
+} from "@/components/seo/shared"
 
 export const dynamic = "force-dynamic"
 
@@ -14,6 +22,54 @@ export const metadata: Metadata = {
   alternates: { canonical: "/destinations" },
 }
 
+/** One country: header row (flag, name, score) + its city reports + overview link. */
+function CountryCard({ c }: { c: CountryHub }) {
+  const score = c.countryReport?.score ?? c.avgScore
+  return (
+    <div className="card flex flex-col overflow-hidden">
+      <Link
+        href={`/${c.countrySlug}`}
+        className="group flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-[rgba(31,116,207,0.05)]"
+      >
+        <span className="font-display min-w-0 truncate text-[1.05rem] font-medium tracking-tight text-[var(--ink)] group-hover:text-[var(--accent-deep)]">
+          {c.flag && <span className="mr-2">{c.flag}</span>}
+          Is {c.country} safe?
+        </span>
+        {score != null && <ScoreBadge score={score} size={34} />}
+      </Link>
+      {c.cities.length > 0 && (
+        <ul className="border-t border-[var(--hairline)]">
+          {c.cities.map((m) => (
+            <li key={m.path}>
+              <Link
+                href={m.path}
+                className="flex items-center justify-between gap-3 px-4 py-2 text-[0.85rem] transition-colors hover:bg-[rgba(31,116,207,0.05)]"
+              >
+                <span className="min-w-0 truncate font-medium text-[var(--ink)]">{m.city}</span>
+                <span className="flex shrink-0 items-center gap-2 text-[0.72rem] text-[var(--ink-faint)]">
+                  {LEVELS[m.level].label}
+                  <span
+                    className="tnum inline-flex w-8 justify-center rounded-full py-0.5 text-[0.7rem] font-bold text-white"
+                    style={{ background: scoreTint(m.score) }}
+                  >
+                    {m.score}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-auto flex items-center justify-between border-t border-[var(--hairline)] px-4 py-2 text-[0.72rem] text-[var(--ink-faint)]">
+        Updated {humanDate(c.updatedAt)}
+        <Link href={`/${c.countrySlug}`} className="font-semibold text-[var(--accent-deep)] hover:underline">
+          {c.country} overview →
+        </Link>
+      </p>
+    </div>
+  )
+}
+
 export default async function DestinationsPage() {
   const countries = await listCountries()
   const total = countries.reduce(
@@ -21,6 +77,18 @@ export default async function DestinationsPage() {
     0
   )
   const updatedAt = countries.map((c) => c.updatedAt).sort().at(-1) ?? null
+
+  // Group by continent/region so the country → city structure reads at a glance.
+  const regions = new Map<string, CountryHub[]>()
+  for (const c of countries) {
+    const key = c.region || "Other regions"
+    regions.set(key, [...(regions.get(key) ?? []), c])
+  }
+  const regionEntries = [...regions.entries()].sort(
+    (a, b) =>
+      b[1].reduce((n, c) => n + c.cities.length + 1, 0) -
+      a[1].reduce((n, c) => n + c.cities.length + 1, 0)
+  )
 
   const trail = [
     { name: "Home", href: "/" },
@@ -36,73 +104,56 @@ export default async function DestinationsPage() {
   })
 
   return (
-    <main className="relative z-10 mx-auto max-w-4xl px-4 py-6 sm:px-6">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+    <>
       <SiteHeader />
-      <div className="mx-auto max-w-[760px]">
-        <Breadcrumbs trail={trail} />
-        <h1 className="font-display text-[clamp(1.6rem,5vw,2.1rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
-          Destination safety reports
-        </h1>
-        <p className="mt-3 text-[0.95rem] leading-relaxed text-[var(--ink-soft)]">
-          {total} independent safety report{total === 1 ? "" : "s"} across {countries.length}{" "}
-          countr{countries.length === 1 ? "y" : "ies"}, each combining official government
-          advisories, crime and governance databases, live environmental data and AI field
-          research into one 0–100 score. Don&apos;t see your destination?{" "}
-          <Link href="/" className="font-medium text-[var(--accent-deep)] hover:underline">
-            Generate its report in about a minute
-          </Link>
-          .
-        </p>
-
-        {countries.length === 0 && (
-          <p className="mt-8 text-[0.9rem] text-[var(--ink-soft)]">
-            No reports published yet —{" "}
+      <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+        <div className="mx-auto max-w-[760px]">
+          <Breadcrumbs trail={trail} />
+          <h1 className="font-display text-[clamp(1.7rem,5vw,2.3rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
+            Destination safety reports
+          </h1>
+          <p className="mt-3 max-w-[640px] text-[0.95rem] leading-relaxed text-[var(--ink-soft)]">
+            {total} independent safety report{total === 1 ? "" : "s"} across {countries.length}{" "}
+            countr{countries.length === 1 ? "y" : "ies"}, each combining official advisories,
+            crime and governance data, live environmental feeds and AI field research into one
+            0–100 score. Don&apos;t see your destination?{" "}
             <Link href="/" className="font-medium text-[var(--accent-deep)] hover:underline">
-              run the first one
+              Generate its report in about a minute
             </Link>
             .
           </p>
-        )}
 
-        <div className="mt-8 space-y-9">
-          {countries.map((c) => (
-            <section key={c.countrySlug}>
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 className="font-display text-[1.3rem] font-medium tracking-tight text-[var(--ink)]">
-                  <Link href={`/${c.countrySlug}`} className="hover:text-[var(--accent-deep)]">
-                    {c.flag && <span className="mr-1.5">{c.flag}</span>}
-                    Is {c.country} safe?
-                  </Link>
-                </h2>
-                {(c.countryReport?.score ?? c.avgScore) != null && (
-                  <span
-                    className="tnum shrink-0 rounded-full px-2 py-0.5 text-[0.74rem] font-bold text-white"
-                    style={{ background: scoreTint(c.countryReport?.score ?? (c.avgScore as number)) }}
-                  >
-                    {c.countryReport?.score ?? c.avgScore}/100
-                  </span>
-                )}
-              </div>
-              {c.cities.length > 0 && (
-                <div className="mt-2.5 grid gap-2 sm:grid-cols-2">
-                  {c.cities.map((m) => (
-                    <ReportLink key={m.path} meta={m} />
+          {countries.length === 0 && (
+            <p className="mt-8 text-[0.9rem] text-[var(--ink-soft)]">
+              No reports published yet —{" "}
+              <Link href="/" className="font-medium text-[var(--accent-deep)] hover:underline">
+                run the first one
+              </Link>
+              .
+            </p>
+          )}
+
+          <div className="mt-9 space-y-10">
+            {regionEntries.map(([region, list]) => (
+              <section key={region}>
+                <SectionHeading
+                  note={`${list.reduce((n, c) => n + c.cities.length + (c.countryReport ? 1 : 0), 0)} reports`}
+                >
+                  {region}
+                </SectionHeading>
+                <div className="mt-3.5 grid items-start gap-3 sm:grid-cols-2">
+                  {list.map((c) => (
+                    <CountryCard key={c.countrySlug} c={c} />
                   ))}
                 </div>
-              )}
-              <p className="mt-2 text-[0.78rem] text-[var(--ink-faint)]">
-                Updated {humanDate(c.updatedAt)} ·{" "}
-                <Link href={`/${c.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
-                  {c.country} overview →
-                </Link>
-              </p>
-            </section>
-          ))}
-        </div>
+              </section>
+            ))}
+          </div>
 
-        <SeoFooter updatedAt={updatedAt} />
-      </div>
-    </main>
+          <SeoFooter updatedAt={updatedAt} />
+        </div>
+      </main>
+    </>
   )
 }
