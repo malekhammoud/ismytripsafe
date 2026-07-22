@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ShieldCheck, Map as MapIcon, FileText, Zap } from "lucide-react"
+import { ArrowLeft, Map as MapIcon, FileText, Zap } from "lucide-react"
 import { useReport } from "@/lib/store"
+import { Logo } from "@/components/Logo"
 
 /** Shared header for the report and map pages: reset + Report/Map tabs. */
 export function TopNav({ active }: { active: "report" | "map" }) {
@@ -48,7 +49,7 @@ export function TopNav({ active }: { active: "report" | "map" }) {
 
       <div className="hidden text-right leading-tight sm:block">
         <div className="wordmark flex items-center justify-end gap-1.5 text-sm text-[var(--ink)]">
-          <ShieldCheck size={14} style={{ color: "var(--accent)" }} />
+          <Logo size={14} />
           Is It Safe<span style={{ color: "var(--accent)" }}>?</span>
         </div>
         <div className="flex items-center justify-end gap-1 text-[0.62rem] uppercase tracking-wider text-[var(--ink-faint)]">

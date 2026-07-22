@@ -42,8 +42,24 @@ export default async function Image({
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 30, letterSpacing: 1, color: "rgba(238,242,248,0.75)" }}>
-            IsMyTripSafe.com
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <svg width="34" height="34" viewBox="0 0 64 64">
+              <path
+                d="M32 4 C 20 4 9 8 9 8 L 9 28 C 9 44.5 19.5 55 32 61 C 44.5 55 55 44.5 55 28 L 55 8 C 55 8 44 4 32 4 Z"
+                fill="#2b8ae6"
+              />
+              <path
+                d="M19.5 32.5 L28 41 L45 21.5"
+                fill="none"
+                stroke="#f4f7fb"
+                strokeWidth={6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div style={{ fontSize: 30, letterSpacing: 1, color: "rgba(238,242,248,0.75)" }}>
+              IsMyTripSafe.com
+            </div>
           </div>
           <div style={{ fontSize: 24, color: "rgba(238,242,248,0.5)" }}>Safety Report</div>
         </div>

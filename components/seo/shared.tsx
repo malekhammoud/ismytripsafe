@@ -1,5 +1,6 @@
 import Link from "next/link"
-import { ShieldCheck, ChevronRight } from "lucide-react"
+import { ChevronRight } from "lucide-react"
+import { Logo } from "@/components/Logo"
 import type { ReportMeta } from "@/lib/reports"
 import type { SafetySignal } from "@/lib/types"
 import { LEVELS, scoreColor } from "@/lib/safety-display"
@@ -40,7 +41,7 @@ export function SiteHeader() {
     >
       <div className="mx-auto flex h-[54px] max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link href="/" className="wordmark flex items-center gap-1.5 text-[0.95rem] text-[var(--ink)]">
-          <ShieldCheck size={16} style={{ color: "var(--accent)" }} />
+          <Logo size={16} />
           IsMyTripSafe<span style={{ color: "var(--accent)" }}>.com</span>
         </Link>
         <nav className="flex items-center gap-4 text-[0.8rem] font-medium text-[var(--ink-soft)] sm:gap-5">

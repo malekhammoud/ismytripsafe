@@ -35,6 +35,7 @@ import { CategoryTiles } from "./CategoryTiles"
 import { InfoTip } from "./InfoTip"
 import { ShareButton } from "./ShareButton"
 import { SourceLink } from "./SourceLink"
+import { Logo } from "@/components/Logo"
 
 const INK = "#141922"
 const RULE = "rgba(20, 25, 34, 0.4)"
@@ -396,7 +397,8 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <p className="eyebrow" style={{ color: "rgba(238,242,248,0.65)" }}>Safety Report</p>
             <span className="flex items-center gap-2.5">
-              <p className="wordmark text-[0.82rem] text-white">
+              <p className="wordmark flex items-center gap-1.5 text-[0.82rem] text-white">
+                <Logo size={13} />
                 IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.5)" }}>.com</span>
               </p>
               <ShareButton targetId="report-hero" city={geo.city} score={personal.index} answer={levelCfg.answer} />
@@ -763,7 +765,10 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
       {/* footer */}
       <footer className="rise-in px-7 py-6 sm:px-9" style={{ background: INK, borderTop: `1px solid ${RULE}`, animationDelay: "560ms" }}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="wordmark text-[0.95rem] text-white">IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.45)" }}>.com</span></p>
+          <p className="wordmark flex items-center gap-1.5 text-[0.95rem] text-white">
+            <Logo size={15} />
+            IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.45)" }}>.com</span>
+          </p>
           <p className="text-[0.68rem] tracking-[0.04em]" style={{ color: "rgba(238,242,248,0.55)" }}>Not legal or medical advice</p>
         </div>
         {permalink && (
