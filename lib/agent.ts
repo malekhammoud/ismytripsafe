@@ -232,7 +232,7 @@ async function* streamModel(
         model,
         stream: true,
         temperature: 0.35,
-        max_tokens: 4096,
+        max_tokens: 8192,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -286,6 +286,24 @@ async function* streamModel(
 function stripThink(text: string): string {
   return text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/^<think>[\s\S]*$/, "")
 }
+
+/** Models sometimes repeat the block markers or fences after the JSON —
+ *  scrub them (and any partially-emitted trailing marker) out of the prose. */
+function sanitizeProse(text: string): string {
+  let t = text.replace(/START_SAFETY|END_SAFETY|```(?:json)?/g, "")
+  for (const marker of ["END_SAFETY", "START_SAFETY"]) {
+    for (let len = marker.length - 1; len >= 3; len--) {
+      if (t.trimEnd().endsWith(marker.slice(0, len))) {
+        t = t.trimEnd().slice(0, -len)
+        break
+      }
+    }
+  }
+  return t
+}
+
+/** Chars held back while streaming so a marker split across chunks can't leak. */
+const PROSE_HOLDBACK = 12
 
 function parseEnrichment(
   text: string
@@ -364,12 +382,22 @@ export async function* runSafetyAgent(
           if (enrichment) yield { type: "enrichment", data: enrichment.data }
         }
         if (enrichment) {
-          const prose = clean.slice(enrichment.proseOffset)
-          if (prose.length > prevProseLength) {
-            const delta = prose.slice(prevProseLength)
+          const prose = sanitizeProse(clean.slice(enrichment.proseOffset))
+          const flushable = Math.max(0, prose.length - PROSE_HOLDBACK)
+          if (flushable > prevProseLength) {
+            const delta = prose.slice(prevProseLength, flushable)
             if (delta.trim()) yield { type: "text", content: delta }
-            prevProseLength = prose.length
+            prevProseLength = flushable
           }
+        }
+      }
+
+      // stream ended cleanly — flush the held-back tail of the prose
+      if (enrichment) {
+        const prose = sanitizeProse(stripThink(accumulated).slice(enrichment.proseOffset))
+        if (prose.length > prevProseLength) {
+          const delta = prose.slice(prevProseLength).trimEnd()
+          if (delta.trim()) yield { type: "text", content: delta }
         }
       }
     } catch (err) {
@@ -387,7 +415,7 @@ export async function* runSafetyAgent(
       enrichment = parseEnrichment(stripThink(accumulated))
       if (enrichment) {
         yield { type: "enrichment", data: enrichment.data }
-        const prose = stripThink(accumulated).slice(enrichment.proseOffset).trim()
+        const prose = sanitizeProse(stripThink(accumulated).slice(enrichment.proseOffset)).trim()
         if (prose) yield { type: "text", content: prose }
       }
     }
