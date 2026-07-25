@@ -400,8 +400,8 @@ export default async function CityReportPage({
                           The score blends {report.bundle.safety.sources.length || "15"}+ public data
                           sources — government advisories, UNODC/World Bank crime statistics, WHO health
                           data, live air quality and disaster alerts — with AI field research over current
-                          local reporting. The databases carry 80% of the weight; the traveller-sentiment
-                          score from field research carries 20%.{" "}
+                          local reporting. The databases carry 82% of the weight; the traveller-sentiment
+                          score from field research carries 18%.{" "}
                           <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
                             Full methodology
                           </Link>

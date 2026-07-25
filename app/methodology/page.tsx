@@ -127,8 +127,8 @@ export default function MethodologyPage() {
             agent searches current news and traveller reporting for recent incidents, unrest,
             district-level safety, scams and sentiment, with the database profile and official
             advisories supplied as fixed ground truth it must not contradict. Its street-crime
-            ratings and traveller-sentiment read contribute <strong>20%</strong> of the final
-            published score; the databases keep 80%. Robbery and pickpocketing are scored on
+            ratings and traveller-sentiment read contribute <strong>18%</strong> of the final
+            published score; the databases keep 82%. Robbery and pickpocketing are scored on
             separate scales, because a threat to your person and a threat to your wallet are
             not the same risk. The field research is bound by the same caps as the composite —
             a positive sentiment read cannot argue away a &quot;Do Not Travel&quot; advisory. Advisory levels are never AI-generated —
@@ -142,7 +142,7 @@ export default function MethodologyPage() {
             report. It combines how safe travellers report actually feeling day to day (35%) with
             current robbery (45%) and pickpocketing (20%) risk, on the same 0–100 scale as
             everything else. It is not a second opinion sitting next to the headline number: it
-            is exactly the 20% term inside it, the part the databases cannot see.
+            is exactly the 18% term inside it, the part the databases cannot see.
           </p>
 
           <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">The score pyramid</h2>

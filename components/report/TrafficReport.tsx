@@ -455,7 +455,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
               <InfoTip
                 text={
                   (final.includesFieldResearch
-                    ? "A single 0–100 score. The database composite carries 80%; the live field research — street-crime ratings and current traveller sentiment — carries 20%. "
+                    ? "A single 0–100 score. The database composite carries 82%; the live field research — street-crime ratings and current traveller sentiment — carries 18%. "
                     : "A single 0–100 score built from every indicator below. ") +
                   "Indicators are grouped into hazard families (crime, conflict, official guidance, institutions, everyday hazards, health) and combined so that severe risk in any one family dominates rather than being averaged away by the others. 100 = safest."
                 }
@@ -684,7 +684,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           <>
             {sentiment.score != null && (
               /* The traveller-sentiment score, shown where it is earned. This
-                 is the same number as the pyramid tile and the 20% of the
+                 is the same number as the pyramid tile and the 18% of the
                  headline that the databases cannot see. */
               <div className="mb-5 rounded-[3px] px-4 py-3.5" style={{ background: "rgba(255,255,255,0.5)" }}>
                 <div className="flex items-baseline justify-between gap-3">

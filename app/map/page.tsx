@@ -255,7 +255,7 @@ export default function MapPage() {
           <div className="card p-5">
             <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
               <Smile size={13} /> Traveller sentiment
-              <InfoTip text="How safe visitors report actually feeling day-to-day, gathered from recent traveller reports, weighted with current robbery and pickpocketing risk. This score carries 20% of the published safety score." color="var(--ink-faint)" />
+              <InfoTip text="How safe visitors report actually feeling day-to-day, gathered from recent traveller reports, weighted with current robbery and pickpocketing risk. This score carries 18% of the published safety score." color="var(--ink-faint)" />
               <SourceLink href={intelSourceHref} label="traveller sentiment" />
             </p>
             {sentiment.score != null ? (

@@ -94,14 +94,14 @@ export interface FinalScore {
   caps: { max: number; reason: string }[]
   /** the database-only composite, before field research folded in */
   baseIndex: number
-  /** the field-research score that carries the remaining 20%, if any */
+  /** the field-research score that carries the remaining 18%, if any */
   sentiment: SentimentScore
 }
 
 // ─── Traveller sentiment (the field-research score) ──────────────────
 
 /** Share of the published score carried by live field research. */
-export const FIELD_RESEARCH_WEIGHT = 0.2
+export const FIELD_RESEARCH_WEIGHT = 0.18
 
 const SENTIMENT_WEIGHTS = { robbery: 0.45, reported: 0.35, pickpocket: 0.2 }
 
@@ -120,7 +120,7 @@ export interface SentimentScore {
  * The traveller-sentiment score: what people on the ground report, expressed
  * on the same 0–100 scale as the database pillars.
  *
- * It is exactly the term that carries the final 20% of the published score —
+ * It is exactly the term that carries the final 18% of the published score —
  * the tile is not a separate opinion sitting beside the headline, it is the
  * part of the headline the databases cannot see. Reported feel is the largest
  * single input, weighted alongside the two street-crime risks a visitor
@@ -187,7 +187,7 @@ function sentimentLabel(score: number): string {
  * re-scores every cached report on its next render instead of leaving old
  * reports frozen at numbers the current engine would never produce.
  *
- * Field research then folds in at 20%: the analyst's street-crime ratings and
+ * Field research then folds in at 18%: the analyst's street-crime ratings and
  * current traveller sentiment. It is capped the same way the composite is —
  * a "Do Not Travel" advisory is not something a positive sentiment read gets
  * to argue away.
@@ -290,7 +290,7 @@ export function tileLevel(score: number | null): { name: string; color: string }
  * their own averages, so a tile can never disagree with the headline score it
  * sits under. "Health & Air" and "Stability" each merge two pillars, weighted
  * the same way the engine weights them. The fifth, traveller sentiment, is the
- * field-research term — the 20% of the headline the databases cannot see.
+ * field-research term — the 18% of the headline the databases cannot see.
  */
 export function computeCategories(
   signals: SafetySignal[],

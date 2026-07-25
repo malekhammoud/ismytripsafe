@@ -16,7 +16,7 @@ const EXPLAIN: Record<CategoryKey, string> = {
   crime:
     "Violent & street-crime risk from homicide, night-safety and victimisation surveys, trafficking and bribery indicators, plus the Numbeo crowdsourced crime index where available. Discounted where weak institutions make the official figures unreliable. Higher = safer.",
   sentiment:
-    "The field-research score — how safe travellers report actually feeling day to day, weighted with current robbery and pickpocketing risk. This is the 20% of the headline score the databases cannot see. Higher = safer.",
+    "The field-research score — how safe travellers report actually feeling day to day, weighted with current robbery and pickpocketing risk. This is the 18% of the headline score the databases cannot see. Higher = safer.",
   advisories:
     "Official government travel advisories (U.S. State Dept & UK FCDO). A Level 3 or 4 warning also caps the headline score outright. Higher = fewer, milder warnings.",
   stability:
