@@ -17,44 +17,19 @@ import {
   ghoLatest,
   type RefHit,
 } from "./refdata"
+import { SIGNAL_BANDS } from "../scoring"
 
-// ─── Normalization helpers (everything → 0–100, 100 = safest) ────────
+// ─── Scoring ─────────────────────────────────────────────────────────
+// Every 0–100 curve lives in lib/scoring.ts, keyed by signal, so the score a
+// signal gets when it is fetched is identical to the score it gets when a
+// cached report is re-scored later. `score` below is looked up from there.
 
-function clamp(n: number, lo = 0, hi = 100) {
-  return Math.max(lo, Math.min(hi, n))
-}
-
-/** Piecewise map of a "lower is better" rate to a 0–100 safety score. */
-function bandLowerBetter(value: number, points: [number, number][]): number {
-  // points: ascending [rawValue, score]; interpolate linearly, clamp at ends.
-  if (value <= points[0][0]) return points[0][1]
-  const last = points[points.length - 1]
-  if (value >= last[0]) return last[1]
-  for (let i = 1; i < points.length; i++) {
-    const [x1, y1] = points[i - 1]
-    const [x2, y2] = points[i]
-    if (value <= x2) {
-      const t = (value - x1) / (x2 - x1)
-      return clamp(y1 + t * (y2 - y1))
-    }
-  }
-  return last[1]
-}
-
-/** Piecewise map of a "higher is better" rate to a 0–100 safety score. */
-function bandHigherBetter(value: number, points: [number, number][]): number {
-  if (value <= points[0][0]) return points[0][1]
-  const last = points[points.length - 1]
-  if (value >= last[0]) return last[1]
-  for (let i = 1; i < points.length; i++) {
-    const [x1, y1] = points[i - 1]
-    const [x2, y2] = points[i]
-    if (value <= x2) {
-      const t = (value - x1) / (x2 - x1)
-      return clamp(y1 + t * (y2 - y1))
-    }
-  }
-  return last[1]
+/** The central band for a signal key, or null-scoring if it has none. */
+function scoreFor(key: string, v: number): number | null {
+  const fn = SIGNAL_BANDS[key]
+  if (!fn) return null
+  const out = fn(v)
+  return Number.isFinite(out) ? Math.round(out) : null
 }
 
 // ─── Signal definitions ──────────────────────────────────────────────
@@ -69,7 +44,6 @@ interface SignalDef {
   unit: string
   lowerIsBetter: boolean
   format: (v: number) => string
-  score: (v: number) => number
   note: string
 }
 
@@ -81,9 +55,6 @@ const WB_WGI = "World Bank Governance Indicators"
 const WB_ENTERPRISE = "World Bank Enterprise Surveys"
 const UN_SDG = "UN SDG Global Database"
 
-// WGI scores are already 0–100 (higher = safer/better) → use directly.
-const wgiScore = (v: number) => clamp(v)
-
 const SIGNAL_DEFS: SignalDef[] = [
   {
     key: "homicide",
@@ -94,17 +65,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "per 100k",
     lowerIsBetter: true,
     format: (v) => `${v.toFixed(1)} / 100k`,
-    score: (v) =>
-      bandLowerBetter(v, [
-        [0, 100],
-        [1, 92],
-        [3, 78],
-        [5, 68],
-        [10, 50],
-        [20, 30],
-        [40, 12],
-        [60, 3],
-      ]),
     note: "Intentional homicides per 100,000 people — the clearest measure of lethal violence.",
   },
   {
@@ -116,16 +76,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "%",
     lowerIsBetter: true,
     format: (v) => `${v.toFixed(1)}%`,
-    score: (v) =>
-      bandLowerBetter(v, [
-        [1, 97],
-        [3, 88],
-        [8, 72],
-        [15, 55],
-        [25, 36],
-        [40, 16],
-        [60, 4],
-      ]),
     note: "Share of firms reporting losses from theft/vandalism (Enterprise Surveys) — a practical proxy for everyday property-crime pressure.",
   },
   {
@@ -137,38 +87,22 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "%",
     lowerIsBetter: true,
     format: (v) => `${v.toFixed(1)}%`,
-    score: (v) =>
-      bandLowerBetter(v, [
-        [1, 96],
-        [4, 87],
-        [10, 74],
-        [18, 58],
-        [30, 40],
-        [45, 20],
-        [65, 5],
-      ]),
     note: "Share of firms naming crime, theft and disorder as their biggest obstacle — signals broad law-and-order strain.",
   },
   {
-    key: "terrorism_deaths",
+    // Per million residents, not the raw count. Scoring the absolute number
+    // rated 4,337 deaths in Afghanistan (~125/M) the same as 4,337 would be
+    // in India (~3/M) — it made big countries look like war zones and small
+    // war zones look calm.
+    key: "terrorism_deaths_pm",
     label: "Terrorism deaths (latest year)",
     group: "Conflict & terrorism",
     source: GTD,
-    unit: "deaths",
+    unit: "per million",
     lowerIsBetter: true,
-    format: (v) => (v === 0 ? "0 recorded" : `${Math.round(v)}`),
-    score: (v) =>
-      bandLowerBetter(v, [
-        [0, 96],
-        [1, 88],
-        [5, 80],
-        [25, 68],
-        [100, 52],
-        [500, 32],
-        [2000, 12],
-        [5000, 3],
-      ]),
-    note: "Deaths from terrorist attacks in the most recent recorded year (Global Terrorism Database). Countries with no recorded incidents count as zero.",
+    format: (v) =>
+      v === 0 ? "0 recorded" : v < 1 ? `${v.toFixed(2)} / million` : `${v.toFixed(1)} / million`,
+    note: "Deaths from terrorist attacks in the most recent recorded year (Global Terrorism Database), per million residents. Countries with no recorded incidents count as zero.",
   },
   {
     key: "road_deaths",
@@ -178,17 +112,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "per 100k",
     lowerIsBetter: true,
     format: (v) => `${v.toFixed(1)} / 100k`,
-    score: (v) =>
-      bandLowerBetter(v, [
-        [2, 95],
-        [4, 88],
-        [8, 74],
-        [12, 62],
-        [18, 48],
-        [25, 34],
-        [35, 18],
-        [50, 6],
-      ]),
     note: "Estimated road-traffic deaths per 100,000 people (WHO) — statistically one of the biggest physical risks to travellers.",
   },
   {
@@ -200,7 +123,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "/100",
     lowerIsBetter: false,
     format: (v) => `${v.toFixed(0)}/100`,
-    score: wgiScore,
     note: "Likelihood of political instability or politically-motivated violence, incl. terrorism (percentile).",
   },
   {
@@ -212,7 +134,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "/100",
     lowerIsBetter: false,
     format: (v) => `${v.toFixed(0)}/100`,
-    score: wgiScore,
     note: "Confidence in police, courts and contract enforcement (percentile rank vs all countries).",
   },
   {
@@ -224,7 +145,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "/100",
     lowerIsBetter: false,
     format: (v) => `${v.toFixed(0)}/100`,
-    score: wgiScore,
     note: "How well public power resists private/corrupt capture — affects police shakedowns & bribery.",
   },
   {
@@ -236,7 +156,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "/100",
     lowerIsBetter: false,
     format: (v) => `${v.toFixed(0)}/100`,
-    score: wgiScore,
     note: "Quality of public services and emergency response — matters when something goes wrong.",
   },
   {
@@ -248,7 +167,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "/100",
     lowerIsBetter: false,
     format: (v) => `${v.toFixed(0)}/100`,
-    score: wgiScore,
     note: "Soundness of rules governing business, transport and health & safety.",
   },
   {
@@ -260,7 +178,6 @@ const SIGNAL_DEFS: SignalDef[] = [
     unit: "/100",
     lowerIsBetter: false,
     format: (v) => `${v.toFixed(0)}/100`,
-    score: wgiScore,
     note: "Freedom of expression & association — low scores correlate with arbitrary detention risk.",
   },
 ]
@@ -337,6 +254,18 @@ function wgiBatch(iso2: string): Promise<Map<string, RefHit> | null> {
 }
 
 /**
+ * Country population, for per-capita normalisation. Cached through
+ * resolveMetric like every other indicator, so it costs one request per
+ * country per process and survives a World Bank outage.
+ */
+async function countryPopulation(iso2: string): Promise<number | null> {
+  const hit = await resolveMetric(`${iso2}:population`, [
+    () => wbLatest(iso2, "SP.POP.TOTL"),
+  ])
+  return hit && hit.value > 0 ? hit.value : null
+}
+
+/**
  * Fallback chains — the heart of "no metric goes missing". Each signal tries
  * its primary source, then independent secondary databases, then a coarser
  * geography (country → region), and finally the durable last-known-good
@@ -400,12 +329,20 @@ function buildChains(
         )
       },
     ],
-    terrorism_deaths: [
+    terrorism_deaths_pm: [
       async () => {
-        const h = await owidLatest("terrorism-deaths", iso3)
+        const [h, pop] = await Promise.all([
+          owidLatest("terrorism-deaths", iso3),
+          countryPopulation(iso2),
+        ])
         // The GTD only lists countries with recorded incidents — absence
         // genuinely means zero recorded deaths, not missing data.
-        return h ?? { value: 0, year: null }
+        const deaths = h?.value ?? 0
+        // Without a population we cannot normalise, and the raw count is not
+        // comparable between countries, so report no data rather than a
+        // number that would mean something different for every place.
+        if (pop == null || pop <= 0) return null
+        return { value: (deaths / pop) * 1e6, year: h?.year ?? null }
       },
     ],
     road_deaths: [
@@ -600,6 +537,9 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
   const signals: SafetySignal[] = []
 
   if (numbeo) {
+    // Only the crime index is kept. Numbeo's "safety index" is definitionally
+    // ~100 − crime index, so scoring both counted one crowdsourced perception
+    // measure twice and gave it double its intended weight.
     const scopeSuffix = numbeo.scope === "city" ? " · city-level" : ""
     const scopeNote =
       numbeo.scope === "city"
@@ -613,21 +553,9 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
       value: numbeo.crimeIndex,
       display: `${numbeo.crimeIndex.toFixed(1)} / 100${scopeSuffix}`,
       year: null,
-      score: Math.round(clamp(100 - numbeo.crimeIndex)),
+      score: scoreFor("numbeo_crime_index", numbeo.crimeIndex),
       lowerIsBetter: true,
-      note: `${scopeNote} Higher index = more perceived crime.`,
-    })
-    signals.push({
-      key: "numbeo_safety_index",
-      label: "Safety index (crowdsourced)",
-      group: "Violent crime",
-      source: "Numbeo Crime Index",
-      value: numbeo.safetyIndex,
-      display: `${numbeo.safetyIndex.toFixed(1)} / 100${scopeSuffix}`,
-      year: null,
-      score: Math.round(clamp(numbeo.safetyIndex)),
-      lowerIsBetter: false,
-      note: `${scopeNote} Higher = people report feeling safer.`,
+      note: `${scopeNote} Higher index = more perceived crime. Self-selected samples, so it is weighted below the recorded-crime statistics.`,
     })
   }
 
@@ -639,7 +567,6 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
     label: string
     lowerIsBetter: boolean
     seriesMatch?: RegExp
-    score: (v: number) => number
     note: string
     display: (v: number) => string
   }> = [
@@ -648,15 +575,6 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
       key: "safe_walking_dark",
       label: "Feel safe walking alone after dark",
       lowerIsBetter: false,
-      score: (v) =>
-        bandHigherBetter(v, [
-          [20, 15],
-          [35, 30],
-          [50, 50],
-          [65, 67],
-          [80, 84],
-          [95, 97],
-        ]),
       note: "Share of people who report feeling safe walking alone at night in their area (SDG 16.1.4).",
       display: (v) => `${v.toFixed(1)}%`,
     },
@@ -666,16 +584,6 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
       label: "Physical assault (past year)",
       lowerIsBetter: true,
       seriesMatch: /physical violence/i,
-      score: (v) =>
-        bandLowerBetter(v, [
-          [1, 97],
-          [3, 90],
-          [7, 76],
-          [12, 60],
-          [20, 40],
-          [35, 18],
-          [50, 5],
-        ]),
       note: "Share of people subjected to physical violence (assault) in the previous 12 months — UNODC-backed survey data (SDG 16.1.3).",
       display: (v) => `${v.toFixed(1)}%`,
     },
@@ -685,16 +593,6 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
       label: "Sexual violence (past year)",
       lowerIsBetter: true,
       seriesMatch: /sexual violence/i,
-      score: (v) =>
-        bandLowerBetter(v, [
-          [0.5, 95],
-          [1, 88],
-          [2, 78],
-          [4, 62],
-          [7, 45],
-          [12, 25],
-          [20, 8],
-        ]),
       note: "Share of people subjected to sexual violence in the previous 12 months — UNODC-backed survey data (SDG 16.1.3).",
       display: (v) => `${v.toFixed(1)}%`,
     },
@@ -706,17 +604,7 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
       // the indicator also publishes absolute victim counts — only the
       // per-100k series is comparable across countries
       seriesMatch: /per 100,?000/i,
-      score: (v) =>
-        bandLowerBetter(v, [
-          [0, 98],
-          [0.5, 88],
-          [1, 78],
-          [2, 60],
-          [4, 38],
-          [8, 18],
-          [15, 5],
-        ]),
-      note: "Detected victims of human trafficking per 100,000 population (SDG 16.2.2) — the metric behind the UNODC Global Report on Trafficking in Persons.",
+      note: "Detected victims of human trafficking per 100,000 population (SDG 16.2.2) — the metric behind the UNODC Global Report on Trafficking in Persons. Detection-biased, since better policing finds more victims, so it carries little weight.",
       display: (v) => `${v.toFixed(2)} / 100k`,
     },
     {
@@ -724,16 +612,6 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
       key: "bribery_contact_rate",
       label: "Bribery during public-official contact",
       lowerIsBetter: true,
-      score: (v) =>
-        bandLowerBetter(v, [
-          [1, 97],
-          [5, 88],
-          [10, 76],
-          [20, 58],
-          [30, 41],
-          [45, 20],
-          [60, 6],
-        ]),
       note: "People who had contact with a public official and were asked for/paid a bribe in the last 12 months (SDG 16.5.1).",
       display: (v) => `${v.toFixed(1)}%`,
     },
@@ -753,7 +631,7 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
       value: hit?.value ?? null,
       display: hit ? d.display(hit.value) : "No data",
       year: hit?.year ?? null,
-      score: hit ? Math.round(d.score(hit.value)) : null,
+      score: hit ? scoreFor(d.key, hit.value) : null,
       lowerIsBetter: d.lowerIsBetter,
       note: d.note,
     })
@@ -815,7 +693,7 @@ export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
       value: res?.value ?? null,
       display: res ? d.format(res.value) + (res.displaySuffix ?? "") : nullDisplay,
       year: res?.year ?? null,
-      score: res ? Math.round(d.score(res.value)) : null,
+      score: res ? scoreFor(d.key, res.value) : null,
       lowerIsBetter: d.lowerIsBetter,
       note: d.note,
     })

@@ -108,10 +108,28 @@ export interface HazardEvent {
   date: string | null
 }
 
+/** One hazard family's roll-up. See lib/scoring.ts for how they combine. */
+export interface PillarScore {
+  key: string
+  label: string
+  score: number | null // 0–100 (100 = safest); null when nothing resolved
+  coverage: number // share of the pillar's indicators that resolved, 0–1
+  imputed: boolean // true when this is a prior, not measured data
+}
+
+/** A ceiling the score cannot exceed while the stated condition holds. */
+export interface ScoreCap {
+  max: number
+  reason: string
+}
+
 export interface SafetyReport {
   index: number // 0–100 composite (100 = safest)
   level: SafetyLevel
   saferThanPct: number | null // "safer than X% of countries"
+  pillars?: PillarScore[] // hazard-family roll-ups behind the index
+  confidence?: number // share of pillar weight backed by real data, 0–1
+  caps?: ScoreCap[] // non-compensatory ceilings that bound the index
   signals: SafetySignal[]
   comparisons: Comparison[]
   advisories: OfficialAdvisory[] // official govt advisories (direct from source)

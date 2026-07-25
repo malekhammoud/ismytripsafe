@@ -4,65 +4,10 @@ import type {
   SafetySource,
   OfficialAdvisory,
 } from "../types"
-import { levelFromIndex } from "../safety-display"
+import { computeSafetyIndex, advisoryScore } from "../scoring"
 import { gatherSignals } from "./signals"
-import { getOfficialAdvisories, stateDeptLevelScore } from "./advisories"
+import { getOfficialAdvisories } from "./advisories"
 import type { GeoPoint } from "../types"
-
-// Weights for the composite index (signals not present are skipped & renormalized).
-const WEIGHTS: Record<string, number> = {
-  natural_hazards: 0.03,
-  homicide: 0.2,
-  safe_walking_dark: 0.09,
-  violence_victimization: 0.08,
-  sexual_violence: 0.06,
-  terrorism_deaths: 0.05,
-  road_deaths: 0.04,
-  human_trafficking_victims: 0.06,
-  bribery_contact_rate: 0.06,
-  numbeo_crime_index: 0.05,
-  numbeo_safety_index: 0.05,
-  firm_crime_losses: 0.05,
-  crime_major_constraint: 0.04,
-  stability: 0.16,
-  advisory: 0.12,
-  rule_of_law: 0.1,
-  corruption: 0.07,
-  gov_effectiveness: 0.07,
-  health: 0.05,
-  hospitals: 0.04,
-  weather: 0.04,
-  air_quality: 0.03,
-  regulatory: 0.03,
-  voice: 0.03,
-}
-
-function compositeIndex(signals: SafetySignal[]): number {
-  let sum = 0
-  let wsum = 0
-  for (const s of signals) {
-    if (s.score == null) continue
-    const w = WEIGHTS[s.key] ?? 0.04
-    sum += s.score * w
-    wsum += w
-  }
-  if (wsum === 0) return 60 // neutral when nothing resolved
-  return Math.round(sum / wsum)
-}
-
-/**
- * "Safer than X% of countries" — derived from the governance percentile
- * signals (WGI scores are already country percentiles 0–100). Falls back to
- * the composite index when no WGI data is available.
- */
-function saferThanPct(signals: SafetySignal[], index: number): number | null {
-  const wgiKeys = ["stability", "rule_of_law", "corruption", "gov_effectiveness", "regulatory", "voice"]
-  const vals = signals
-    .filter((s) => wgiKeys.includes(s.key) && s.value != null)
-    .map((s) => s.value as number)
-  if (vals.length === 0) return Math.max(0, Math.min(100, index))
-  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
-}
 
 /**
  * Build the "Official guidance" index signal from every graded advisory.
@@ -80,11 +25,11 @@ function advisorySignal(advisories: OfficialAdvisory[]): SafetySignal {
   const us = advisories.find((a) => a.sourceShort === "US" && a.level != null)
   const lead = us ?? pool[0]
 
-  const score = pool.length
-    ? Math.round(
-        pool.reduce((sum, a) => sum + stateDeptLevelScore(a.level as number), 0) /
-          pool.length
-      )
+  // Average the advisory *level* across issuing governments, then let the
+  // scoring engine map that to a 0–100 score — the level is also what drives
+  // the "Do Not Travel" cap, so the two must read the same number.
+  const level = pool.length
+    ? pool.reduce((sum, a) => sum + (a.level as number), 0) / pool.length
     : null
 
   const display = lead
@@ -101,13 +46,13 @@ function advisorySignal(advisories: OfficialAdvisory[]): SafetySignal {
         ? "US State Dept · Canada"
         : "U.S. Department of State"
       : (lead?.source ?? "U.S. Department of State"),
-    value: lead?.level ?? null,
+    value: level,
     display,
     year: null,
     note:
       lead?.summary ||
       "Official government travel advisory levels (1 = normal precautions, 4 = do not travel), averaged across issuing governments.",
-    score,
+    score: level == null ? null : Math.round(advisoryScore(level)),
     lowerIsBetter: true,
   }
 }
@@ -119,9 +64,7 @@ export async function getSafetyReport(geo: GeoPoint): Promise<SafetyReport> {
   // Fold the official advisory into the scored signals (drives the index).
   const signals = [...baseSignals, advisorySignal(advisories)]
 
-  const index = compositeIndex(signals)
-  const level = levelFromIndex(index)
-  const safer = saferThanPct(signals, index)
+  const scored = computeSafetyIndex(signals)
 
   // Distinct databases that actually returned data, for honest attribution.
   const withData = signals.filter((s) => s.score != null)
@@ -132,9 +75,12 @@ export async function getSafetyReport(geo: GeoPoint): Promise<SafetyReport> {
   })
 
   return {
-    index,
-    level,
-    saferThanPct: safer,
+    index: scored.index,
+    level: scored.level,
+    saferThanPct: scored.saferThanPct,
+    pillars: scored.pillars,
+    confidence: scored.confidence,
+    caps: scored.caps,
     signals,
     comparisons,
     advisories,

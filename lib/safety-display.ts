@@ -5,6 +5,14 @@ import type {
   SafetyEnrichment,
   RiskLevel,
 } from "./types"
+import {
+  computeSafetyIndex,
+  levelFromIndex,
+  saferThanPct,
+  type PillarKey,
+} from "./scoring"
+
+export { levelFromIndex }
 
 export interface LevelConfig {
   label: string
@@ -46,23 +54,30 @@ export const LEVELS: Record<SafetyLevel, LevelConfig> = {
   },
 }
 
-/** Level band for a 0–100 safety index. */
-export function levelFromIndex(index: number): SafetyLevel {
-  if (index >= 80) return "VERY_SAFE"
-  if (index >= 66) return "SAFE"
-  if (index >= 50) return "MODERATE"
-  if (index >= 34) return "CAUTION"
-  return "HIGH_RISK"
-}
-
 // ─── Final published score (databases + field research) ──────────────
 
-/** 0–100 equivalents for the analyst's qualitative street-crime risk levels. */
-const RISK_LEVEL_SCORE: Record<RiskLevel, number> = {
-  Low: 88,
+// 0–100 equivalents for the analyst's qualitative street-crime ratings.
+//
+// Robbery and pickpocketing get separate scales because they are not the same
+// kind of risk. Armed robbery is a threat to life; pickpocketing is a threat
+// to a wallet. On a single shared scale, "High pickpocket risk" scored 38 —
+// which is what pushed Barcelona and Rome, two cities with very little
+// violent crime, below Yerevan and Skagway.
+
+/** Mugging / armed robbery — a risk to the traveller's person. */
+const ROBBERY_SCORE: Record<RiskLevel, number> = {
+  Low: 92,
   Moderate: 62,
-  High: 38,
-  Severe: 15,
+  High: 34,
+  Severe: 12,
+}
+
+/** Pickpocketing / bag-snatching — costly and common, but rarely dangerous. */
+const PICKPOCKET_SCORE: Record<RiskLevel, number> = {
+  Low: 96,
+  Moderate: 78,
+  High: 58,
+  Severe: 40,
 }
 
 export interface FinalScore {
@@ -70,35 +85,76 @@ export interface FinalScore {
   level: SafetyLevel
   /** true when the on-the-ground research contributed to the number */
   includesFieldResearch: boolean
+  /** share of the database pillars backed by real data, 0–1 */
+  confidence: number
+  /** "safer than X% of countries", derived from this same index */
+  saferThanPct: number
+  /** non-compensatory ceilings that bound the score, worst first */
+  caps: { max: number; reason: string }[]
 }
 
 /**
- * The headline score shown in the hero. The multi-database composite is the
- * backbone (75%); once the field research finishes, its street-crime ratings
- * and current traveller sentiment fold in (25%). The report is held until the
- * research completes, so this final number always reflects everything in it.
+ * The headline score shown in the hero.
+ *
+ * The database composite is recomputed here from the report's raw signal
+ * values rather than read off `safety.index`. That makes the published number
+ * a pure function of the stored inputs, so a change to the scoring engine
+ * re-scores every cached report on its next render instead of leaving old
+ * reports frozen at numbers the current engine would never produce.
+ *
+ * Field research then folds in at 20%: the analyst's street-crime ratings and
+ * current traveller sentiment. It is capped the same way the composite is —
+ * a "Do Not Travel" advisory is not something a positive sentiment read gets
+ * to argue away.
  */
 export function computeFinalScore(
   safety: SafetyReport,
   intel: SafetyEnrichment | null
 ): FinalScore {
-  const ground: number[] = []
+  const base = computeSafetyIndex(safety.signals)
+
+  const ground: { score: number; weight: number }[] = []
   // Record lookup can miss at runtime if the model emits an off-schema level.
-  const riskScore = (r?: { level: RiskLevel }) => {
-    const v = r ? RISK_LEVEL_SCORE[r.level] : undefined
-    if (v != null) ground.push(v)
+  const add = (
+    table: Record<RiskLevel, number>,
+    weight: number,
+    r?: { level: RiskLevel }
+  ) => {
+    const v = r ? table[r.level] : undefined
+    if (v != null) ground.push({ score: v, weight })
   }
-  riskScore(intel?.robbery)
-  riskScore(intel?.pickpocket)
+  add(ROBBERY_SCORE, 0.45, intel?.robbery)
+  add(PICKPOCKET_SCORE, 0.2, intel?.pickpocket)
   const sentiment = Number(intel?.consumerSentiment?.score)
-  if (Number.isFinite(sentiment)) ground.push(Math.max(0, Math.min(100, sentiment)))
+  if (Number.isFinite(sentiment)) {
+    ground.push({ score: Math.max(0, Math.min(100, sentiment)), weight: 0.35 })
+  }
 
   if (!ground.length) {
-    return { index: safety.index, level: safety.level, includesFieldResearch: false }
+    return {
+      index: base.index,
+      level: base.level,
+      includesFieldResearch: false,
+      confidence: base.confidence,
+      saferThanPct: base.saferThanPct,
+      caps: base.caps,
+    }
   }
-  const groundScore = ground.reduce((a, b) => a + b, 0) / ground.length
-  const index = Math.round(0.75 * safety.index + 0.25 * groundScore)
-  return { index, level: levelFromIndex(index), includesFieldResearch: true }
+
+  const wsum = ground.reduce((a, g) => a + g.weight, 0)
+  const groundScore = ground.reduce((a, g) => a + g.score * g.weight, 0) / wsum
+  let index = Math.round(0.8 * base.index + 0.2 * groundScore)
+  for (const c of base.caps) index = Math.min(index, c.max)
+  index = Math.max(0, Math.min(100, index))
+
+  return {
+    index,
+    level: levelFromIndex(index),
+    includesFieldResearch: true,
+    confidence: base.confidence,
+    saferThanPct: saferThanPct(index),
+    caps: base.caps,
+  }
 }
 
 /** Color for a 0–100 signal score. */
@@ -134,59 +190,55 @@ export function tileLevel(score: number | null): { name: string; color: string }
 }
 
 /**
- * Roll the raw signals up into the four headline categories shown as clickable
+ * Roll the signals up into the four headline categories shown as clickable
  * tiles at the top of the report. Each tile links to its detail section below.
+ *
+ * The tiles read straight off the scoring engine's pillars rather than
+ * recomputing their own averages, so a tile can never disagree with the
+ * headline score it sits under. "Health & Air" and "Stability" each merge two
+ * pillars, weighted the same way the engine weights them.
  */
 export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
+  const { pillars } = computeSafetyIndex(signals)
   const byKey = new Map(signals.map((s) => [s.key, s]))
-  const scoreOf = (k: string) => byKey.get(k)?.score ?? null
+  const pillar = (k: PillarKey) => pillars.find((p) => p.key === k)
 
-  const mean = (keys: string[]): number | null => {
-    const vals = keys.map(scoreOf).filter((v): v is number => v != null)
-    if (!vals.length) return null
-    return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length)
-  }
-
-  const weightedMean = (weighted: [string, number][]): number | null => {
+  /** Weighted blend of several pillars, skipping any that resolved nothing. */
+  const blend = (parts: [PillarKey, number][]): number | null => {
     let sum = 0
     let wsum = 0
-    for (const [k, w] of weighted) {
-      const v = scoreOf(k)
-      if (v == null) continue
-      sum += v * w
+    for (const [k, w] of parts) {
+      const score = pillar(k)?.score
+      if (score == null) continue
+      sum += score * w
       wsum += w
     }
     return wsum === 0 ? null : Math.round(sum / wsum)
   }
 
-  // Advisories — colour by the advisory LEVEL itself, not a raw score, because
-  // an advisory is categorical: Level 1 = normal precautions (green), Level 2 =
-  // "exercise increased caution" (yellow — neither good nor bad), Level 3 =
-  // reconsider (orange), Level 4 = do not travel (red). No advisory ≈ green.
   const adv = byKey.get("advisory")
-  const advLevel = (adv?.value ?? null) as number | null
-  const advScore =
-    advLevel == null ? 90 : advLevel <= 1 ? 90 : advLevel === 2 ? 62 : advLevel === 3 ? 45 : 15
-  const advNote = adv
-    ? adv.value == null
-      ? "No advisory issued"
-      : adv.display
-    : "No advisory issued"
+  const advNote =
+    adv && adv.value != null ? adv.display : "No advisory issued"
 
-  const crimeNote = byKey.get("numbeo_crime_index")?.value != null
-    ? `Crime index ${byKey.get("numbeo_crime_index")!.display}`
-    : byKey.get("homicide")?.value != null
-      ? `Homicide ${byKey.get("homicide")!.display}`
-      : "Street & violent crime"
-  const healthNote = byKey.get("air_quality")?.value != null
-    ? byKey.get("air_quality")!.display
-    : "Air, disease & care"
+  const crimeNote =
+    byKey.get("numbeo_crime_index")?.value != null
+      ? `Crime index ${byKey.get("numbeo_crime_index")!.display}`
+      : byKey.get("homicide")?.value != null
+        ? `Homicide ${byKey.get("homicide")!.display}`
+        : "Street & violent crime"
+
+  const healthNote =
+    byKey.get("air_quality")?.value != null
+      ? byKey.get("air_quality")!.display
+      : "Air, disease & care"
 
   const cats: CategoryScore[] = [
     {
       key: "advisories",
       label: "Advisories",
-      score: advScore,
+      // An advisory with no grade is not a bad advisory — an ungraded or
+      // absent one reads as "no government is warning about this place".
+      score: pillar("advisory")?.score ?? 90,
       note: advNote,
       signalKeys: ["advisory"],
       levelName: "",
@@ -195,18 +247,7 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
     {
       key: "crime",
       label: "Crime",
-      score: weightedMean([
-        ["homicide", 0.26],
-        ["safe_walking_dark", 0.16],
-        ["violence_victimization", 0.13],
-        ["sexual_violence", 0.09],
-        ["numbeo_crime_index", 0.11],
-        ["numbeo_safety_index", 0.11],
-        ["human_trafficking_victims", 0.07],
-        ["bribery_contact_rate", 0.04],
-        ["firm_crime_losses", 0.02],
-        ["crime_major_constraint", 0.01],
-      ]),
+      score: pillar("crime")?.score ?? null,
       note: crimeNote,
       signalKeys: [
         "homicide",
@@ -216,7 +257,6 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
         "human_trafficking_victims",
         "bribery_contact_rate",
         "numbeo_crime_index",
-        "numbeo_safety_index",
         "firm_crime_losses",
         "crime_major_constraint",
       ],
@@ -226,33 +266,38 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
     {
       key: "health",
       label: "Health & Air",
-      score: mean(["air_quality", "health", "hospitals", "weather", "road_deaths", "natural_hazards"]),
+      score: blend([
+        ["hazards", 0.1],
+        ["health", 0.06],
+      ]),
       note: healthNote,
-      signalKeys: ["air_quality", "health", "hospitals", "weather", "road_deaths", "natural_hazards"],
+      signalKeys: [
+        "air_quality",
+        "health",
+        "hospitals",
+        "weather",
+        "road_deaths",
+        "natural_hazards",
+      ],
       levelName: "",
       color: "",
     },
     {
       key: "stability",
       label: "Stability",
-      score: mean([
-        "stability",
-        "rule_of_law",
-        "corruption",
-        "gov_effectiveness",
-        "regulatory",
-        "voice",
-        "terrorism_deaths",
+      score: blend([
+        ["conflict", 0.2],
+        ["institutions", 0.14],
       ]),
       note: "Governance & conflict basket",
       signalKeys: [
         "stability",
+        "terrorism_deaths_pm",
         "rule_of_law",
         "corruption",
         "gov_effectiveness",
         "regulatory",
         "voice",
-        "terrorism_deaths",
       ],
       levelName: "",
       color: "",

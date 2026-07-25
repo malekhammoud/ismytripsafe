@@ -5,6 +5,7 @@ import { cache } from "react"
 import { getCountryHub, listCountries } from "@/lib/reports"
 import { readCacheAnyAge, type CachedReport } from "@/lib/cache"
 import { LEVELS } from "@/lib/safety-display"
+import { rescoreSignals } from "@/lib/scoring"
 import { absUrl, humanDate, monthYear } from "@/lib/site"
 import {
   breadcrumbNode,
@@ -64,9 +65,12 @@ const COUNTRY_SIGNAL_KEYS = [
 
 function countrySignals(sample: CachedReport | null): SafetySignal[] {
   if (!sample) return []
-  return COUNTRY_SIGNAL_KEYS.map((k) =>
-    sample.bundle.safety.signals.find((s) => s.key === k)
-  ).filter((s): s is SafetySignal => !!s && s.score != null)
+  // Re-score from the cached raw values so these rows agree with the headline
+  // score, which is itself recomputed on render.
+  const signals = rescoreSignals(sample.bundle.safety.signals)
+  return COUNTRY_SIGNAL_KEYS.map((k) => signals.find((s) => s.key === k)).filter(
+    (s): s is SafetySignal => !!s && s.score != null
+  )
 }
 
 export async function generateMetadata({

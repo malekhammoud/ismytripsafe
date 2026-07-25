@@ -17,11 +17,11 @@ const EXPLAIN: Record<CategoryKey, string> = {
   advisories:
     "Official government travel advisories (U.S. State Dept & UK FCDO). A higher score means fewer or lower-level warnings.",
   crime:
-    "Violent & street-crime risk from homicide, night-safety/victimization surveys, trafficking and bribery indicators, plus Numbeo crime/safety indices when available. Higher = safer.",
+    "Violent & street-crime risk from homicide, night-safety/victimization surveys, trafficking and bribery indicators, plus the Numbeo crowdsourced crime index when available. Higher = safer.",
   health:
     "Air quality, active disease notices, nearby hospitals and the seasonal weather outlook, combined. Higher = healthier & safer.",
   stability:
-    "World Bank governance basket — political stability, rule of law, control of corruption, government effectiveness, regulatory quality and voice. Higher = stronger institutions.",
+    "Conflict and governance — political stability, terrorism deaths per million, rule of law, control of corruption, government effectiveness, regulatory quality and voice. Higher = stronger institutions and less conflict.",
 }
 
 // What each colour band on the tile actually means — shown on hovering the pill.

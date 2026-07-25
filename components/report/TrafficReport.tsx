@@ -442,24 +442,32 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
                 />
               </p>
             )}
-            {safety.saferThanPct != null && (
-              <p className="mt-2 flex items-center justify-center gap-1 text-[0.75rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
-                Safer than ~{safety.saferThanPct}% of countries
-                <InfoTip
-                  text={
-                    final.includesFieldResearch
-                      ? "A single 0–100 score. The database composite (crime, governance, health, advisories, weather) carries 75%; the live field research — street-crime ratings and current traveller sentiment — carries 25%. Computed once the research completes. 100 = safest."
-                      : "A single 0–100 score blending every signal below (crime, governance, health, advisories, weather) by weight. 100 = safest."
-                  }
-                  color="rgba(238,242,248,0.7)"
-                />
-                {sourceUrlForName("World Bank Governance Indicators") && (
-                  <SourceLink
-                    href={sourceUrlForName("World Bank Governance Indicators")!}
-                    label="safer than percentile"
-                    color="rgba(238,242,248,0.6)"
-                  />
-                )}
+            <p className="mt-2 flex items-center justify-center gap-1 text-[0.75rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
+              Safer than ~{final.saferThanPct}% of countries
+              <InfoTip
+                text={
+                  (final.includesFieldResearch
+                    ? "A single 0–100 score. The database composite carries 80%; the live field research — street-crime ratings and current traveller sentiment — carries 20%. "
+                    : "A single 0–100 score built from every indicator below. ") +
+                  "Indicators are grouped into hazard families (crime, conflict, official guidance, institutions, everyday hazards, health) and combined so that severe risk in any one family dominates rather than being averaged away by the others. 100 = safest."
+                }
+                color="rgba(238,242,248,0.7)"
+              />
+            </p>
+            {final.caps.length > 0 && (
+              /* A capped score must never look arbitrary — say what bounds it. */
+              <p
+                className="mx-auto mt-2.5 max-w-[30rem] rounded-lg px-3 py-2 text-[0.72rem] leading-snug"
+                style={{
+                  color: "rgba(238,242,248,0.9)",
+                  background: "rgba(212,80,58,0.16)",
+                  border: "1px solid rgba(212,80,58,0.4)",
+                }}
+              >
+                <span className="font-semibold uppercase tracking-[0.08em]">
+                  Score capped at {final.caps[0].max}
+                </span>{" "}
+                — {final.caps[0].reason}. No other indicator can raise the score above this.
               </p>
             )}
           </div>
@@ -556,7 +564,6 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
               sig("sexual_violence"),
               sig("human_trafficking_victims"),
               sig("bribery_contact_rate"),
-              sig("numbeo_safety_index"),
               sig("firm_crime_losses"),
               sig("crime_major_constraint"),
             ]}
@@ -654,12 +661,12 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
         title="Stability"
         icon={<Landmark size={13} strokeWidth={2.4} />}
         statusWord={categories.find((c) => c.key === "stability")?.levelName ?? ""}
-        info="The World Bank's Worldwide Governance Indicators — percentile ranks (vs every country) for the institutions that keep travellers safe when something goes wrong — plus recorded terrorism deaths (Global Terrorism Database). Backed by fallback sources so the data is always populated."
+        info="The World Bank's Worldwide Governance Indicators — percentile ranks (vs every country) for the institutions that keep travellers safe when something goes wrong — plus terrorism deaths per million residents (Global Terrorism Database). Backed by fallback sources so the data is always populated."
         delay={360}
       >
         <div>
           <SignalRow signal={sig("stability")} />
-          <SignalRow signal={sig("terrorism_deaths")} />
+          <SignalRow signal={sig("terrorism_deaths_pm")} />
           <SignalRow signal={sig("rule_of_law")} />
           <SignalRow signal={sig("corruption")} />
           <MoreSignals signals={[sig("gov_effectiveness"), sig("regulatory"), sig("voice")]} />

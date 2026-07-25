@@ -134,7 +134,18 @@ function buildPrompt(
 
 === REAL MULTI-DATABASE SAFETY PROFILE (ground truth) ===
 Composite safety index: ${s.index}/100 (${s.level.replace("_", " ")})
-${s.saferThanPct != null ? `Safer than ~${s.saferThanPct}% of countries (governance percentile)\n` : ""}
+${s.saferThanPct != null ? `Safer than ~${s.saferThanPct}% of countries\n` : ""}${
+    s.pillars?.length
+      ? `Hazard-family scores (0–100, 100 = safest): ${s.pillars
+          .filter((p) => p.score != null)
+          .map((p) => `${p.label} ${p.score}${p.imputed ? " (estimated)" : ""}`)
+          .join(" · ")}\n`
+      : ""
+  }${
+    s.caps?.length
+      ? `Score is capped at ${s.caps[0].max} because: ${s.caps[0].reason}\n`
+      : ""
+  }
 Signals:
 ${signalLines}
 

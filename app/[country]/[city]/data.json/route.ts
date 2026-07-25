@@ -38,7 +38,9 @@ export async function GET(
         score: final.index,
         level: final.level,
         answer: LEVELS[final.level].answer,
-        saferThanPctOfCountries: s.saferThanPct,
+        saferThanPctOfCountries: final.saferThanPct,
+        confidence: final.confidence,
+        caps: final.caps,
         categories: computeCategories(s.signals).map((c) => ({
           key: c.key,
           label: c.label,

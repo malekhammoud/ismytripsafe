@@ -170,7 +170,12 @@ export function personalizeScore(
     drivers.push(`${CATEGORY_LABEL[cat as keyof typeof CATEGORY_LABEL] ?? cat} +${Math.round(w * 100)}% weight`)
   }
 
-  const index = Math.round(Math.max(0, Math.min(100, sum / used)))
+  // Re-apply the composite's non-compensatory ceilings. Re-weighting toward a
+  // category a place happens to do well in must not lift it over a cap — a
+  // "Do Not Travel" advisory still bounds the score for a business traveller.
+  let index = Math.round(Math.max(0, Math.min(100, sum / used)))
+  for (const c of base.caps) index = Math.min(index, c.max)
+
   return {
     index,
     level: levelFromIndex(index),
