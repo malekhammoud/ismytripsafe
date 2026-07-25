@@ -28,10 +28,17 @@ import type {
   Comparison,
   DestinationImages,
 } from "@/lib/types"
-import { computeCategories, computeFinalScore, scoreColor, LEVELS, type CategoryKey } from "@/lib/safety-display"
+import {
+  computeCategories,
+  computeFinalScore,
+  scoreColor,
+  FIELD_RESEARCH_WEIGHT,
+  LEVELS,
+  type CategoryKey,
+} from "@/lib/safety-display"
 import { personalizeScore, profileSummary, type TravelerProfile } from "@/lib/profile"
 import { extractSourceLinksFromText, sourceUrlForName, sourceUrlForSearchQuery } from "@/lib/source-links"
-import { CategoryTiles } from "./CategoryTiles"
+import { ScorePyramid } from "./ScorePyramid"
 import { InfoTip } from "./InfoTip"
 import { ShareButton } from "./ShareButton"
 import { SourceLink } from "./SourceLink"
@@ -331,7 +338,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
   const geo = bundle.geo
   const flag = bundle.country?.flag
   const sig = (key: string) => safety.signals.find((s) => s.key === key)
-  const categories = computeCategories(safety.signals)
+  const categories = computeCategories(safety.signals, intel)
   const catScore = (k: CategoryKey) => categories.find((c) => c.key === k)?.score ?? null
   const homicideCmp = safety.comparisons.find((c) => /homicide/i.test(c.metric))
   // The published score blends the database composite with the field research
@@ -355,11 +362,10 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
       ? images.hero.replace(/\/\d{3,4}px-([^/]+)$/, "/1280px-$1")
       : null
   // The "on the ground" block reflects how safe it actually is right now — the
-  // AI's current-sentiment read if present, otherwise the overall rating — so a
-  // "not safe right now" verdict never sits on a green panel.
-  const intelTone: Tone = intel?.consumerSentiment
-    ? toneForScore(intel.consumerSentiment.score)
-    : indexTone
+  // traveller-sentiment score if the research has landed, otherwise the overall
+  // rating — so a "not safe right now" verdict never sits on a green panel.
+  const sentiment = final.sentiment
+  const intelTone: Tone = sentiment.score != null ? toneForScore(sentiment.score) : indexTone
   const it = TONES[intelTone]
   const toneWord: Record<Tone, string> = { safe: "Stable", moderate: "Moderate", caution: "Caution", risky: "Elevated" }
   const streaming = loading && prose.length > 0
@@ -472,24 +478,12 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             )}
           </div>
 
-          <div
-            className="mt-5 flex items-center justify-center gap-2.5 text-[0.6rem] font-semibold uppercase tracking-[0.16em]"
-            style={{ color: "rgba(238,242,248,0.6)" }}
-            aria-label="Report color scale"
-          >
-            <span>High risk</span>
-            <span className="flex items-center gap-1.5">
-              {(["risky", "caution", "moderate", "safe"] as Tone[]).map((k) => (
-                <span key={k} className="h-2 w-2 rounded-full" style={{ background: TONES[k].strong, outline: k === indexTone ? "2px solid rgba(255,255,255,0.85)" : "none", outlineOffset: 1.5 }} />
-              ))}
-            </span>
-            <span>Very safe</span>
-          </div>
+          {/* the pyramid: headline above, the two scores felt directly, then
+              the three that set the context. Inside the hero so the shared
+              image carries the whole breakdown, not just the number. */}
+          <ScorePyramid categories={categories} />
         </div>
       </section>
-
-      {/* category tiles — click to jump to a section */}
-      <CategoryTiles categories={categories} />
 
       {/* advisories */}
       <Block
@@ -686,6 +680,52 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
       >
         {intel ? (
           <>
+            {sentiment.score != null && (
+              /* The traveller-sentiment score, shown where it is earned. This
+                 is the same number as the pyramid tile and the 20% of the
+                 headline that the databases cannot see. */
+              <div className="mb-5 rounded-[3px] px-4 py-3.5" style={{ background: "rgba(255,255,255,0.5)" }}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="flex items-center gap-1 text-[0.66rem] font-semibold uppercase tracking-[0.12em]" style={{ color: it.deep }}>
+                    Traveller sentiment score
+                    <InfoTip
+                      text={`How safe travellers report actually feeling, weighted with current robbery (45%) and pickpocketing (20%) risk; reported feel carries 35%. This score is ${Math.round(FIELD_RESEARCH_WEIGHT * 100)}% of the published ${personal.index}/100 — the database composite on its own is ${final.baseIndex}.`}
+                      color={it.deep}
+                    />
+                  </p>
+                  <p className="tnum shrink-0 text-[0.7rem] font-semibold uppercase tracking-[0.08em]" style={{ color: it.deep }}>
+                    {sentiment.label}
+                  </p>
+                </div>
+                <div className="mt-2 flex items-center gap-3">
+                  <p className="tnum font-display text-[1.9rem] leading-none" style={{ color: INK, fontWeight: 540 }}>
+                    {sentiment.score}
+                    <span className="ml-1 text-[0.62rem] font-normal" style={{ color: `${INK}88` }}>/100</span>
+                  </p>
+                  <ScoreBar value={sentiment.score} color={it.strong} track={it.track} />
+                </div>
+                <div className="mt-3 grid gap-x-4 gap-y-1.5 sm:grid-cols-3">
+                  {sentiment.parts.map((p) => (
+                    <div key={p.label} className="flex items-baseline justify-between gap-2 sm:flex-col sm:items-start sm:gap-0.5">
+                      <span className="text-[0.66rem] uppercase tracking-[0.08em]" style={{ color: `${INK}99` }}>
+                        {p.label}
+                      </span>
+                      <span className="tnum text-[0.76rem] font-semibold" style={{ color: scoreColor(p.score) }}>
+                        {p.score}
+                        <span className="ml-1 font-normal" style={{ color: `${INK}88` }}>{p.detail}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {sentiment.summary && (
+                  <p className="mt-3 flex items-start gap-1 text-[0.78rem] leading-relaxed" style={{ color: `${INK}b0` }}>
+                    {sentiment.summary}
+                    {intelSourceHref && <SourceLink href={intelSourceHref} label="traveller sentiment source" color={`${INK}99`} />}
+                  </p>
+                )}
+              </div>
+            )}
+
             <p className="font-display flex items-center gap-1 text-[1.02rem] leading-[1.6]" style={{ color: INK }}>
               {intel.verdict}
               {intelSourceHref && <SourceLink href={intelSourceHref} label="field research" color={`${INK}99`} />}

@@ -8,7 +8,7 @@ import { useReport } from "@/lib/store"
 import { TopNav } from "@/components/report/TopNav"
 import { InfoTip } from "@/components/report/InfoTip"
 import { SourceLink } from "@/components/report/SourceLink"
-import { scoreColor } from "@/lib/safety-display"
+import { computeSentiment, scoreColor } from "@/lib/safety-display"
 import { extractSourceLinksFromText, sourceUrlForSearchQuery } from "@/lib/source-links"
 import type { ZoneLevel } from "@/lib/types"
 import type { MapZonePoint } from "@/components/map/CityMap"
@@ -135,7 +135,9 @@ export default function MapPage() {
     )
   }
 
-  const sentiment = intel?.consumerSentiment
+  // The same traveller-sentiment score the report publishes, so the two pages
+  // can never show different numbers under the same name.
+  const sentiment = computeSentiment(intel)
   const watch = intel?.watchOuts ?? []
   const tips = intel?.tips ?? []
   const placeQuery = query?.place ?? (geo ? `${geo.city}, ${geo.country}` : "")
@@ -252,11 +254,11 @@ export default function MapPage() {
           {/* consumer sentiment */}
           <div className="card p-5">
             <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[var(--ink-faint)]">
-              <Smile size={13} /> Consumer sentiment
-              <InfoTip text="How safe visitors report actually feeling day-to-day, gathered from recent traveller reports and reviews." align="left" color="var(--ink-faint)" />
-              <SourceLink href={intelSourceHref} label="consumer sentiment" />
+              <Smile size={13} /> Traveller sentiment
+              <InfoTip text="How safe visitors report actually feeling day-to-day, gathered from recent traveller reports, weighted with current robbery and pickpocketing risk. This score carries 20% of the published safety score." color="var(--ink-faint)" />
+              <SourceLink href={intelSourceHref} label="traveller sentiment" />
             </p>
-            {sentiment ? (
+            {sentiment.score != null ? (
               <>
                 <div className="mt-2 flex items-end gap-2">
                   <span className="tnum font-display text-[2rem] font-medium leading-none" style={{ color: scoreColor(sentiment.score) }}>{sentiment.score}</span>
@@ -265,10 +267,20 @@ export default function MapPage() {
                 <div className="mt-2 h-[6px] w-full overflow-hidden rounded-full" style={{ background: "rgba(20,25,34,0.08)" }}>
                   <div className="h-full rounded-full" style={{ width: `${sentiment.score}%`, background: scoreColor(sentiment.score) }} />
                 </div>
-                <p className="mt-2.5 flex items-center gap-1 text-[0.82rem] leading-relaxed text-[var(--ink-soft)]">
-                  {sentiment.summary}
-                  <SourceLink href={intelSourceHref} label="sentiment summary" />
-                </p>
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+                  {sentiment.parts.map((p) => (
+                    <span key={p.label} className="text-[0.7rem] text-[var(--ink-faint)]">
+                      {p.label}{" "}
+                      <span className="tnum font-semibold" style={{ color: scoreColor(p.score) }}>{p.score}</span>
+                    </span>
+                  ))}
+                </div>
+                {sentiment.summary && (
+                  <p className="mt-2.5 flex items-center gap-1 text-[0.82rem] leading-relaxed text-[var(--ink-soft)]">
+                    {sentiment.summary}
+                    <SourceLink href={intelSourceHref} label="sentiment summary" />
+                  </p>
+                )}
               </>
             ) : (
               <p className="mt-2 text-[0.82rem] italic text-[var(--ink-faint)]">{intel ? "No sentiment read available." : "Gathering traveller sentiment…"}</p>

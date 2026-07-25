@@ -136,6 +136,25 @@ export default function MethodologyPage() {
             this on every report because you should know which parts are measured and which are
             researched.
           </p>
+          <p>
+            That research is published as a score of its own — the{" "}
+            <strong>traveller-sentiment score</strong>, shown beside the crime score on every
+            report. It combines how safe travellers report actually feeling day to day (35%) with
+            current robbery (45%) and pickpocketing (20%) risk, on the same 0–100 scale as
+            everything else. It is not a second opinion sitting next to the headline number: it
+            is exactly the 20% term inside it, the part the databases cannot see.
+          </p>
+
+          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">The score pyramid</h2>
+          <p>
+            Each report leads with the composite, then the five scores behind it, arranged by how
+            directly a traveller meets them. <strong>Crime</strong> and{" "}
+            <strong>traveller sentiment</strong> sit on the upper tier — the two you feel walking
+            down a street. <strong>Advisories</strong>, <strong>stability</strong> and{" "}
+            <strong>health &amp; air</strong> sit below as context. Every tile reads straight off
+            the same engine as the headline, so a tile can never disagree with the number above it,
+            and each one links to the evidence it came from.
+          </p>
 
           <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">Traveller-type adjustments</h2>
           <p>

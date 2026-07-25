@@ -4,6 +4,7 @@ import type {
   SafetyReport,
   SafetyEnrichment,
   RiskLevel,
+  RiskRating,
 } from "./types"
 import {
   computeSafetyIndex,
@@ -91,6 +92,90 @@ export interface FinalScore {
   saferThanPct: number
   /** non-compensatory ceilings that bound the score, worst first */
   caps: { max: number; reason: string }[]
+  /** the database-only composite, before field research folded in */
+  baseIndex: number
+  /** the field-research score that carries the remaining 20%, if any */
+  sentiment: SentimentScore
+}
+
+// ─── Traveller sentiment (the field-research score) ──────────────────
+
+/** Share of the published score carried by live field research. */
+export const FIELD_RESEARCH_WEIGHT = 0.2
+
+const SENTIMENT_WEIGHTS = { robbery: 0.45, reported: 0.35, pickpocket: 0.2 }
+
+export interface SentimentScore {
+  /** 0–100 (100 = travellers report feeling safe); null when no research yet */
+  score: number | null
+  label: string // "Mostly positive"
+  summary: string // 1–2 sentences, verbatim from the research
+  /** true when travellers' own reported feel is part of the number */
+  fromTravellers: boolean
+  /** the components, for the tooltip and the JSON feed */
+  parts: { label: string; score: number; weight: number; detail: string }[]
+}
+
+/**
+ * The traveller-sentiment score: what people on the ground report, expressed
+ * on the same 0–100 scale as the database pillars.
+ *
+ * It is exactly the term that carries the final 20% of the published score —
+ * the tile is not a separate opinion sitting beside the headline, it is the
+ * part of the headline the databases cannot see. Reported feel is the largest
+ * single input, weighted alongside the two street-crime risks a visitor
+ * actually meets.
+ */
+export function computeSentiment(intel: SafetyEnrichment | null): SentimentScore {
+  const parts: SentimentScore["parts"] = []
+
+  // Record lookup can miss at runtime if the model emits an off-schema level.
+  const risk = (
+    table: Record<RiskLevel, number>,
+    weight: number,
+    label: string,
+    r?: RiskRating
+  ) => {
+    const v = r ? table[r.level] : undefined
+    if (v != null) parts.push({ label, score: v, weight, detail: `${r!.level} risk` })
+  }
+
+  const reported = Number(intel?.consumerSentiment?.score)
+  const fromTravellers = Number.isFinite(reported)
+  if (fromTravellers) {
+    parts.push({
+      label: "Reported feel",
+      score: Math.max(0, Math.min(100, reported)),
+      weight: SENTIMENT_WEIGHTS.reported,
+      detail: intel?.consumerSentiment?.label ?? "traveller reports",
+    })
+  }
+  risk(ROBBERY_SCORE, SENTIMENT_WEIGHTS.robbery, "Robbery risk", intel?.robbery)
+  risk(PICKPOCKET_SCORE, SENTIMENT_WEIGHTS.pickpocket, "Pickpocket risk", intel?.pickpocket)
+
+  if (!parts.length) {
+    return { score: null, label: "Researching…", summary: "", fromTravellers: false, parts }
+  }
+
+  const wsum = parts.reduce((a, p) => a + p.weight, 0)
+  const score = Math.round(parts.reduce((a, p) => a + p.score * p.weight, 0) / wsum)
+
+  return {
+    score,
+    label: intel?.consumerSentiment?.label?.trim() || sentimentLabel(score),
+    summary: intel?.consumerSentiment?.summary ?? "",
+    fromTravellers,
+    parts,
+  }
+}
+
+/** Fallback wording when the research returned risk levels but no label. */
+function sentimentLabel(score: number): string {
+  if (score >= 80) return "Positive"
+  if (score >= 62) return "Mostly positive"
+  if (score >= 45) return "Mixed"
+  if (score >= 30) return "Wary"
+  return "Negative"
 }
 
 /**
@@ -112,25 +197,9 @@ export function computeFinalScore(
   intel: SafetyEnrichment | null
 ): FinalScore {
   const base = computeSafetyIndex(safety.signals)
+  const sentiment = computeSentiment(intel)
 
-  const ground: { score: number; weight: number }[] = []
-  // Record lookup can miss at runtime if the model emits an off-schema level.
-  const add = (
-    table: Record<RiskLevel, number>,
-    weight: number,
-    r?: { level: RiskLevel }
-  ) => {
-    const v = r ? table[r.level] : undefined
-    if (v != null) ground.push({ score: v, weight })
-  }
-  add(ROBBERY_SCORE, 0.45, intel?.robbery)
-  add(PICKPOCKET_SCORE, 0.2, intel?.pickpocket)
-  const sentiment = Number(intel?.consumerSentiment?.score)
-  if (Number.isFinite(sentiment)) {
-    ground.push({ score: Math.max(0, Math.min(100, sentiment)), weight: 0.35 })
-  }
-
-  if (!ground.length) {
+  if (sentiment.score == null) {
     return {
       index: base.index,
       level: base.level,
@@ -138,12 +207,13 @@ export function computeFinalScore(
       confidence: base.confidence,
       saferThanPct: base.saferThanPct,
       caps: base.caps,
+      baseIndex: base.index,
+      sentiment,
     }
   }
 
-  const wsum = ground.reduce((a, g) => a + g.weight, 0)
-  const groundScore = ground.reduce((a, g) => a + g.score * g.weight, 0) / wsum
-  let index = Math.round(0.8 * base.index + 0.2 * groundScore)
+  const w = FIELD_RESEARCH_WEIGHT
+  let index = Math.round((1 - w) * base.index + w * sentiment.score)
   for (const c of base.caps) index = Math.min(index, c.max)
   index = Math.max(0, Math.min(100, index))
 
@@ -154,6 +224,8 @@ export function computeFinalScore(
     confidence: base.confidence,
     saferThanPct: saferThanPct(index),
     caps: base.caps,
+    baseIndex: base.index,
+    sentiment,
   }
 }
 
@@ -166,19 +238,40 @@ export function scoreColor(score: number): string {
   return "#d4503a"
 }
 
-// ─── Category tiles (Advisories · Crime · Health & Air · Stability) ───
+// ─── Category tiles ──────────────────────────────────────────────────
+//
+// Five scores sit under the headline, laid out as a pyramid: the two a
+// traveller feels most directly (crime, and what people on the ground
+// report) on the upper tier, the three contextual ones below.
 
-export type CategoryKey = "advisories" | "crime" | "health" | "stability"
+export type CategoryKey =
+  | "advisories"
+  | "crime"
+  | "sentiment"
+  | "health"
+  | "stability"
 
 export interface CategoryScore {
   key: CategoryKey
   label: string
+  /** One-word form for the pyramid tiles, which are narrow on a phone. */
+  short: string
   score: number | null // 0–100 (100 = safest) or null when no data
   levelName: string // "Good" | "Fair" | "Caution" | "Elevated" | "No data"
   color: string
   note: string // short one-liner shown on the tile
   signalKeys: string[] // signal keys rendered in the detail section
+  /** Report section this tile scrolls to. */
+  section: string
+  /** 1 = upper tier of the pyramid (felt directly), 2 = lower tier. */
+  tier: 1 | 2
 }
+
+/** Pyramid tiers, widest last. */
+export const PYRAMID: CategoryKey[][] = [
+  ["crime", "sentiment"],
+  ["advisories", "stability", "health"],
+]
 
 /** Level name + color for a category tile score. */
 export function tileLevel(score: number | null): { name: string; color: string } {
@@ -190,15 +283,19 @@ export function tileLevel(score: number | null): { name: string; color: string }
 }
 
 /**
- * Roll the signals up into the four headline categories shown as clickable
- * tiles at the top of the report. Each tile links to its detail section below.
+ * Roll the report up into the five headline categories shown as the score
+ * pyramid. Each tile links to its detail section below.
  *
- * The tiles read straight off the scoring engine's pillars rather than
- * recomputing their own averages, so a tile can never disagree with the
- * headline score it sits under. "Health & Air" and "Stability" each merge two
- * pillars, weighted the same way the engine weights them.
+ * Four read straight off the scoring engine's pillars rather than recomputing
+ * their own averages, so a tile can never disagree with the headline score it
+ * sits under. "Health & Air" and "Stability" each merge two pillars, weighted
+ * the same way the engine weights them. The fifth, traveller sentiment, is the
+ * field-research term — the 20% of the headline the databases cannot see.
  */
-export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
+export function computeCategories(
+  signals: SafetySignal[],
+  intel: SafetyEnrichment | null = null
+): CategoryScore[] {
   const { pillars } = computeSafetyIndex(signals)
   const byKey = new Map(signals.map((s) => [s.key, s]))
   const pillar = (k: PillarKey) => pillars.find((p) => p.key === k)
@@ -232,10 +329,13 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
       ? byKey.get("air_quality")!.display
       : "Air, disease & care"
 
+  const sentiment = computeSentiment(intel)
+
   const cats: CategoryScore[] = [
     {
       key: "advisories",
       label: "Advisories",
+      short: "Advisories",
       // An advisory with no grade is not a bad advisory — an ungraded or
       // absent one reads as "no government is warning about this place".
       score: pillar("advisory")?.score ?? 90,
@@ -243,12 +343,17 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
       signalKeys: ["advisory"],
       levelName: "",
       color: "",
+      section: "sec-advisories",
+      tier: 2,
     },
     {
       key: "crime",
       label: "Crime",
+      short: "Crime",
       score: pillar("crime")?.score ?? null,
       note: crimeNote,
+      section: "sec-crime",
+      tier: 1,
       signalKeys: [
         "homicide",
         "safe_walking_dark",
@@ -264,8 +369,21 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
       color: "",
     },
     {
+      key: "sentiment",
+      label: "Traveller Sentiment",
+      short: "Sentiment",
+      score: sentiment.score,
+      note: sentiment.score == null ? "Field research pending" : sentiment.label,
+      signalKeys: [],
+      levelName: "",
+      color: "",
+      section: "sec-local-intel",
+      tier: 1,
+    },
+    {
       key: "health",
       label: "Health & Air",
+      short: "Health",
       score: blend([
         ["hazards", 0.1],
         ["health", 0.06],
@@ -281,10 +399,13 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
       ],
       levelName: "",
       color: "",
+      section: "sec-health",
+      tier: 2,
     },
     {
       key: "stability",
       label: "Stability",
+      short: "Stability",
       score: blend([
         ["conflict", 0.2],
         ["institutions", 0.14],
@@ -301,11 +422,18 @@ export function computeCategories(signals: SafetySignal[]): CategoryScore[] {
       ],
       levelName: "",
       color: "",
+      section: "sec-stability",
+      tier: 2,
     },
   ]
 
-  return cats.map((c) => {
-    const lv = tileLevel(c.score)
-    return { ...c, levelName: lv.name, color: lv.color }
-  })
+  // Emitted in pyramid order so any consumer that just maps over the array
+  // (the JSON feed, the OG card) shows them the same way the page does.
+  const order = PYRAMID.flat()
+  return cats
+    .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key))
+    .map((c) => {
+      const lv = tileLevel(c.score)
+      return { ...c, levelName: lv.name, color: lv.color }
+    })
 }

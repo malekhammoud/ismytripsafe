@@ -133,7 +133,7 @@ export default async function CityReportPage({
   const { report, meta } = hit
 
   const final = finalScoreOf(report)
-  const categories = computeCategories(report.bundle.safety.signals)
+  const categories = computeCategories(report.bundle.safety.signals, report.enrichment)
   const capsule = buildCapsule(report)
   const related = await getRelated(meta)
   const e = report.enrichment
@@ -400,7 +400,8 @@ export default async function CityReportPage({
                           The score blends {report.bundle.safety.sources.length || "15"}+ public data
                           sources — government advisories, UNODC/World Bank crime statistics, WHO health
                           data, live air quality and disaster alerts — with AI field research over current
-                          local reporting. The databases carry 75% of the weight, field research 25%.{" "}
+                          local reporting. The databases carry 80% of the weight; the traveller-sentiment
+                          score from field research carries 20%.{" "}
                           <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
                             Full methodology
                           </Link>

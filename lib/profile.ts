@@ -110,6 +110,7 @@ const CATEGORY_LABEL: Record<Exclude<CategoryKey, "advisories">, string> = {
   crime: "Crime",
   health: "Health & Air",
   stability: "Stability",
+  sentiment: "Traveller Sentiment",
 }
 
 export interface PersonalScore {

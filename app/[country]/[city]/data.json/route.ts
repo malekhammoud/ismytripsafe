@@ -1,5 +1,10 @@
 import { getCityReport } from "@/lib/reports"
-import { computeCategories, computeFinalScore, LEVELS } from "@/lib/safety-display"
+import {
+  computeCategories,
+  computeFinalScore,
+  FIELD_RESEARCH_WEIGHT,
+  LEVELS,
+} from "@/lib/safety-display"
 import { absUrl } from "@/lib/site"
 
 export const dynamic = "force-dynamic"
@@ -41,10 +46,24 @@ export async function GET(
         saferThanPctOfCountries: final.saferThanPct,
         confidence: final.confidence,
         caps: final.caps,
-        categories: computeCategories(s.signals).map((c) => ({
+        // the database-only composite, before the traveller-sentiment term
+        databaseScore: final.baseIndex,
+        travellerSentiment: {
+          score: final.sentiment.score,
+          label: final.sentiment.label,
+          summary: final.sentiment.summary,
+          weightInScore: final.includesFieldResearch ? FIELD_RESEARCH_WEIGHT : 0,
+          components: final.sentiment.parts.map((p) => ({
+            label: p.label,
+            score: p.score,
+            weight: p.weight,
+          })),
+        },
+        categories: computeCategories(s.signals, report.enrichment).map((c) => ({
           key: c.key,
           label: c.label,
           score: c.score,
+          tier: c.tier,
         })),
       },
       advisories: s.advisories.map((a) => ({
