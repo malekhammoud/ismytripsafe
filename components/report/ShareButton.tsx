@@ -41,27 +41,52 @@ export function ShareButton({
   const shareText = `Is ${city} safe? ${answer} — ${score}/100 on IsMyTripSafe.`
   const shareUrl = () => window.location.href
 
+  /** 1×1 transparent GIF — stands in for any image the capture can't refetch. */
+  const TRANSPARENT_PX =
+    "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+
+  /** How long to wait on the destination photo before exporting without it. */
+  const PHOTO_TIMEOUT_MS = 9000
+
+  const render = (node: HTMLElement, withPhoto: boolean) =>
+    toBlob(node, {
+      pixelRatio: 2,
+      imagePlaceholder: TRANSPARENT_PX,
+      filter: (n: HTMLElement) => {
+        if (!(n instanceof HTMLElement)) return true
+        if (n.dataset?.noshare != null) return false // interactive affordances
+        if (!withPhoto && n.dataset?.sharePhoto != null) return false
+        return true
+      },
+    })
+
   // Render the hero to a PNG blob once per open; kicked off when the menu
   // opens so the blob is usually ready before an option is tapped (Safari's
   // share/clipboard calls need to stay close to the user gesture).
+  //
+  // The capture has to refetch the destination photo to inline it, and that
+  // fetch can fail or stall on the image host (Wikimedia rate-limits). That
+  // used to sink the whole export and leave both image options disabled —
+  // for a card whose real payload is the score pyramid. So the photo gets a
+  // deadline, after which the hero exports without it: dark ink, the tone
+  // glow, and every score still there.
   const generate = (): Promise<Blob | null> => {
     if (!genRef.current) {
       const node = document.getElementById(targetId)
-      genRef.current = node
-        ? toBlob(node, {
-            pixelRatio: 2,
-            filter: (n: HTMLElement) => !(n instanceof HTMLElement && n.dataset?.noshare != null),
-          })
-            .then((b) => {
-              blobRef.current = b
-              setReady(!!b)
-              return b
-            })
-            .catch(() => {
-              genRef.current = null
-              return null
-            })
-        : Promise.resolve(null)
+      if (!node) return Promise.resolve(null)
+      genRef.current = Promise.race([
+        render(node, true),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), PHOTO_TIMEOUT_MS)),
+      ])
+        .catch(() => null)
+        .then((b) => b ?? render(node, false))
+        .catch(() => null)
+        .then((b) => {
+          blobRef.current = b
+          setReady(!!b)
+          if (!b) genRef.current = null // let a retry start clean
+          return b
+        })
     }
     return genRef.current
   }

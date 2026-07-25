@@ -385,6 +385,8 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             src={heroPhoto}
             alt=""
             aria-hidden
+            // dropped from the shared image if the host won't serve it again
+            data-share-photo
             className="absolute inset-0 h-full w-full object-cover"
             style={{ objectPosition: "center 35%" }}
             onError={(e) => {
