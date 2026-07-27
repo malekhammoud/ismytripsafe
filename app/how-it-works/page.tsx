@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ShieldCheck, Search, Users, Map as MapIcon, Sparkles } from "lucide-react"
+import { ShieldCheck, Sparkles } from "lucide-react"
 import { absUrl, monthYear } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import {
@@ -51,29 +51,6 @@ const LIGHTS: { label: string; color: string; body: string }[] = [
   },
 ]
 
-const WHAT_YOU_GET: { icon: React.ReactNode; title: string; body: string }[] = [
-  {
-    icon: <Search size={14} strokeWidth={2.3} />,
-    title: "Type a destination",
-    body: "A city, a town or a whole country. Anywhere with a name on the map.",
-  },
-  {
-    icon: <Users size={14} strokeWidth={2.3} />,
-    title: "Say who's going",
-    body: "Solo or with family, women or men in the party, age, trip style. This is what makes the report yours rather than generic.",
-  },
-  {
-    icon: <ShieldCheck size={14} strokeWidth={2.3} />,
-    title: "Read the rating",
-    body: "One number out of 100, which is a weighting of the five sub-scores under it.",
-  },
-  {
-    icon: <MapIcon size={14} strokeWidth={2.3} />,
-    title: "Go deeper",
-    body: "Scroll on for the district-by-district map and the full written briefing.",
-  },
-]
-
 export default function HowItWorksPage() {
   const trail = [
     { name: "Home", href: "/" },
@@ -101,12 +78,8 @@ export default function HowItWorksPage() {
           <p className="mt-1.5 text-[0.8rem] text-[var(--ink-faint)]">
             Reading your report · page current as of {monthYear()}
           </p>
-          <p className="mt-4 text-[1rem] leading-[1.75] text-[var(--ink)]">
-            One place, one click, one report. Below: what the rating actually means, what sits
-            behind it, and how we get to a number we&apos;re willing to put our name on.
-          </p>
 
-          <div className="mt-8">
+          <div className="mt-7">
             <ReportDoc>
               <DocSection num={num()} kicker="Getting started" title="How do I use it?" first>
                 <p className="text-[0.92rem] leading-relaxed text-[var(--ink-soft)]">
@@ -123,26 +96,7 @@ export default function HowItWorksPage() {
                   safety notes and an in-depth briefing, under the &quot;Map&quot; tab.
                 </p>
 
-                <ol className="mt-5 grid gap-2.5 sm:grid-cols-2">
-                  {WHAT_YOU_GET.map((s, i) => (
-                    <li
-                      key={s.title}
-                      className="rounded-[3px] px-4 py-3.5"
-                      style={{ background: "rgba(20,25,34,0.03)", borderLeft: "3px solid var(--orange)" }}
-                    >
-                      <p className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.1em] text-[var(--navy)]">
-                        <span className="tnum">{String(i + 1).padStart(2, "0")}</span>
-                        <span style={{ color: "var(--orange-deep)" }}>{s.icon}</span>
-                        {s.title}
-                      </p>
-                      <p className="mt-1.5 text-[0.85rem] leading-relaxed text-[var(--ink-soft)]">
-                        {s.body}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
-
-                <p className="mt-7 text-[0.92rem] leading-relaxed text-[var(--ink-soft)]">
+                <p className="mt-5 text-[0.92rem] leading-relaxed text-[var(--ink-soft)]">
                   Think of this report as a stoplight for your car on the way to adventure:
                 </p>
                 <div className="mt-3.5 grid gap-2.5 sm:grid-cols-3">
@@ -207,7 +161,7 @@ export default function HowItWorksPage() {
                     </Link>{" "}
                     — or just{" "}
                     <a
-                      href="mailto:malek@malekhammoud.com"
+                      href="mailto:malek@ismytripsafe.com"
                       className="font-medium text-[var(--accent-deep)] hover:underline"
                     >
                       contact us
@@ -245,7 +199,7 @@ export default function HowItWorksPage() {
                   </p>
                 </div>
                 <a
-                  href="mailto:malek@malekhammoud.com?subject=Contributing%20to%20IsMyTripSafe"
+                  href="mailto:malek@ismytripsafe.com?subject=Contributing%20to%20IsMyTripSafe"
                   className="mt-4 inline-flex items-center gap-2 rounded-[3px] px-4 py-3 text-[0.9rem] font-semibold text-[var(--orange-deep)]"
                   style={{ background: "rgba(243,108,10,0.08)", border: "1px solid rgba(243,108,10,0.25)" }}
                 >

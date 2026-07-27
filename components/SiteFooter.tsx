@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Mail } from "lucide-react"
-import { BrandBadge } from "@/components/brand/BrandBadge"
+import { Logo } from "@/components/Logo"
 import { humanDate } from "@/lib/site"
 
 const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
@@ -34,8 +34,8 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
       <div className="flex flex-col gap-9 sm:flex-row sm:justify-between sm:gap-12">
         {/* Brand */}
         <div className="max-w-[19rem]">
-          <Link href="/" className="flex items-center gap-3">
-            <BrandBadge size={44} />
+          <Link href="/" className="flex items-center gap-2.5">
+            <Logo size={30} />
             <span className="wordmark text-[1.05rem] text-[var(--navy)]">
               IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
             </span>
@@ -45,11 +45,11 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
             anywhere you&apos;re thinking of going — free, every time.
           </p>
           <a
-            href="mailto:malek@malekhammoud.com"
+            href="mailto:malek@ismytripsafe.com"
             className="mt-3.5 inline-flex items-center gap-1.5 text-[0.8rem] font-medium text-[var(--accent-deep)] hover:underline"
           >
             <Mail size={13} strokeWidth={2.2} />
-            malek@malekhammoud.com
+            malek@ismytripsafe.com
           </a>
         </div>
 

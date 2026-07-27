@@ -42,7 +42,7 @@ export function SiteHeader() {
     >
       <div className="mx-auto flex h-[54px] max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link href="/" className="wordmark flex items-center gap-1.5 text-[0.95rem] text-[var(--navy)]">
-          <Logo size={17} />
+          <Logo size={20} />
           <span>
             IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
           </span>

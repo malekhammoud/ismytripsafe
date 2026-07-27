@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
 import { Logo } from "@/components/Logo"
+import { BadgeWash } from "@/components/brand/BadgeWash"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
@@ -105,7 +106,7 @@ export function HomeClient({ children }: { children?: ReactNode }) {
         {/* Top bar — the landing page's only route out to the written pages */}
         <div className="fade-in flex items-center justify-between gap-3">
           <span className="wordmark flex items-center gap-1.5 text-[0.95rem] text-[var(--navy)]">
-            <Logo size={17} />
+            <Logo size={20} />
             <span>
               IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
             </span>
@@ -119,7 +120,8 @@ export function HomeClient({ children }: { children?: ReactNode }) {
         </div>
 
         {/* Hero — the search is the product, so it sits high and alone */}
-        <div className="flex flex-col items-center py-16 sm:py-24">
+        <div className="relative flex flex-col items-center py-16 sm:py-24">
+          <BadgeWash />
           <div className="mb-8 text-center">
             <div
               className="mb-5 inline-flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.1em] rise-in sm:text-xs"
@@ -138,13 +140,6 @@ export function HomeClient({ children }: { children?: ReactNode }) {
               <br />
               to go there?
             </h1>
-            <p
-              className="mx-auto mt-5 max-w-[26rem] text-[0.95rem] leading-relaxed text-[var(--ink-soft)] rise-in"
-              style={{ animationDelay: "0.12s" }}
-            >
-              One honest rating out of 100 for any city or country — built from real databases and
-              re-weighted for who&apos;s actually travelling.
-            </p>
           </div>
 
           {/* z-20: the autocomplete drops over the source line below it, and

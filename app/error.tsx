@@ -78,7 +78,7 @@ export default function Error({
             <p className="mt-6 border-t border-[var(--hairline)] pt-4 text-[0.75rem] text-[var(--ink-faint)]">
               Still stuck?{" "}
               <a
-                href={`mailto:malek@malekhammoud.com?subject=${encodeURIComponent(
+                href={`mailto:malek@ismytripsafe.com?subject=${encodeURIComponent(
                   `Error on IsMyTripSafe${error.digest ? ` (${error.digest})` : ""}`,
                 )}`}
                 className="font-medium text-[var(--accent-deep)] hover:underline"

@@ -1,14 +1,11 @@
-import { useId } from "react"
-
 /**
- * The IsMyTripSafe mark, lifted from the badge River designed: an orange
- * location pin holding a navy check. Drawn rather than cropped so it stays
- * crisp at 14px in a header — the full illustrated badge is `BrandBadge`.
+ * The IsMyTripSafe mark: the globe-and-plane emblem from the banner's wordmark
+ * bar. Redrawn as vector — the artwork only has it at ~100px, which is too
+ * small for anything but a footnote — so it stays sharp at any size, and it
+ * carries its own navy disc so it reads on paper and on the dark report
+ * masthead alike.
  */
 export function Logo({ size = 20, className }: { size?: number; className?: string }) {
-  const id = useId()
-  const gradientId = `logo-g-${id}`
-
   return (
     <svg
       width={size}
@@ -18,24 +15,29 @@ export function Logo({ size = 20, className }: { size?: number; className?: stri
       aria-hidden="true"
       role="img"
     >
-      <defs>
-        <linearGradient id={gradientId} x1="14" y1="4" x2="50" y2="58" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#fb9224" />
-          <stop offset="1" stopColor="#ef5f00" />
-        </linearGradient>
-      </defs>
+      <circle cx="33" cy="31" r="23" fill="#16304f" />
+      {/* Meridians and parallels, all inside r=21.4 so nothing needs clipping */}
+      <g stroke="#fff" strokeWidth={1.3} fill="none" strokeLinecap="round">
+        <circle cx="33" cy="31" r="21.4" />
+        <line x1="33" y1="9.6" x2="33" y2="52.4" />
+        <ellipse cx="33" cy="31" rx="10.7" ry="21.4" />
+        <line x1="11.6" y1="31" x2="54.4" y2="31" />
+        <path d="M15.8 19.8 Q33 24.5 50.2 19.8" />
+        <path d="M15.8 42.2 Q33 37.5 50.2 42.2" />
+      </g>
+      {/* The navy outline is what keeps the plane from fusing with the grid */}
+      <g transform="translate(34.5 26.5) rotate(40) scale(0.72)">
+        <path
+          fill="#fff"
+          stroke="#16304f"
+          strokeWidth={2.2}
+          strokeLinejoin="round"
+          d="M0-18c2.2 0 3.4 4 3.6 8.5L17.5 1.5l1 3.3-14.9-1.4-.4 6.3 5.3 4 .3 2.3-6.2-1.6-1 4.3h-3.2l-1-4.3-6.2 1.6.3-2.3 5.3-4-.4-6.3-14.9 1.4 1-3.3L-3.6-9.5C-3.4-14-2.2-18 0-18Z"
+        />
+      </g>
       <path
-        d="M32 3C19.85 3 10 12.85 10 25c0 15.5 18.6 33.2 20.5 35.1a2.1 2.1 0 0 0 3 0C35.4 58.2 54 40.5 54 25 54 12.85 44.15 3 32 3Z"
-        fill={`url(#${gradientId})`}
-      />
-      <circle cx="32" cy="24.5" r="12.6" fill="#ffffff" />
-      <path
-        d="M25.7 24.6 30.3 29.4 39 19.9"
-        fill="none"
-        stroke="#0b2049"
-        strokeWidth={5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        fill="#f47c1a"
+        d="M4.8 35.4c1.2 5.2 5.6 8.6 11.8 9.2 8.6.8 17.8-4 24.4-11.8-7 6.2-15 9.6-22.4 9-5.6-.4-9.8-3-11.4-7.2Z"
       />
     </svg>
   )
