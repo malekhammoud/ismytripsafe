@@ -4,7 +4,6 @@ import { HomeClient } from "@/components/HomeClient"
 import { listCountries, listReports } from "@/lib/reports"
 import { graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { ReportLink } from "@/components/seo/shared"
-import { BrandBanner } from "@/components/brand/BrandBanner"
 import { SiteFooter } from "@/components/SiteFooter"
 
 // Server-rendered so crawlers land on real HTML with real links; the
@@ -49,9 +48,8 @@ export default async function Home() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <HomeClient>
-        <BrandBanner className="rise-in" />
         {(featured.length > 0 || countries.length > 0) && (
-          <section className="mt-16 w-full rise-in" style={{ animationDelay: "0.4s" }}>
+          <section className="mt-8 w-full rise-in" style={{ animationDelay: "0.4s" }}>
             <h2 className="text-center text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--ink-faint)]">
               Latest safety reports
             </h2>

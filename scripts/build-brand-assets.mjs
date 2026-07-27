@@ -1,6 +1,6 @@
 // Turns the raw brand art River sent over WhatsApp into the web assets the site
-// ships: the banner, the share card, the illustrated badge as a soft background
-// wash, the founder photo, and the apple touch icon drawn from app/icon.svg.
+// ships: the share card, the illustrated badge as a soft background wash, the
+// founder photo, and the apple touch icon drawn from app/icon.svg.
 // The sources are the chat export, which is gitignored — the derived assets in
 // public/brand and app/ are what's committed, so this only needs re-running
 // when the art changes.
@@ -67,14 +67,10 @@ async function circleBounds(file) {
     .toFile(`${OUT}/badge-wash.png`)
 }
 
-// ── 2. The banner, whole — it's one piece of art, not three ────────────
+// ── 2. The share card ──────────────────────────────────────────────────
 {
-  await sharp(bannerSrc)
-    .resize(1600, null, { withoutEnlargement: true })
-    .jpeg({ quality: 84, mozjpeg: true })
-    .toFile(`${OUT}/banner.jpg`)
-
-  // Default share card for every page that doesn't generate its own.
+  // The banner art no longer runs anywhere on the site, but it still makes the
+  // right first impression when a link is pasted somewhere.
   await sharp(bannerSrc)
     .resize(1200, 630, { fit: "cover", position: "centre" })
     .jpeg({ quality: 86, mozjpeg: true })
