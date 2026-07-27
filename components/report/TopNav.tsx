@@ -4,7 +4,6 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Map as MapIcon, FileText, Zap } from "lucide-react"
 import { useReport } from "@/lib/store"
-import { Logo } from "@/components/Logo"
 
 /** Shared header for the report and map pages: reset + Report/Map tabs. */
 export function TopNav({ active }: { active: "report" | "map" }) {
@@ -47,17 +46,11 @@ export function TopNav({ active }: { active: "report" | "map" }) {
         {tab(`/map${placeParam}`, "Map", <MapIcon size={13} />, active === "map")}
       </div>
 
-      <div className="hidden text-right leading-tight sm:block">
-        <div className="wordmark flex items-center justify-end gap-1.5 text-sm text-[var(--navy)]">
-          <Logo size={15} />
-          <span>
-            Is It Safe<span style={{ color: "var(--orange)" }}>?</span>
-          </span>
-        </div>
-        <div className="flex items-center justify-end gap-1 text-[0.62rem] uppercase tracking-wider text-[var(--ink-faint)]">
-          {cached && <Zap size={9} style={{ color: "var(--accent)" }} />}
-          {generatedAt ? `${cached ? "Cached" : "Assessed"} ${generatedAt}` : "Independent assessment"}
-        </div>
+      {/* The site header above already says whose site this is; all this row
+          owes the reader is how fresh the numbers under it are. */}
+      <div className="hidden items-center justify-end gap-1 text-[0.62rem] uppercase tracking-wider text-[var(--ink-faint)] sm:flex">
+        {cached && <Zap size={9} style={{ color: "var(--accent)" }} />}
+        {generatedAt ? `${cached ? "Cached" : "Assessed"} ${generatedAt}` : "Independent assessment"}
       </div>
     </header>
   )

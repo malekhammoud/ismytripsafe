@@ -99,7 +99,7 @@ async function circleBounds(file) {
   // it's drawn edge to edge on navy instead.
   const icon = (await readFile("app/icon.svg", "utf8"))
     .replace("<svg", '<svg width="180" height="180"')
-    .replace(/viewBox="0 0 64 64"/, 'viewBox="6 4 54 54"')
+    .replace(/viewBox="[^"]+"/, 'viewBox="7.5 8 47 47"')
   await sharp(Buffer.from(icon))
     .resize(180, 180)
     .flatten({ background: "#16304f" })

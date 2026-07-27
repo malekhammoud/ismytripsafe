@@ -1,6 +1,5 @@
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
-import { Logo } from "@/components/Logo"
 import { SiteFooter } from "@/components/SiteFooter"
 import type { ReportMeta } from "@/lib/reports"
 import type { SafetySignal } from "@/lib/types"
@@ -29,37 +28,8 @@ export function scoreTint(score: number): string {
 
 // ─── Site chrome ─────────────────────────────────────────────────────
 
-/** Sticky full-width top bar. Render it before <main>, not inside it. */
-export function SiteHeader() {
-  return (
-    <header
-      className="sticky top-0 z-40 border-b border-[var(--hairline)]"
-      style={{
-        background: "rgba(238, 242, 248, 0.82)",
-        backdropFilter: "blur(16px) saturate(1.4)",
-        WebkitBackdropFilter: "blur(16px) saturate(1.4)",
-      }}
-    >
-      <div className="mx-auto flex h-[54px] max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
-        <Link href="/" className="wordmark flex items-center gap-1.5 text-[0.95rem] text-[var(--navy)]">
-          <Logo size={20} />
-          <span>
-            IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
-          </span>
-        </Link>
-        <nav className="flex items-center gap-4 whitespace-nowrap text-[0.8rem] font-medium text-[var(--ink-soft)] sm:gap-5">
-          <Link href="/destinations" className="hover:text-[var(--orange-deep)]">Destinations</Link>
-          <Link href="/how-it-works" className="hidden hover:text-[var(--orange-deep)] sm:inline">How it works</Link>
-          <Link href="/methodology" className="hidden hover:text-[var(--orange-deep)] sm:inline">Methodology</Link>
-          <Link href="/about" className="hidden hover:text-[var(--orange-deep)] sm:inline">About</Link>
-          <Link href="/" className="btn px-3.5 py-1.5 text-[0.78rem]">
-            Check<span className="hidden sm:inline"> a place</span>
-          </Link>
-        </nav>
-      </div>
-    </header>
-  )
-}
+/** Re-exported so pages keep importing their chrome from one place. */
+export { SiteHeader } from "@/components/SiteHeader"
 
 export interface Crumb {
   name: string

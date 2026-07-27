@@ -41,7 +41,7 @@ export default function Error({
     <main className="relative z-10 mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-5 py-16">
       <div className="card w-full max-w-[30rem] p-7">
         <span className="wordmark flex items-center gap-1.5 text-[0.9rem] text-[var(--navy)]">
-          <Logo size={16} />
+          <Logo size={19} />
           <span>
             IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
           </span>

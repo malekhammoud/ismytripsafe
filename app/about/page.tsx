@@ -5,7 +5,6 @@ import { ShieldCheck, Mail, Quote } from "lucide-react"
 import { absUrl } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { Breadcrumbs, SeoFooter, SiteHeader } from "@/components/seo/shared"
-import { BrandBanner } from "@/components/brand/BrandBanner"
 import river from "@/public/brand/river-ica-peru.jpg"
 
 export const dynamic = "force-dynamic"
@@ -45,8 +44,6 @@ export default function AboutPage() {
       <SiteHeader />
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-
-        <BrandBanner className="mb-9" priority />
 
         <div className="mx-auto max-w-[680px]">
           <Breadcrumbs trail={trail} />

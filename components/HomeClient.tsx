@@ -2,9 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
-import { Logo } from "@/components/Logo"
+import { SiteHeader } from "@/components/SiteHeader"
 import { BadgeWash } from "@/components/brand/BadgeWash"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
@@ -74,7 +73,9 @@ export function HomeClient({ children }: { children?: ReactNode }) {
   // ─── Personalise (between search and report) ───────────────
   if (!started && pending) {
     return (
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-5 py-16">
+      <>
+      <SiteHeader />
+      <main className="relative z-10 mx-auto flex min-h-[calc(100vh-56px)] max-w-2xl flex-col items-center justify-center px-5 py-16">
         <div
           className="pointer-events-none fixed inset-0 -z-10"
           style={{
@@ -88,13 +89,16 @@ export function HomeClient({ children }: { children?: ReactNode }) {
           onSkip={() => startReport(pending, null)}
         />
       </main>
+      </>
     )
   }
 
   // ─── Landing ───────────────────────────────────────────────
   if (!started) {
     return (
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-5 pb-4 pt-5">
+      <>
+      <SiteHeader />
+      <main className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-5 pb-4">
         <div
           className="pointer-events-none fixed inset-0 -z-10"
           style={{
@@ -103,24 +107,8 @@ export function HomeClient({ children }: { children?: ReactNode }) {
           }}
         />
 
-        {/* Top bar — the landing page's only route out to the written pages */}
-        <div className="fade-in flex items-center justify-between gap-3">
-          <span className="wordmark flex items-center gap-1.5 text-[0.95rem] text-[var(--navy)]">
-            <Logo size={20} />
-            <span>
-              IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
-            </span>
-          </span>
-          <nav className="flex items-center gap-4 whitespace-nowrap text-[0.8rem] font-medium text-[var(--ink-soft)] sm:gap-5">
-            <Link href="/destinations" className="hover:text-[var(--orange-deep)]">Destinations</Link>
-            <Link href="/how-it-works" className="hidden hover:text-[var(--orange-deep)] sm:inline">How it works</Link>
-            <Link href="/methodology" className="hidden hover:text-[var(--orange-deep)] sm:inline">Methodology</Link>
-            <Link href="/about" className="hover:text-[var(--orange-deep)]">About</Link>
-          </nav>
-        </div>
-
         {/* Hero — the search is the product, so it sits high and alone */}
-        <div className="relative flex flex-col items-center py-16 sm:py-24">
+        <div className="relative flex flex-col items-center py-14 sm:py-20">
           <BadgeWash />
           <div className="mb-8 text-center">
             <div
@@ -159,11 +147,14 @@ export function HomeClient({ children }: { children?: ReactNode }) {
         {/* Server-rendered latest-reports directory (crawlable) */}
         {children}
       </main>
+      </>
     )
   }
 
   // ─── Result ───────────────────────────────────────────────
   return (
+    <>
+    <SiteHeader />
     <main className="relative z-10 mx-auto max-w-4xl px-4 py-6 sm:px-6">
       <TopNav active="report" />
 
@@ -203,5 +194,6 @@ export function HomeClient({ children }: { children?: ReactNode }) {
         />
       ) : null}
     </main>
+    </>
   )
 }

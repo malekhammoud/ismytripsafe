@@ -448,7 +448,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             <p className="eyebrow" style={{ color: "rgba(238,242,248,0.65)" }}>Safety Report</p>
             <span className="flex items-center gap-2.5">
               <p className="wordmark flex items-center gap-1.5 text-[0.82rem] text-white">
-                <Logo size={14} />
+                <Logo size={17} />
                 <span>
                   IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.5)" }}>.com</span>
                 </span>
@@ -874,7 +874,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
       <footer className="rise-in px-7 py-6 sm:px-9" style={{ background: INK, borderTop: `1px solid ${RULE}`, animationDelay: "560ms" }}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="wordmark flex items-center gap-1.5 text-[0.95rem] text-white">
-            <Logo size={16} />
+            <Logo size={19} />
             <span>
               IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.45)" }}>.com</span>
             </span>

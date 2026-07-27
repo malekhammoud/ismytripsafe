@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { MapPin, Search, CircleCheck, CircleAlert, Smile, Eye, Lightbulb, MousePointerClick } from "lucide-react"
 import { useReport } from "@/lib/store"
+import { SiteHeader } from "@/components/SiteHeader"
 import { TopNav } from "@/components/report/TopNav"
 import { InfoTip } from "@/components/report/InfoTip"
 import { SourceLink } from "@/components/report/SourceLink"
@@ -119,6 +120,8 @@ export default function MapPage() {
 
   if (!geo) {
     return (
+      <>
+      <SiteHeader />
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-6 sm:px-6">
         <TopNav active="map" />
         <div className="mx-auto max-w-[640px] card p-8 text-center">
@@ -132,6 +135,7 @@ export default function MapPage() {
           </Link>
         </div>
       </main>
+      </>
     )
   }
 
@@ -145,6 +149,8 @@ export default function MapPage() {
   const intelSourceHref = intelLinks[0] ?? searchSource ?? reportSourceAnchor
 
   return (
+    <>
+    <SiteHeader />
     <main className="relative z-10 mx-auto max-w-6xl px-4 py-6 sm:px-6">
       <TopNav active="map" />
 
@@ -327,6 +333,7 @@ export default function MapPage() {
         </div>
       </div>
     </main>
+    </>
   )
 }
 

@@ -373,6 +373,41 @@ body::before {
   transform: rotate(-0.5deg);
 }
 
+/* Header links: the banner's orange swash marks the page you're on, and
+   previews itself on hover so the bar doesn't shift when it appears. */
+.nav-link {
+  position: relative;
+  color: var(--ink-soft);
+  padding-bottom: 3px;
+  transition: color 0.18s;
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--orange-bright), var(--orange-deep));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.nav-link:hover {
+  color: var(--navy);
+}
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+.nav-link.is-active {
+  color: var(--navy);
+  font-weight: 600;
+}
+.nav-link.is-active::after {
+  transform: scaleX(1);
+}
+
 /* Photo frame with the badge's navy edge — used for the panels and portraits */
 .photo-frame {
   overflow: hidden;

@@ -35,7 +35,7 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
         {/* Brand */}
         <div className="max-w-[19rem]">
           <Link href="/" className="flex items-center gap-2.5">
-            <Logo size={30} />
+            <Logo size={36} />
             <span className="wordmark text-[1.05rem] text-[var(--navy)]">
               IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
             </span>

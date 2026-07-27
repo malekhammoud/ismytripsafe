@@ -10,7 +10,7 @@ export function Logo({ size = 20, className }: { size?: number; className?: stri
     <svg
       width={size}
       height={size}
-      viewBox="0 0 64 64"
+      viewBox="4.8 5.4 51.2 51.2"
       className={className}
       aria-hidden="true"
       role="img"
