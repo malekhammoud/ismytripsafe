@@ -1,7 +1,12 @@
 import type { GeoPoint } from "../types"
 import { englishCountryName } from "./country"
+import { withBudget } from "../timing"
 
-const TIMEOUT = 8000
+// The geocode ladder is serial by necessity (Nominatim's usage policy rules out
+// firing it speculatively alongside Open-Meteo just to save a round-trip), so
+// each rung has to be cheap. Most searches skip this entirely — the autocomplete
+// resolves coordinates in the browser and posts them as `placeGeo`.
+const TIMEOUT = 4000
 
 async function fetchJson(url: string, timeoutMs: number = TIMEOUT): Promise<unknown> {
   const controller = new AbortController()
@@ -143,7 +148,9 @@ async function nominatimGeocode(query: string): Promise<GeoPoint | null> {
       lon,
       countryCode: iso2,
       country: englishCountryName(iso2) ?? r.address?.country ?? "",
-      timezone: (await getTimezone(lat, lon)) ?? "UTC",
+      // A nested lookup on the slowest rung of the ladder, for a cosmetic
+      // field with a working fallback — it gets a short leash.
+      timezone: (await withBudget(getTimezone(lat, lon), 1500)) ?? "UTC",
       population: null,
     }
   } catch {
@@ -155,7 +162,7 @@ async function nominatimGeocode(query: string): Promise<GeoPoint | null> {
 export async function getTimezone(lat: number, lon: number): Promise<string | null> {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=auto&forecast_days=1`
-    const data = (await fetchJson(url, 6000)) as { timezone?: string }
+    const data = (await fetchJson(url, 3000)) as { timezone?: string }
     return data.timezone ?? null
   } catch {
     return null

@@ -149,10 +149,12 @@ export default async function CityReportPage({
   // Deterministic traveller-type scores (same arithmetic as the interactive
   // personalisation — unique numbers per city, no AI involved).
   const travellerRows: { label: string; profile: TravelerProfile }[] = [
-    { label: "Solo traveller", profile: { party: "solo", age: "under30", style: "sightseeing" } },
-    { label: "Solo, nightlife-focused", profile: { party: "solo", age: "under30", style: "nightlife" } },
-    { label: "Family with kids", profile: { party: "family", age: "30to49", style: "sightseeing" } },
-    { label: "Travellers 65+", profile: { party: "couple", age: "65plus", style: "sightseeing" } },
+    { label: "Solo female traveller", profile: { party: "solo", gender: "female", age: "under30", style: "sightseeing" } },
+    { label: "Solo traveller", profile: { party: "solo", gender: "unspecified", age: "under30", style: "sightseeing" } },
+    { label: "Family with kids", profile: { party: "family", gender: "mixed", age: "30to49", style: "sightseeing" } },
+    { label: "Nightlife-focused trip", profile: { party: "group", gender: "mixed", age: "under30", style: "nightlife" } },
+    { label: "Travellers 65+", profile: { party: "couple", gender: "mixed", age: "65plus", style: "sightseeing" } },
+    { label: "Business trip", profile: { party: "solo", gender: "unspecified", age: "30to49", style: "business" } },
   ]
 
   const walkDark = report.bundle.safety.signals.find((s) => s.key === "safe_walking_dark")
@@ -172,7 +174,7 @@ export default async function CityReportPage({
     breadcrumbNode(trail),
     reportArticleNode({
       meta,
-      headline: `Is ${meta.city} Safe? Travel Safety Report`,
+      headline: `Is ${meta.city} Safe in ${new Date(report.cachedAt).getFullYear()}? Travel Safety Report`,
       description: metaDescription(report),
       image: report.images.hero,
     }),
@@ -349,7 +351,7 @@ export default async function CityReportPage({
                           <p>
                             {avoidZones.length
                               ? `Field research flags ${avoidZones.map((z) => z.name).join(", ")} as best avoided.`
-                              : e.avoidAreas.slice(0, 3).join("; ") + "."}{" "}
+                              : (e.avoidAreas ?? []).slice(0, 3).join("; ") + "."}{" "}
                             <Link href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
                               See the district-by-district safety map
                             </Link>

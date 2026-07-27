@@ -7,6 +7,7 @@ import type {
 import { computeSafetyIndex, advisoryScore } from "../scoring"
 import { gatherSignals } from "./signals"
 import { getOfficialAdvisories } from "./advisories"
+import { timed } from "../timing"
 import type { GeoPoint } from "../types"
 
 /**
@@ -59,7 +60,10 @@ function advisorySignal(advisories: OfficialAdvisory[]): SafetySignal {
 
 export async function getSafetyReport(geo: GeoPoint): Promise<SafetyReport> {
   const [{ signals: baseSignals, comparisons, health, hazardEvents, quakeSummary }, advisories] =
-    await Promise.all([gatherSignals(geo), getOfficialAdvisories(geo)])
+    await Promise.all([
+      timed("signals", gatherSignals(geo)),
+      timed("advisories", getOfficialAdvisories(geo)),
+    ])
 
   // Fold the official advisory into the scored signals (drives the index).
   const signals = [...baseSignals, advisorySignal(advisories)]

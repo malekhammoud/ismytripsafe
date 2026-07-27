@@ -12,9 +12,12 @@ import type { GeoPoint } from "./types"
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0"
 
-const FETCH_TIMEOUT_MS = 10_000
-const MAX_ARTICLES = 5
-const MAX_EXTRACT_CHARS = 2_600
+// These bound the model's prompt, and time-to-first-token scales with prompt
+// size — the extracts are by far the biggest contributor. Headlines are what
+// ground `recentIncidents`, so they stay; the full-text extracts are trimmed.
+const FETCH_TIMEOUT_MS = 6_000
+const MAX_ARTICLES = 4
+const MAX_EXTRACT_CHARS = 1_600
 
 export interface NewsHeadline {
   title: string

@@ -3,6 +3,7 @@ import { geocode } from "./geo"
 import { getSafetyReport } from "./safety"
 import { getCountryFacts } from "./country"
 import { getImages } from "./images"
+import { timed } from "../timing"
 
 export { geocode }
 
@@ -15,8 +16,8 @@ export async function gatherSafety(geo: GeoPoint): Promise<SafetyBundle> {
   const country = getCountryFacts(geo.countryCode)
 
   const [safety, images] = await Promise.allSettled([
-    getSafetyReport(geo),
-    getImages(geo.city, geo.country, country?.capital ?? null),
+    timed("bundle.safety", getSafetyReport(geo)),
+    timed("bundle.images", getImages(geo.city, geo.country, country?.capital ?? null)),
   ])
 
   return {

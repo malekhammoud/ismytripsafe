@@ -1,6 +1,7 @@
 import { promises as fs } from "fs"
 import path from "path"
 import { fetchJson } from "./geo"
+import { withBudget } from "../timing"
 
 // ─────────────────────────────────────────────────────────────────────
 // Resilient reference-data layer. Country-level statistics (WGI, homicide,
@@ -59,19 +60,23 @@ async function rememberGood(key: string, hit: RefHit): Promise<void> {
   persistStore()
 }
 
-async function recallGood(key: string): Promise<RefHit | null> {
+async function recallGood(key: string, maxAgeDays = STALE_MAX_DAYS): Promise<RefHit | null> {
   const s = await loadStore()
   const e = s[key]
   if (!e) return null
   const ageDays = (Date.now() - Date.parse(e.savedAt)) / 86_400_000
-  if (!Number.isFinite(ageDays) || ageDays > STALE_MAX_DAYS) return null
+  if (!Number.isFinite(ageDays) || ageDays > maxAgeDays) return null
   return e
 }
 
 /** fetchJson with retries and growing timeouts. */
 export async function fetchJsonRetry(
   url: string,
-  timeouts: number[] = [8000, 14000]
+  // Tightened from [8000, 14000]. These sources answer in ~1s when healthy
+  // (measured: World Bank 0.9s, WHO GHO 1.2s); a 22s ladder per call only ever
+  // bought us slow failures, and `resolveMetric` now has a wall-clock budget
+  // over the whole chain anyway.
+  timeouts: number[] = [4000, 6000]
 ): Promise<unknown> {
   let lastErr: unknown
   for (const t of timeouts) {
@@ -84,17 +89,24 @@ export async function fetchJsonRetry(
   throw lastErr
 }
 
+/** How long a stored value is served immediately, without touching the network. */
+const FRESH_MAX_DAYS = Number(process.env.REFDATA_FRESH_DAYS) || 7
 /**
- * Run a fallback chain for one metric. Returns the first source that
- * produces a value (and remembers it); if every source fails, returns the
- * last-known-good value from disk (marked stale=false — the year label
- * already communicates data age).
+ * Whole-chain wall-clock budget. A chain that blows it falls back to disk.
+ * Healthy sources answer in ~1s (World Bank 0.9s, WHO GHO 1.2s), so this only
+ * bites when one is genuinely struggling — and in that case the last-known-good
+ * value is the better answer anyway, since these figures move once a year.
  */
-export async function resolveMetric(
+const CHAIN_BUDGET_MS = 4_000
+
+/** Walk the fallback chain in order, first source that answers wins. */
+async function resolveLive(
   key: string,
-  fetchers: Array<() => Promise<RefHit | null>>
+  fetchers: Array<() => Promise<RefHit | null>>,
+  deadline: number
 ): Promise<RefHit | null> {
   for (const f of fetchers) {
+    if (Date.now() > deadline) break
     try {
       const hit = await f()
       if (hit && Number.isFinite(hit.value)) {
@@ -105,6 +117,43 @@ export async function resolveMetric(
       // try the next source
     }
   }
+  return null
+}
+
+/**
+ * Resolve one metric.
+ *
+ * These are country-level statistics — homicide rates, WGI governance scores,
+ * road deaths — that upstream revises at most once a year. The disk store used
+ * to be a last resort, consulted only after every live source had failed,
+ * which meant every report paid full network cost for numbers that had not
+ * moved in months.
+ *
+ * Now it leads: a value stored within FRESH_MAX_DAYS is returned immediately
+ * and refreshed in the background, so any country we have seen before costs
+ * nothing on the critical path. Only a genuine miss blocks on the network, and
+ * even then the chain is bounded — past its budget we serve the last-known-good
+ * value rather than keep dialling.
+ */
+export async function resolveMetric(
+  key: string,
+  fetchers: Array<() => Promise<RefHit | null>>
+): Promise<RefHit | null> {
+  const fresh = await recallGood(key, FRESH_MAX_DAYS)
+  if (fresh) {
+    // Revalidate out of band; this report is already served from the store.
+    void resolveLive(key, fetchers, Date.now() + CHAIN_BUDGET_MS).catch(() => {})
+    return fresh
+  }
+
+  // A hard ceiling, not just a between-sources check: an individual fetcher
+  // can honour every one of its own timeouts and still take their sum (the
+  // retry ladder is 4s + 6s), which is how a "6s budget" turned into 10s.
+  const live = await withBudget(
+    resolveLive(key, fetchers, Date.now() + CHAIN_BUDGET_MS),
+    CHAIN_BUDGET_MS
+  )
+  if (live) return live
   return recallGood(key)
 }
 
@@ -154,22 +203,33 @@ export async function wbRegionCode(iso2: string): Promise<string | null> {
  * slug in memory, keyed by ISO3.
  */
 const owidCache = new Map<string, Map<string, RefHit>>()
+/**
+ * OWID now returns 403 to server-side requests (any User-Agent). The fetchers
+ * are kept in the fallback chains in case that changes, but once we've seen a
+ * refusal there's no point paying the round-trip on every subsequent report —
+ * trip a breaker for the life of the process. A restart re-probes.
+ */
+let owidBlocked = false
 export async function owidLatest(
   slug: string,
   iso3: string
 ): Promise<RefHit | null> {
+  if (owidBlocked) return null
   let bySlug = owidCache.get(slug)
   if (!bySlug) {
     const url = `https://ourworldindata.org/grapher/${slug}.csv?csvType=filtered`
     const controller = new AbortController()
-    const t = setTimeout(() => controller.abort(), 14000)
+    const t = setTimeout(() => controller.abort(), 6000)
     let text: string
     try {
       const res = await fetch(url, {
         signal: controller.signal,
         headers: { "User-Agent": "TravelAI/1.0 (travel research app)" },
       })
-      if (!res.ok) return null
+      if (!res.ok) {
+        if (res.status === 403 || res.status === 429) owidBlocked = true
+        return null
+      }
       text = await res.text()
     } finally {
       clearTimeout(t)

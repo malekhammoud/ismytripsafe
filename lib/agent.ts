@@ -1,5 +1,6 @@
 import type { SafetyBundle, GeoPoint, StreamEvent, SafetyEnrichment } from "./types"
 import type { WikivoyageSafety } from "./data/wikivoyage"
+import { timeLog } from "./timing"
 import {
   buildQueryPlan,
   searchGoogleNews,
@@ -13,34 +14,52 @@ import {
 // Research runs on OpenRouter's free models — the account-wide free-model
 // budget is ~1,000 requests/day (20/min), and each report costs exactly ONE
 // request because all searching/crawling happens in lib/research.ts, not in
-// a model tool loop. Ordered strongest-first; we fall through on any failure.
+// a model tool loop.
+//
+// Ordered FASTEST-first, not strongest-first: the whole report budget is ~10s
+// and the model is most of it. Measured on a report-sized prompt —
+//   nemotron-3-nano-30b   4.9s to first token, 195 tok/s   ← primary
+//   nemotron-3-super-120b 4.5s to first token,  ~90 tok/s
+//   gemma-4-26b-a4b      16.1s to first token,   45 tok/s   ← last resort
+// The old primary (nemotron-3-ultra-550b) took 14s to first token and ran at
+// 28 tok/s — ~45s for one report on its own. gpt-oss-20b:free was also in this
+// list and is now gone: it only streams `delta.reasoning`, never `delta.content`,
+// so it can never satisfy the parser and just burned a slot.
 const DEFAULT_MODELS = [
-  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "nvidia/nemotron-3-nano-30b-a3b:free",
   "nvidia/nemotron-3-super-120b-a12b:free",
-  "google/gemma-4-31b-it:free",
-  "openai/gpt-oss-20b:free",
+  "google/gemma-4-26b-a4b-it:free",
 ]
 
-const LLM_DEADLINE_MS = 230_000 // route maxDuration is 300s; leave room for research + cache write
-const STALL_TIMEOUT_MS = 60_000 // abort a model that stops sending chunks
+const LLM_DEADLINE_MS = 45_000 // whole-chain ceiling; the target for one report is <10s
+const STALL_TIMEOUT_MS = 12_000 // abort a model that stops sending chunks
+// A model that streams only reasoning deltas and never any content can't
+// produce a usable report. The timer only starts once we've seen the stream is
+// alive, and it is generous: these are reasoning models, and a long think that
+// ends in good output is still a win over falling through to a slower model.
+const NO_CONTENT_TIMEOUT_MS = 25_000
 
-const SYSTEM_PROMPT = `You are a travel-safety analyst. Your ONE job: tell a traveler whether a place is safe, and why. Stay focused on personal safety — not flights, hotels, food or attractions.
+
+// Shared grounding preamble for both model calls. Kept in one place so the
+// zones pass can't drift from the core pass on what counts as evidence.
+const GROUNDING = `You are a travel-safety analyst. Your ONE job: tell a traveler whether a place is safe, and why. Stay focused on personal safety — not flights, hotels, food or attractions.
 
 You will receive a REAL, multi-database safety profile (World Bank crime & governance indicators, live air quality, nearby-hospital data, seasonal weather, live disaster alerts) AND the official government travel advisories (U.S. State Department, UK FCDO, Canada) pulled straight from those governments' own data feeds. You may also receive the Wikivoyage "Stay safe" section — traveller-maintained background that can be months old: treat it as leads, not current fact. Treat the databases and advisories as ground truth. The official advisory wording is already shown to the user verbatim from the source — do NOT restate, summarize, or invent advisory levels.
 
-You will ALSO receive a LIVE WEB RESEARCH DOSSIER: real, current news headlines, web search results and full-text page extracts gathered moments ago specifically for this city. This dossier is your window onto the current situation — you cannot search the web yourself, so it is your ONLY source for anything recent. Use it for:
-- Recent incidents, unrest, protests, crime trends
-- Neighborhood-level detail: which specific districts are safe vs. which to avoid
-- Street-crime specifics: robbery/mugging and pickpocketing/bag-snatching risk for a visitor
-- How safe visitors actually feel day-to-day (traveller sentiment)
-- Scams and threats that specifically target visitors
-- Seasonal hazards to watch for right now, and practical safety advice
+You will ALSO receive a LIVE WEB RESEARCH DOSSIER: real, current news headlines, web search results and full-text page extracts gathered moments ago specifically for this city. This dossier is your window onto the current situation — you cannot search the web yourself, so it is your ONLY source for anything recent.
 
 GROUNDING RULES — non-negotiable:
-- Every entry in "recentIncidents" MUST come from a dated item in the dossier (headline or extract). Copy its real date and real source name. NEVER invent an incident, a date, or a publication. If the dossier has nothing notable, use [].
-- Neighborhood names in mapZones/safeAreas/avoidAreas must be real districts of this city — prefer ones the dossier or Wikivoyage actually mentions; fill gaps only with districts you are certain exist.
-- If dossier items contradict each other, trust the more recent, more local source, and say so in the briefing.
-- If the dossier is thin or empty, be conservative: lean on the database profile, keep recentIncidents empty, and never fabricate currency ("as of this month…") you do not have.
+- NEVER invent an incident, a date, or a publication. Anything dated must come from a dated item in the dossier, copying its real date and real source name.
+- Neighborhood names must be real districts of this city — prefer ones the dossier or Wikivoyage actually mentions; fill gaps only with districts you are certain exist.
+- If dossier items contradict each other, trust the more recent, more local source.
+- If the dossier is thin or empty, be conservative: lean on the database profile and never fabricate currency ("as of this month…") you do not have.`
+
+// ── Call A: everything the report page renders. On the critical path, so it
+// is kept deliberately small — district-by-district zone ratings (the single
+// largest chunk of the old output) moved to call B below.
+const SYSTEM_PROMPT = `${GROUNDING}
+
+Use the dossier for: recent incidents and crime trends; street-crime specifics (robbery/mugging and pickpocketing/bag-snatching risk for a visitor); how safe visitors actually feel day-to-day; scams that target visitors; and practical safety advice.
 
 CRITICAL: Output a single JSON block in EXACTLY this format, then a prose briefing:
 
@@ -48,31 +67,41 @@ START_SAFETY
 {
   "verdict": "One direct sentence answering 'is it safe?' — e.g. 'Yes — Lisbon is one of Europe's safest capitals for visitors.'",
   "summary": "2-3 sentences interpreting the real safety data for a traveler.",
-  "safeAreas": ["District A", "District B", "District C"],
-  "avoidAreas": ["Area to avoid (with why, briefly)", "another"],
   "scams": ["common scam targeting visitors", "another"],
   "tips": ["specific actionable safety tip", "another", "another"],
   "robbery": { "level": "Low|Moderate|High|Severe", "note": "one line on mugging/armed-robbery risk to visitors and where it happens" },
   "pickpocket": { "level": "Low|Moderate|High|Severe", "note": "one line on pickpocketing/bag-snatching risk and the hotspots" },
   "consumerSentiment": { "score": 0-100, "label": "short label e.g. 'Mostly positive'", "summary": "1-2 sentences on how safe visitors report feeling day-to-day, from recent traveller reports" },
-  "watchOuts": ["specific thing to watch out for in this city right now (incl. any seasonal weather hazard)", "another", "another"],
   "recentIncidents": [
     { "when": "Jun 2026", "what": "one line: a real recent incident, trend or development relevant to visitor safety", "source": "publication or site name" }
-  ],
-  "mapZones": [
-    { "name": "specific real district/neighbourhood name", "level": "safe|caution|avoid", "note": "one line: why it's this level for a visitor" }
   ]
 }
 END_SAFETY
 
-For "level" use exactly one of: Low, Moderate, High, Severe. For "score" use a number 0-100. For "recentIncidents" list 2-4 REAL, dated items from the dossier, most recent first ("when" is a month + year); use [] if genuinely nothing notable. For "mapZones" list 5-8 REAL, individually named districts/neighbourhoods of this specific city (not the whole country) that can be found on a map, each rated "safe" (green), "caution" (yellow — okay but stay alert / avoid after dark) or "avoid" (red). Include a mix of levels where the city warrants it.
+For "level" use exactly one of: Low, Moderate, High, Severe. For "score" use a number 0-100. For "recentIncidents" list 2-4 REAL, dated items from the dossier, most recent first ("when" is a month + year); use [] if genuinely nothing notable.
 
-DIVISION OF LABOUR — these render on two different pages, so keep them strictly separate:
-- District-by-district safety judgments belong ONLY in mapZones / safeAreas / avoidAreas (shown on the map page). safeAreas and avoidAreas must agree with your mapZones ratings.
-- The prose briefing (shown on the report page) covers the overall picture: verdict, what the data means, the current situation, how to stay safe. Do NOT re-rate individual neighbourhoods in the prose, and never contradict your own mapZones.
-- Do NOT quote the numeric composite index in the prose — the published score is recomputed after your research lands and may differ.
+Keep the JSON tight — it is what the reader waits on. Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what the dossier found, with source names and dates), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.
 
-Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what the dossier found, with source names and dates), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places. Output the JSON block and briefing directly with no preamble.`
+Do NOT re-rate individual neighbourhoods in the prose — district ratings render on a separate page. Do NOT quote the numeric composite index in the prose: the published score is recomputed after your research lands and may differ. Output the JSON block and briefing directly with no preamble.`
+
+// ── Call B: the map page's district ratings. Runs after the report has already
+// been delivered, so it never costs the reader a second.
+const ZONES_SYSTEM_PROMPT = `${GROUNDING}
+
+Your task here is ONLY district-by-district ratings for the map page. No prose, no briefing, no preamble — output the JSON block and nothing else.
+
+START_SAFETY
+{
+  "mapZones": [
+    { "name": "specific real district/neighbourhood name", "level": "safe|caution|avoid", "note": "one line: why it's this level for a visitor" }
+  ],
+  "safeAreas": ["District A", "District B", "District C"],
+  "avoidAreas": ["Area to avoid (with why, briefly)", "another"],
+  "watchOuts": ["specific thing to watch out for in this city right now (incl. any seasonal weather hazard)", "another", "another"]
+}
+END_SAFETY
+
+For "mapZones" list 5-8 REAL, individually named districts/neighbourhoods of this specific city (not the whole country) that can be found on a map, each rated "safe" (green), "caution" (yellow — okay but stay alert / avoid after dark) or "avoid" (red). Include a mix of levels where the city warrants it. "safeAreas" and "avoidAreas" must agree with your own mapZones ratings.`
 
 function buildPrompt(
   geo: GeoPoint,
@@ -169,42 +198,52 @@ Interpret this for the traveler and add neighborhood-level safety, current incid
 
 // ─── Free web research (Google News RSS + DuckDuckGo + crawling) ────
 
-async function* runResearch(
+/**
+ * Search + crawl into a dossier. Nothing here depends on the safety bundle, so
+ * the route kicks this off in parallel with the database gather rather than
+ * waiting for it — see app/api/research/route.ts. Progress is reported through
+ * `onQuery` instead of yielded, because the caller is no longer a generator.
+ */
+export async function collectResearch(
   geo: GeoPoint,
-  dossier: ResearchDossier
-): AsyncGenerator<StreamEvent> {
+  onQuery: (query: string) => void = () => {}
+): Promise<ResearchDossier> {
+  const dossier: ResearchDossier = { headlines: [], webResults: [], extracts: [] }
   const plan = buildQueryPlan(geo)
 
-  for (const q of [...plan.news, ...plan.web]) {
-    yield { type: "searching", query: q.replace(/"/g, "") }
-  }
+  for (const q of [...plan.news, ...plan.web]) onQuery(q.replace(/"/g, ""))
 
-  const [newsResults, webResults] = await Promise.all([
-    Promise.all(plan.news.map((q) => searchGoogleNews(q))),
-    Promise.all(plan.web.map((q) => searchDuckDuckGo(q))),
-  ])
+  try {
+    const [newsResults, webResults] = await Promise.all([
+      Promise.all(plan.news.map((q) => searchGoogleNews(q))),
+      Promise.all(plan.web.map((q) => searchDuckDuckGo(q))),
+    ])
 
-  const seenTitles = new Set<string>()
-  for (const h of newsResults.flat()) {
-    const key = h.title.toLowerCase()
-    if (seenTitles.has(key)) continue
-    seenTitles.add(key)
-    dossier.headlines.push(h)
-  }
+    const seenTitles = new Set<string>()
+    for (const h of newsResults.flat()) {
+      const key = h.title.toLowerCase()
+      if (seenTitles.has(key)) continue
+      seenTitles.add(key)
+      dossier.headlines.push(h)
+    }
 
-  const seenUrls = new Set<string>()
-  for (const r of webResults.flat()) {
-    if (seenUrls.has(r.url)) continue
-    seenUrls.add(r.url)
-    dossier.webResults.push(r)
-  }
+    const seenUrls = new Set<string>()
+    for (const r of webResults.flat()) {
+      if (seenUrls.has(r.url)) continue
+      seenUrls.add(r.url)
+      dossier.webResults.push(r)
+    }
 
-  const toCrawl = pickArticleUrls(dossier.webResults)
-  for (const r of toCrawl) {
-    yield { type: "searching", query: `Reading ${new URL(r.url).hostname.replace(/^www\./, "")}…` }
+    const toCrawl = pickArticleUrls(dossier.webResults)
+    for (const r of toCrawl) {
+      onQuery(`Reading ${new URL(r.url).hostname.replace(/^www\./, "")}…`)
+    }
+    const extracts = await Promise.all(toCrawl.map((r) => fetchArticle(r.url)))
+    dossier.extracts.push(...extracts.filter((e): e is NonNullable<typeof e> => e != null))
+  } catch {
+    // research is best-effort; the prompts say how to behave with a thin dossier
   }
-  const extracts = await Promise.all(toCrawl.map((r) => fetchArticle(r.url)))
-  dossier.extracts.push(...extracts.filter((e): e is NonNullable<typeof e> => e != null))
+  return dossier
 }
 
 // ─── OpenRouter streaming ───────────────────────────────────────────
@@ -221,7 +260,8 @@ async function* streamModel(
   apiKey: string,
   system: string,
   user: string,
-  deadline: number
+  deadline: number,
+  maxTokens = 1500
 ): AsyncGenerator<string> {
   const controller = new AbortController()
   const hardTimer = setTimeout(
@@ -229,6 +269,12 @@ async function* streamModel(
     Math.max(1, deadline - Date.now())
   )
   let stallTimer = setTimeout(() => controller.abort(), STALL_TIMEOUT_MS)
+  // Some models stream only `delta.reasoning` and never emit any content.
+  // Cut them loose quickly rather than letting the stall timer run.
+  let sawContent = false
+  const noContentTimer = setTimeout(() => {
+    if (!sawContent) controller.abort()
+  }, NO_CONTENT_TIMEOUT_MS)
 
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -243,7 +289,15 @@ async function* streamModel(
         model,
         stream: true,
         temperature: 0.35,
-        max_tokens: 8192,
+        max_tokens: maxTokens,
+        // The strong free models are hybrid-reasoning: left on, they spend
+        // 15-20s and most of the token budget thinking before emitting a
+        // single character of content. Measured on the real prompt, turning
+        // reasoning off takes the primary from 20.5s to 4.4s end-to-end
+        // (first token 0.7s, JSON block closed at 3.5s) with no loss of
+        // structure — the prompt already dictates the schema. This is the
+        // single biggest lever on report latency.
+        reasoning: { enabled: false },
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -282,12 +336,16 @@ async function* streamModel(
         if (json.error) throw new Error(`OpenRouter mid-stream error: ${json.error.message}`)
         // reasoning models also send delta.reasoning — only content is output
         const content = json.choices?.[0]?.delta?.content
-        if (content) yield content
+        if (content) {
+          sawContent = true
+          yield content
+        }
       }
     }
   } finally {
     clearTimeout(hardTimer)
     clearTimeout(stallTimer)
+    clearTimeout(noContentTimer)
   }
 }
 
@@ -316,36 +374,68 @@ function sanitizeProse(text: string): string {
 /** Chars held back while streaming so a marker split across chunks can't leak. */
 const PROSE_HOLDBACK = 12
 
-function parseEnrichment(
-  text: string
-): { data: SafetyEnrichment; proseOffset: number } | null {
-  const startIdx = text.indexOf("START_SAFETY")
-  const endIdx = text.lastIndexOf("END_SAFETY")
-  let jsonStr: string | null = null
-  let proseOffset = 0
-
-  if (startIdx !== -1 && endIdx > startIdx) {
-    jsonStr = text.slice(startIdx + "START_SAFETY".length, endIdx).trim()
-    proseOffset = endIdx + "END_SAFETY".length
-  } else {
-    // fallback: model dropped the markers — take the outermost JSON object
-    const first = text.indexOf("{")
-    const last = text.lastIndexOf("}")
-    if (first !== -1 && last > first && text.includes('"verdict"')) {
-      jsonStr = text.slice(first, last + 1)
-      proseOffset = last + 1
+/**
+ * Index just past the close brace matching the object that starts at `from`,
+ * or -1 if it hasn't been streamed yet. String-aware, so braces inside values
+ * don't throw off the depth count.
+ */
+function objectEnd(text: string, from: number): number {
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = from; i < text.length; i++) {
+    const c = text[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (c === "\\") escaped = true
+      else if (c === '"') inString = false
+      continue
     }
+    if (c === '"') inString = true
+    else if (c === "{") depth++
+    else if (c === "}" && --depth === 0) return i + 1
   }
-  if (!jsonStr) return null
+  return -1
+}
 
-  jsonStr = jsonStr.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim()
+/**
+ * Pull the leading JSON object out of a (possibly still-streaming) response.
+ * Balances braces rather than waiting for END_SAFETY, so the report unblocks
+ * the instant the object closes — models often dawdle before the marker, and
+ * some drop it entirely.
+ */
+function parseJsonBlock(
+  text: string
+): { data: Record<string, unknown>; proseOffset: number } | null {
+  const marker = text.indexOf("START_SAFETY")
+  const braceStart = text.indexOf("{", marker === -1 ? 0 : marker)
+  if (braceStart === -1) return null
+
+  const end = objectEnd(text, braceStart)
+  if (end === -1) return null // object still streaming
+
+  const jsonStr = text
+    .slice(braceStart, end)
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim()
   try {
     const data = JSON.parse(jsonStr)
-    if (typeof data?.verdict !== "string") return null
-    return { data, proseOffset }
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null
+    // The prose starts after the object; sanitizeProse strips any trailing
+    // END_SAFETY marker, so we don't need to have seen it yet.
+    return { data, proseOffset: end }
   } catch {
     return null
   }
+}
+
+function parseEnrichment(
+  text: string
+): { data: SafetyEnrichment; proseOffset: number } | null {
+  const hit = parseJsonBlock(text)
+  if (!hit || typeof hit.data.verdict !== "string") return null
+  return { data: hit.data as unknown as SafetyEnrichment, proseOffset: hit.proseOffset }
 }
 
 // ─── The agent ──────────────────────────────────────────────────────
@@ -353,7 +443,8 @@ function parseEnrichment(
 export async function* runSafetyAgent(
   geo: GeoPoint,
   bundle: SafetyBundle,
-  wikivoyage: WikivoyageSafety | null = null
+  wikivoyage: WikivoyageSafety | null = null,
+  dossier: ResearchDossier = { headlines: [], webResults: [], extracts: [] }
 ): AsyncGenerator<StreamEvent> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
@@ -361,44 +452,61 @@ export async function* runSafetyAgent(
     return
   }
 
-  // 1. Free web research: search + crawl, streaming progress to the UI.
-  const dossier: ResearchDossier = { headlines: [], webResults: [], extracts: [] }
-  try {
-    yield* runResearch(geo, dossier)
-  } catch {
-    // research is best-effort; the model is told how to behave with a thin dossier
-  }
-
+  // The dossier is gathered by the route in parallel with the safety bundle
+  // (see collectResearch) — by the time we get here it's already done.
   const userPrompt = buildPrompt(geo, bundle, wikivoyage, formatDossier(dossier, new Date()))
 
-  // 2. One free-model completion, falling through the chain on any failure.
+  // One free-model completion, falling through the chain on any failure.
   yield { type: "searching", query: "Analyzing findings…" }
   const deadline = Date.now() + LLM_DEADLINE_MS
   const errors: string[] = []
 
   for (const model of getModels()) {
-    if (Date.now() > deadline - 15_000) break
+    if (Date.now() > deadline - 5_000) break
 
     let accumulated = ""
     let enrichment: { data: SafetyEnrichment; proseOffset: number } | null = null
     let prevProseLength = 0
+    let emittedProse = false
+    const modelStart = Date.now()
+    let firstChunkAt = 0
 
     try {
       for await (const chunk of streamModel(model, apiKey, SYSTEM_PROMPT, userPrompt, deadline)) {
         accumulated += chunk
+        if (!firstChunkAt) {
+          firstChunkAt = Date.now()
+          timeLog("llm.ttft", firstChunkAt - modelStart, model)
+        }
         const clean = stripThink(accumulated)
 
-        if (!enrichment && clean.includes("END_SAFETY")) {
+        // Fire as soon as the JSON object closes — don't wait for END_SAFETY.
+        if (!enrichment && clean.includes("}")) {
           enrichment = parseEnrichment(clean)
-          if (enrichment) yield { type: "enrichment", data: enrichment.data }
+          if (enrichment) {
+            timeLog("llm.json", Date.now() - modelStart, model)
+            yield { type: "enrichment", data: enrichment.data }
+          }
         }
         if (enrichment) {
           const prose = sanitizeProse(clean.slice(enrichment.proseOffset))
           const flushable = Math.max(0, prose.length - PROSE_HOLDBACK)
           if (flushable > prevProseLength) {
             const delta = prose.slice(prevProseLength, flushable)
-            if (delta.trim()) yield { type: "text", content: delta }
-            prevProseLength = flushable
+            // Only the blank run between the JSON block and the first real
+            // character may be dropped. A whitespace-only delta *inside* the
+            // prose is a real space: skipping it while still advancing the
+            // cursor silently fuses words together ("centre'smain plazas").
+            if (emittedProse) {
+              yield { type: "text", content: delta }
+              prevProseLength = flushable
+            } else if (delta.trim()) {
+              yield { type: "text", content: delta.replace(/^\s+/, "") }
+              emittedProse = true
+              prevProseLength = flushable
+            } else {
+              prevProseLength = flushable // leading blank run — safe to drop
+            }
           }
         }
       }
@@ -407,12 +515,14 @@ export async function* runSafetyAgent(
       if (enrichment) {
         const prose = sanitizeProse(stripThink(accumulated).slice(enrichment.proseOffset))
         if (prose.length > prevProseLength) {
-          const delta = prose.slice(prevProseLength).trimEnd()
-          if (delta.trim()) yield { type: "text", content: delta }
+          const tail = prose.slice(prevProseLength).trimEnd()
+          const delta = emittedProse ? tail : tail.replace(/^\s+/, "")
+          if (delta) yield { type: "text", content: delta }
         }
       }
     } catch (err) {
       errors.push(String(err))
+      timeLog("llm.abort", Date.now() - modelStart, `${model} ${String(err).slice(0, 60)}`)
       if (enrichment) {
         // stream died after the structured block landed — ship what we have
         yield { type: "done" }
@@ -432,9 +542,11 @@ export async function* runSafetyAgent(
     }
 
     if (enrichment) {
+      timeLog("llm.total", Date.now() - modelStart, model)
       yield { type: "done" }
       return
     }
+    timeLog("llm.unparseable", Date.now() - modelStart, model)
     errors.push(`${model}: finished without a parseable START_SAFETY block`)
   }
 
@@ -442,4 +554,61 @@ export async function* runSafetyAgent(
     type: "error",
     message: `All research models failed. ${errors.slice(-2).join(" | ")}`,
   }
+}
+
+// ─── Deferred pass: district ratings for the map page ────────────────
+
+/** The slice of the enrichment produced by the second, off-critical-path call. */
+export type ZonesResult = Pick<
+  SafetyEnrichment,
+  "mapZones" | "safeAreas" | "avoidAreas" | "watchOuts"
+>
+
+/**
+ * District-by-district ratings. These render only on the map page and the SEO
+ * city page — never on the report the user is waiting for — so they are
+ * generated *after* the report has been delivered and merged into the cached
+ * record. Returns null if every model fails; callers degrade to no zones.
+ */
+export async function generateMapZones(
+  geo: GeoPoint,
+  bundle: SafetyBundle,
+  wikivoyage: WikivoyageSafety | null,
+  dossier: ResearchDossier
+): Promise<ZonesResult | null> {
+  const apiKey = process.env.OPENROUTER_API_KEY
+  if (!apiKey) return null
+
+  const userPrompt = buildPrompt(geo, bundle, wikivoyage, formatDossier(dossier, new Date()))
+  const deadline = Date.now() + LLM_DEADLINE_MS
+
+  for (const model of getModels()) {
+    if (Date.now() > deadline - 5_000) break
+    let accumulated = ""
+    try {
+      for await (const chunk of streamModel(
+        model,
+        apiKey,
+        ZONES_SYSTEM_PROMPT,
+        userPrompt,
+        deadline,
+        1200
+      )) {
+        accumulated += chunk
+      }
+    } catch {
+      // fall through to the next model
+    }
+
+    const hit = parseJsonBlock(stripThink(accumulated))
+    if (hit && Array.isArray(hit.data.mapZones)) {
+      return {
+        mapZones: hit.data.mapZones as ZonesResult["mapZones"],
+        safeAreas: (hit.data.safeAreas as string[]) ?? [],
+        avoidAreas: (hit.data.avoidAreas as string[]) ?? [],
+        watchOuts: (hit.data.watchOuts as string[]) ?? [],
+      }
+    }
+  }
+  return null
 }

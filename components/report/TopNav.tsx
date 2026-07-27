@@ -48,9 +48,11 @@ export function TopNav({ active }: { active: "report" | "map" }) {
       </div>
 
       <div className="hidden text-right leading-tight sm:block">
-        <div className="wordmark flex items-center justify-end gap-1.5 text-sm text-[var(--ink)]">
-          <Logo size={14} />
-          Is It Safe<span style={{ color: "var(--accent)" }}>?</span>
+        <div className="wordmark flex items-center justify-end gap-1.5 text-sm text-[var(--navy)]">
+          <Logo size={15} />
+          <span>
+            Is It Safe<span style={{ color: "var(--orange)" }}>?</span>
+          </span>
         </div>
         <div className="flex items-center justify-end gap-1 text-[0.62rem] uppercase tracking-wider text-[var(--ink-faint)]">
           {cached && <Zap size={9} style={{ color: "var(--accent)" }} />}

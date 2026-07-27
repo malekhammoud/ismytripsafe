@@ -100,8 +100,9 @@ export async function GET(
         summary: report.enrichment.summary,
         robberyRisk: report.enrichment.robbery ?? null,
         pickpocketRisk: report.enrichment.pickpocket ?? null,
-        safeAreas: report.enrichment.safeAreas,
-        avoidAreas: report.enrichment.avoidAreas,
+        // may not have landed yet — the district pass runs after the report
+        safeAreas: report.enrichment.safeAreas ?? [],
+        avoidAreas: report.enrichment.avoidAreas ?? [],
         scams: report.enrichment.scams,
         zones: report.enrichment.mapZones ?? [],
       },

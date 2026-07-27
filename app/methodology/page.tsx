@@ -163,6 +163,15 @@ export default function MethodologyPage() {
             trip, on health &amp; care for families and older travellers, capped so the general
             score stays the backbone and re-bounded by the same hard caps. Same inputs, same number, every time.
           </p>
+          <p>
+            Who is in the party counts too. A women-only party puts a further 12% of the weight
+            on the crime family, which is where the two indicators that track this most directly
+            live — sexual-violence victimisation and the share of people who say they feel safe
+            walking alone after dark; a mixed party adds 4%. The answers also change the written
+            report: the findings pulled to the top are the ones that bear on that party, quoted
+            from the same data shown further down the page. Nothing about the personalisation is
+            AI-generated, and it can never lift a score above a hard cap.
+          </p>
 
           <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">Update cadence &amp; dates</h2>
           <p>

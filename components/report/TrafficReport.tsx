@@ -39,6 +39,7 @@ import {
 import { personalizeScore, profileSummary, type TravelerProfile } from "@/lib/profile"
 import { extractSourceLinksFromText, sourceUrlForName, sourceUrlForSearchQuery } from "@/lib/source-links"
 import { ScorePyramid } from "./ScorePyramid"
+import { PersonalBrief } from "./PersonalBrief"
 import { InfoTip } from "./InfoTip"
 import { ShareButton } from "./ShareButton"
 import { SourceLink } from "./SourceLink"
@@ -296,7 +297,19 @@ function StatTile({ icon, k, signal }: { icon: ReactNode; k: string; signal: Saf
 // ————— main —————
 
 /** Circular 0–100 meter with the score centered inside — the hero's focal point. */
-function ScoreRing({ score, accent, strong }: { score: number; accent: string; strong: string }) {
+function ScoreRing({
+  score,
+  accent,
+  strong,
+  pending = false,
+}: {
+  score: number
+  accent: string
+  strong: string
+  /** Field research still in flight — the score isn't final, so don't show a
+   *  number the reader would watch change under them. */
+  pending?: boolean
+}) {
   const R = 54
   const C = 2 * Math.PI * R
   const filled = (Math.max(0, Math.min(100, score)) / 100) * C
@@ -304,12 +317,38 @@ function ScoreRing({ score, accent, strong }: { score: number; accent: string; s
     <div className="relative mx-auto h-[168px] w-[168px] sm:h-[192px] sm:w-[192px]">
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90" style={{ filter: `drop-shadow(0 0 16px ${strong}66)` }}>
         <circle cx="60" cy="60" r={R} fill="none" stroke="rgba(238,242,248,0.16)" strokeWidth="6.5" />
-        <circle cx="60" cy="60" r={R} fill="none" stroke={accent} strokeWidth="6.5" strokeLinecap="round" strokeDasharray={`${filled} ${C}`} />
+        {!pending && (
+          <circle cx="60" cy="60" r={R} fill="none" stroke={accent} strokeWidth="6.5" strokeLinecap="round" strokeDasharray={`${filled} ${C}`} />
+        )}
+        {pending && (
+          /* an indeterminate arc, so the ring reads as "working" not "zero" */
+          <circle
+            cx="60"
+            cy="60"
+            r={R}
+            fill="none"
+            stroke={accent}
+            strokeWidth="6.5"
+            strokeLinecap="round"
+            strokeDasharray={`${C * 0.22} ${C}`}
+            className="spin-slow"
+            style={{ transformOrigin: "60px 60px" }}
+          />
+        )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <p className="font-display leading-none text-white" style={{ fontSize: "clamp(2.9rem,12vw,3.5rem)", fontWeight: 560, letterSpacing: "-0.02em" }}>
-          {score}
-        </p>
+        {pending ? (
+          <p
+            className="font-display leading-none pulse"
+            style={{ fontSize: "clamp(2.9rem,12vw,3.5rem)", fontWeight: 560, letterSpacing: "-0.02em", color: "rgba(238,242,248,0.42)" }}
+          >
+            —
+          </p>
+        ) : (
+          <p className="font-display leading-none text-white" style={{ fontSize: "clamp(2.9rem,12vw,3.5rem)", fontWeight: 560, letterSpacing: "-0.02em" }}>
+            {score}
+          </p>
+        )}
         <p className="mt-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.22em]" style={{ color: "rgba(238,242,248,0.6)" }}>
           / 100
         </p>
@@ -342,9 +381,12 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
   const catScore = (k: CategoryKey) => categories.find((c) => c.key === k)?.score ?? null
   const homicideCmp = safety.comparisons.find((c) => /homicide/i.test(c.metric))
   // The published score blends the database composite with the field research
-  // (street-crime ratings + traveller sentiment) — it's only final once the
-  // research is in, which is why the page holds the report until then. A
-  // traveller profile then deterministically re-weights it for who's going.
+  // (street-crime ratings + traveller sentiment), so it isn't final until the
+  // research lands. The rest of the report — advisories, signals, comparisons —
+  // is database-derived and correct the moment the bundle arrives, so it
+  // renders straight away and only the score itself waits. A traveller profile
+  // then deterministically re-weights it for who's going.
+  const scorePending = loading && !intel
   const final = computeFinalScore(safety, intel)
   const personal = personalizeScore(final, categories, profile)
   const levelCfg = LEVELS[personal.level]
@@ -406,10 +448,15 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             <p className="eyebrow" style={{ color: "rgba(238,242,248,0.65)" }}>Safety Report</p>
             <span className="flex items-center gap-2.5">
               <p className="wordmark flex items-center gap-1.5 text-[0.82rem] text-white">
-                <Logo size={13} />
-                IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.5)" }}>.com</span>
+                <Logo size={14} />
+                <span>
+                  IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.5)" }}>.com</span>
+                </span>
               </p>
-              <ShareButton targetId="report-hero" city={geo.city} score={personal.index} answer={levelCfg.answer} />
+              {/* nothing worth sharing until the score is final */}
+              {!scorePending && (
+                <ShareButton targetId="report-hero" city={geo.city} score={personal.index} answer={levelCfg.answer} />
+              )}
             </span>
           </div>
 
@@ -425,7 +472,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           </p>
 
           <div className="mt-5">
-            <ScoreRing score={personal.index} accent={heroAccent} strong={TONES[indexTone].strong} />
+            <ScoreRing score={personal.index} accent={heroAccent} strong={TONES[indexTone].strong} pending={scorePending} />
           </div>
 
           <div className="mt-4 text-center">
@@ -438,9 +485,9 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
               }}
             >
               <Gauge size={14} strokeWidth={2.4} className="shrink-0" style={{ color: heroAccent }} />
-              {levelCfg.answer}
+              {scorePending ? "Weighing the field research…" : levelCfg.answer}
             </span>
-            {personal.personalized && profile && (
+            {personal.personalized && profile && !scorePending && (
               <p className="mt-2 flex items-center justify-center gap-1 text-[0.72rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
                 <span className="font-semibold uppercase tracking-[0.1em]" style={{ color: heroAccent }}>Personalised</span>
                 {profileSummary(profile)}
@@ -451,7 +498,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
               </p>
             )}
             <p className="mt-2 flex items-center justify-center gap-1 text-[0.75rem]" style={{ color: "rgba(238,242,248,0.72)" }}>
-              Safer than ~{final.saferThanPct}% of countries
+              {scorePending ? "Databases in — blending live field research" : `Safer than ~${final.saferThanPct}% of countries`}
               <InfoTip
                 text={
                   (final.includesFieldResearch
@@ -486,6 +533,18 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           <ScorePyramid categories={categories} />
         </div>
       </section>
+
+      {/* written for you — only when the traveller answered "who's going?",
+          and only once the research it draws on has landed */}
+      {profile && !scorePending && (
+        <PersonalBrief
+          profile={profile}
+          bundle={bundle}
+          intel={intel}
+          personal={personal}
+          generatedAt={generatedAt}
+        />
+      )}
 
       {/* advisories */}
       <Block
@@ -815,11 +874,19 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
       <footer className="rise-in px-7 py-6 sm:px-9" style={{ background: INK, borderTop: `1px solid ${RULE}`, animationDelay: "560ms" }}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="wordmark flex items-center gap-1.5 text-[0.95rem] text-white">
-            <Logo size={15} />
-            IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.45)" }}>.com</span>
+            <Logo size={16} />
+            <span>
+              IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.45)" }}>.com</span>
+            </span>
           </p>
           <p className="text-[0.68rem] tracking-[0.04em]" style={{ color: "rgba(238,242,248,0.55)" }}>Not legal or medical advice</p>
         </div>
+        {generatedAt && (
+          <p className="mt-2 text-[0.68rem]" style={{ color: "rgba(238,242,248,0.62)" }}>
+            Report generated {generatedAt}
+            {profile ? ` for ${profileSummary(profile).toLowerCase()}` : ""}
+          </p>
+        )}
         {permalink && (
           <p className="mt-2 text-[0.68rem]" style={{ color: "rgba(238,242,248,0.55)" }}>
             Permanent report:{" "}

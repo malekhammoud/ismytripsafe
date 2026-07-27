@@ -1,4 +1,5 @@
 import type { GeoPoint, SafetySignal, HealthNotice } from "../types"
+import { timed, withBudget } from "../timing"
 import { countryMatchNames, iso3Code } from "./country"
 import { ghoLatest } from "./refdata"
 
@@ -235,6 +236,11 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
   return 2 * R * Math.asin(Math.sqrt(s))
 }
 
+// Overpass is the slowest thing left in the bundle and the least load-bearing:
+// on a dense city the 15km hospital query can take >6s on every mirror. Cap it
+// tight — when it misses we fall back to the WHO hospital-beds figure, which is
+// already in flight alongside it, so a miss costs data resolution, not a signal.
+const OVERPASS_TIMEOUT_MS = 4_000
 const OVERPASS_ENDPOINTS = [
   "https://overpass-api.de/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
@@ -246,36 +252,44 @@ async function fetchHospitals(
   geo: GeoPoint
 ): Promise<{ count: number; nearestKm: number | null } | null> {
   const q =
-    `[out:json][timeout:12];(` +
+    `[out:json][timeout:4];(` +
     `node["amenity"="hospital"](around:15000,${geo.lat},${geo.lon});` +
     `way["amenity"="hospital"](around:15000,${geo.lat},${geo.lon});` +
     `relation["amenity"="hospital"](around:15000,${geo.lat},${geo.lon});` +
     `);out center 80;`
-  // two rounds over the public mirrors — they rate-limit independently
-  for (const endpoint of [...OVERPASS_ENDPOINTS, ...OVERPASS_ENDPOINTS]) {
-    const raw = await fetchText(`${endpoint}?data=${encodeURIComponent(q)}`, 12000)
-    if (!raw) continue
-    try {
-      const data = JSON.parse(raw) as {
-        elements?: Array<{ lat?: number; lon?: number; center?: { lat: number; lon: number } }>
-      }
-      const els = data.elements ?? []
-      let nearest = Infinity
-      for (const e of els) {
-        const lat = e.lat ?? e.center?.lat
-        const lon = e.lon ?? e.center?.lon
-        if (lat == null || lon == null) continue
-        nearest = Math.min(nearest, haversineKm(geo.lat, geo.lon, lat, lon))
-      }
-      return {
-        count: els.length,
-        nearestKm: Number.isFinite(nearest) ? Math.round(nearest * 10) / 10 : null,
-      }
-    } catch {
-      /* try next endpoint */
+
+  const parse = (raw: string) => {
+    const data = JSON.parse(raw) as {
+      elements?: Array<{ lat?: number; lon?: number; center?: { lat: number; lon: number } }>
+    }
+    const els = data.elements ?? []
+    let nearest = Infinity
+    for (const e of els) {
+      const lat = e.lat ?? e.center?.lat
+      const lon = e.lon ?? e.center?.lon
+      if (lat == null || lon == null) continue
+      nearest = Math.min(nearest, haversineKm(geo.lat, geo.lon, lat, lon))
+    }
+    return {
+      count: els.length,
+      nearestKm: Number.isFinite(nearest) ? Math.round(nearest * 10) / 10 : null,
     }
   }
-  return null
+
+  // Race the public mirrors instead of walking them. Serially this was six
+  // 12s attempts — 72s worst case on the critical path — and the mirrors
+  // rate-limit independently, so whichever is healthy answers in ~2-3s.
+  const attempts = OVERPASS_ENDPOINTS.map(async (endpoint) => {
+    const raw = await fetchText(`${endpoint}?data=${encodeURIComponent(q)}`, OVERPASS_TIMEOUT_MS)
+    if (!raw) throw new Error("no response")
+    return parse(raw) // throws on malformed JSON → this mirror loses the race
+  })
+
+  try {
+    return await Promise.any(attempts)
+  } catch {
+    return null // every mirror failed
+  }
 }
 
 /** Country-level fallback when the map query fails: WHO hospital-bed density. */
@@ -447,13 +461,18 @@ export interface EnvironmentResult {
 
 /** Air-quality + CDC health + hospitals + weather signals, fetched in parallel. */
 export async function getEnvironment(geo: GeoPoint): Promise<EnvironmentResult> {
-  const [air, health, hospitals, weather] = await Promise.all([
-    fetchAirQuality(geo),
-    fetchHealthNotices(geo),
-    fetchHospitals(geo),
-    fetchWeather(geo),
+  // The WHO hospital-beds figure is only *used* when the map query comes back
+  // empty, but fetching it conditionally put it in series after this block.
+  // Speculate on it instead: one cheap country-level call, zero added latency.
+  const [air, health, hospitals, weather, bedsFallback] = await Promise.all([
+    timed("env.air", fetchAirQuality(geo)),
+    timed("env.cdc", fetchHealthNotices(geo)),
+    timed("env.hospitals", fetchHospitals(geo)),
+    timed("env.weather", fetchWeather(geo)),
+    // a fallback for a minor signal — it gets a short leash, not a retry ladder
+    timed("env.beds", withBudget(fetchHospitalBeds(geo.countryCode).catch(() => null), 3_000)),
   ])
-  const beds = hospitals == null ? await fetchHospitalBeds(geo.countryCode) : null
+  const beds = hospitals == null ? bedsFallback : null
   return {
     signals: [
       airQualitySignal(air),

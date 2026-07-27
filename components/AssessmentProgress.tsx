@@ -108,7 +108,7 @@ export function AssessmentProgress({
       </div>
 
       <p className="mt-4 text-center text-[0.72rem] text-[var(--ink-faint)]">
-        This usually takes 30–60 seconds. The full report appears once every source is in.
+        This usually takes a few seconds. The report appears as soon as the databases are in.
       </p>
     </div>
   )

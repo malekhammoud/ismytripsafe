@@ -175,17 +175,19 @@ export interface MapZone {
 export interface SafetyEnrichment {
   verdict: string // direct answer, e.g. "Yes — generally safe for visitors"
   summary: string // 2–3 sentences interpreting the real data
-  safeAreas: string[]
-  avoidAreas: string[]
   scams: string[] // common scams targeting visitors
   tips: string[] // practical safety tips
   // ── added: qualitative, AI-assessed detail (optional; may be absent) ──
   robbery?: RiskRating // mugging / armed robbery risk to visitors
   pickpocket?: RiskRating // pickpocketing / bag-snatching risk
   consumerSentiment?: ConsumerSentiment // how safe visitors feel (map page)
+  recentIncidents?: RecentIncident[] // dated recent developments (report page)
+  // ── map-page only, produced by a second model pass AFTER the report is
+  //    delivered (see generateMapZones) — absent until that pass lands ──
+  safeAreas?: string[]
+  avoidAreas?: string[]
   watchOuts?: string[] // current things to watch out for (map page)
   mapZones?: MapZone[] // districts to plot as coloured zones on the map
-  recentIncidents?: RecentIncident[] // dated recent developments (report page)
 }
 
 // ─── Bundle / inputs / stream ───────────────────────────────────────

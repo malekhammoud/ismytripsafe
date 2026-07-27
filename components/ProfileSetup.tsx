@@ -13,14 +13,20 @@ import {
   ArrowRight,
   MapPin,
   SlidersHorizontal,
+  Venus,
+  Mars,
+  VenusAndMars,
+  HelpCircle,
 } from "lucide-react"
 import {
   PARTY_OPTIONS,
   AGE_OPTIONS,
   STYLE_OPTIONS,
+  GENDER_OPTIONS,
   type TravelerProfile,
   type PartyType,
   type TripStyle,
+  type GenderMix,
   type ProfileOption,
 } from "@/lib/profile"
 
@@ -29,6 +35,13 @@ const PARTY_ICONS: Record<PartyType, React.ReactNode> = {
   couple: <Heart size={15} strokeWidth={2.2} />,
   family: <Baby size={15} strokeWidth={2.2} />,
   group: <UsersRound size={15} strokeWidth={2.2} />,
+}
+
+const GENDER_ICONS: Record<GenderMix, React.ReactNode> = {
+  female: <Venus size={15} strokeWidth={2.2} />,
+  male: <Mars size={15} strokeWidth={2.2} />,
+  mixed: <VenusAndMars size={15} strokeWidth={2.2} />,
+  unspecified: <HelpCircle size={15} strokeWidth={2.2} />,
 }
 
 const STYLE_ICONS: Record<TripStyle, React.ReactNode> = {
@@ -84,11 +97,24 @@ function OptionChip<T extends string>({
   )
 }
 
-function Question({ label, children }: { label: string; children: React.ReactNode }) {
+function Question({
+  label,
+  note,
+  children,
+}: {
+  label: string
+  note?: string
+  children: React.ReactNode
+}) {
   return (
     <div>
       <p className="label mb-2">{label}</p>
       {children}
+      {note && (
+        <p className="mt-2 text-[0.7rem] leading-snug" style={{ color: "var(--ink-faint)" }}>
+          {note}
+        </p>
+      )}
     </div>
   )
 }
@@ -108,6 +134,7 @@ export function ProfileSetup({
   onSkip: () => void
 }) {
   const [party, setParty] = useState<TravelerProfile["party"]>("solo")
+  const [gender, setGender] = useState<TravelerProfile["gender"]>("unspecified")
   const [age, setAge] = useState<TravelerProfile["age"]>("30to49")
   const [style, setStyle] = useState<TravelerProfile["style"]>("sightseeing")
 
@@ -121,9 +148,9 @@ export function ProfileSetup({
         Who&apos;s going?
       </h2>
       <p className="mt-1.5 text-[0.88rem] leading-relaxed text-[var(--ink-soft)]">
-        Safety isn&apos;t one number. A family with kids, a solo traveller and a
-        business trip face different risks — your answers re-weight the score for
-        your situation.
+        Safety isn&apos;t one number. A woman travelling alone, a family with kids and
+        a business trip face different risks — your answers re-weight the score and
+        change which findings the report leads with.
       </p>
 
       <div className="mt-6 space-y-6">
@@ -135,8 +162,19 @@ export function ProfileSetup({
           </div>
         </Question>
 
+        <Question
+          label="Who's in the party"
+          note="Women travellers meet different street-level risk, so this re-weights the score and changes which findings the report leads with."
+        >
+          <div className="grid grid-cols-2 gap-2">
+            {GENDER_OPTIONS.map((o) => (
+              <OptionChip key={o.value} option={o} icon={GENDER_ICONS[o.value]} selected={gender === o.value} onSelect={() => setGender(o.value)} />
+            ))}
+          </div>
+        </Question>
+
         <Question label="Age of the oldest traveller">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {AGE_OPTIONS.map((o) => (
               <OptionChip key={o.value} option={o} selected={age === o.value} onSelect={() => setAge(o.value)} />
             ))}
@@ -162,7 +200,7 @@ export function ProfileSetup({
         </button>
         <button
           type="button"
-          onClick={() => onConfirm({ party, age, style })}
+          onClick={() => onConfirm({ party, gender, age, style })}
           className="btn inline-flex items-center gap-2 px-5 py-2.5 text-sm"
         >
           <SlidersHorizontal size={14} />

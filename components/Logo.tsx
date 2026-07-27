@@ -1,6 +1,10 @@
 import { useId } from "react"
 
-/** The IsMyTripSafe mark: a shield with a checkmark, in the brand's accent gradient. */
+/**
+ * The IsMyTripSafe mark, lifted from the badge River designed: an orange
+ * location pin holding a navy check. Drawn rather than cropped so it stays
+ * crisp at 14px in a header — the full illustrated badge is `BrandBadge`.
+ */
 export function Logo({ size = 20, className }: { size?: number; className?: string }) {
   const id = useId()
   const gradientId = `logo-g-${id}`
@@ -15,20 +19,21 @@ export function Logo({ size = 20, className }: { size?: number; className?: stri
       role="img"
     >
       <defs>
-        <linearGradient id={gradientId} x1="9" y1="4" x2="55" y2="60" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#2b8ae6" />
-          <stop offset="1" stopColor="#14538f" />
+        <linearGradient id={gradientId} x1="14" y1="4" x2="50" y2="58" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#fb9224" />
+          <stop offset="1" stopColor="#ef5f00" />
         </linearGradient>
       </defs>
       <path
-        d="M32 4 C 20 4 9 8 9 8 L 9 28 C 9 44.5 19.5 55 32 61 C 44.5 55 55 44.5 55 28 L 55 8 C 55 8 44 4 32 4 Z"
+        d="M32 3C19.85 3 10 12.85 10 25c0 15.5 18.6 33.2 20.5 35.1a2.1 2.1 0 0 0 3 0C35.4 58.2 54 40.5 54 25 54 12.85 44.15 3 32 3Z"
         fill={`url(#${gradientId})`}
       />
+      <circle cx="32" cy="24.5" r="12.6" fill="#ffffff" />
       <path
-        d="M19.5 32.5 L28 41 L45 21.5"
+        d="M25.7 24.6 30.3 29.4 39 19.9"
         fill="none"
-        stroke="#f4f7fb"
-        strokeWidth={6}
+        stroke="#0b2049"
+        strokeWidth={5}
         strokeLinecap="round"
         strokeLinejoin="round"
       />

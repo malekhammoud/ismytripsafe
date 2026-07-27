@@ -11,11 +11,16 @@ import { levelFromIndex, type FinalScore, type CategoryScore, type CategoryKey }
 export type PartyType = "solo" | "couple" | "family" | "group"
 export type AgeBand = "under30" | "30to49" | "50to64" | "65plus"
 export type TripStyle = "sightseeing" | "nightlife" | "business" | "outdoors"
+export type GenderMix = "female" | "male" | "mixed" | "unspecified"
 
 export interface TravelerProfile {
   party: PartyType
   age: AgeBand
   style: TripStyle
+  /** Who's in the party — women face measurably different street risk, so this
+   *  changes both the weighting and what the report says. Optional: older
+   *  links (and travellers who'd rather not say) resolve to "unspecified". */
+  gender: GenderMix
 }
 
 export interface ProfileOption<T extends string> {
@@ -29,6 +34,13 @@ export const PARTY_OPTIONS: ProfileOption<PartyType>[] = [
   { value: "couple", label: "Couple", hint: "Two adults" },
   { value: "family", label: "Family with kids", hint: "Children coming along" },
   { value: "group", label: "Group", hint: "Friends or a tour group" },
+]
+
+export const GENDER_OPTIONS: ProfileOption<GenderMix>[] = [
+  { value: "female", label: "Women", hint: "All women travelling" },
+  { value: "male", label: "Men", hint: "All men travelling" },
+  { value: "mixed", label: "Mixed", hint: "Women and men together" },
+  { value: "unspecified", label: "Rather not say", hint: "Skip this one" },
 ]
 
 export const AGE_OPTIONS: ProfileOption<AgeBand>[] = [
@@ -49,28 +61,50 @@ const partyLabel = (v: PartyType) => PARTY_OPTIONS.find((o) => o.value === v)?.l
 const ageLabel = (v: AgeBand) => AGE_OPTIONS.find((o) => o.value === v)?.label ?? v
 const styleLabel = (v: TripStyle) => STYLE_OPTIONS.find((o) => o.value === v)?.label ?? v
 
-/** "Family with kids · 30–49 · Sightseeing" — shown beside the score. */
-export function profileSummary(p: TravelerProfile): string {
-  return `${partyLabel(p.party)} · ${ageLabel(p.age)} · ${styleLabel(p.style)}`
+/** "Woman" reads better than "Women" for a party of one. */
+function genderLabel(p: TravelerProfile): string | null {
+  const single = p.party === "solo"
+  switch (p.gender) {
+    case "female":
+      return single ? "Woman" : "Women"
+    case "male":
+      return single ? "Man" : "Men"
+    case "mixed":
+      return "Mixed group"
+    default:
+      return null
+  }
 }
 
-// ─── URL round-trip (the profile lives in ?party=&age=&style=) ──────
+/** "Family with kids · Women · 30–49 · Sightseeing" — shown beside the score. */
+export function profileSummary(p: TravelerProfile): string {
+  return [partyLabel(p.party), genderLabel(p), ageLabel(p.age), styleLabel(p.style)]
+    .filter(Boolean)
+    .join(" · ")
+}
+
+// ─── URL round-trip (?party=&gender=&age=&style=) ───────────────────
 
 export function profileToParams(p: TravelerProfile, params: URLSearchParams): void {
   params.set("party", p.party)
   params.set("age", p.age)
   params.set("style", p.style)
+  params.set("gender", p.gender)
 }
 
 export function profileFromParams(params: URLSearchParams): TravelerProfile | null {
   const party = params.get("party") as PartyType | null
   const age = params.get("age") as AgeBand | null
   const style = params.get("style") as TripStyle | null
+  const gender = params.get("gender") as GenderMix | null
   if (!party || !age || !style) return null
   if (!PARTY_OPTIONS.some((o) => o.value === party)) return null
   if (!AGE_OPTIONS.some((o) => o.value === age)) return null
   if (!STYLE_OPTIONS.some((o) => o.value === style)) return null
-  return { party, age, style }
+  // gender arrived later than the other three — links shared before it existed
+  // stay valid and simply carry no gender emphasis.
+  const validGender = gender && GENDER_OPTIONS.some((o) => o.value === gender) ? gender : "unspecified"
+  return { party, age, style, gender: validGender }
 }
 
 // ─── Deterministic score adjustment ─────────────────────────────────
@@ -95,6 +129,16 @@ const AGE_EMPHASIS: Record<AgeBand, Emphasis> = {
   "30to49": {},
   "50to64": { health: 0.08 },
   "65plus": { health: 0.16, stability: 0.04 },
+}
+
+// The crime pillar carries the two indicators that track this most directly —
+// sexual-violence victimisation and how safe people feel walking alone after
+// dark — so a women-only party leans on it harder.
+const GENDER_EMPHASIS: Record<GenderMix, Emphasis> = {
+  female: { crime: 0.12 },
+  mixed: { crime: 0.04 },
+  male: {},
+  unspecified: {},
 }
 
 const STYLE_EMPHASIS: Record<TripStyle, Emphasis> = {
@@ -142,6 +186,7 @@ export function personalizeScore(
   const emphasis: Record<string, number> = {}
   for (const e of [
     PARTY_EMPHASIS[profile.party],
+    GENDER_EMPHASIS[profile.gender],
     AGE_EMPHASIS[profile.age],
     STYLE_EMPHASIS[profile.style],
   ]) {

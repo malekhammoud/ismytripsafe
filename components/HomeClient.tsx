@@ -2,7 +2,9 @@
 
 import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
+import { Logo } from "@/components/Logo"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
@@ -91,7 +93,7 @@ export function HomeClient({ children }: { children?: ReactNode }) {
   // ─── Landing ───────────────────────────────────────────────
   if (!started) {
     return (
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-5 py-16">
+      <main className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-5 pb-4 pt-5">
         <div
           className="pointer-events-none fixed inset-0 -z-10"
           style={{
@@ -100,34 +102,64 @@ export function HomeClient({ children }: { children?: ReactNode }) {
           }}
         />
 
-        <div className="mb-8 text-center">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] bg-white/60 px-4 py-1.5 text-xs font-medium text-[var(--ink-soft)] rise-in">
-            <ShieldCheck size={13} style={{ color: "var(--accent)" }} />
-            15+ safety databases · one clear answer
+        {/* Top bar — the landing page's only route out to the written pages */}
+        <div className="fade-in flex items-center justify-between gap-3">
+          <span className="wordmark flex items-center gap-1.5 text-[0.95rem] text-[var(--navy)]">
+            <Logo size={17} />
+            <span>
+              IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
+            </span>
+          </span>
+          <nav className="flex items-center gap-4 whitespace-nowrap text-[0.8rem] font-medium text-[var(--ink-soft)] sm:gap-5">
+            <Link href="/destinations" className="hover:text-[var(--orange-deep)]">Destinations</Link>
+            <Link href="/how-it-works" className="hidden hover:text-[var(--orange-deep)] sm:inline">How it works</Link>
+            <Link href="/methodology" className="hidden hover:text-[var(--orange-deep)] sm:inline">Methodology</Link>
+            <Link href="/about" className="hover:text-[var(--orange-deep)]">About</Link>
+          </nav>
+        </div>
+
+        {/* Hero — the search is the product, so it sits high and alone */}
+        <div className="flex flex-col items-center py-16 sm:py-24">
+          <div className="mb-8 text-center">
+            <div
+              className="mb-5 inline-flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.1em] rise-in sm:text-xs"
+              style={{
+                background: "rgba(243,108,10,0.08)",
+                border: "1px solid rgba(243,108,10,0.22)",
+                color: "var(--orange-deep)",
+              }}
+            >
+              <ShieldCheck size={13} />
+              One place · One click · One report
+            </div>
+            <h1 className="display-xl rise-in" style={{ animationDelay: "0.08s", color: "var(--navy)" }}>
+              Is it
+              <span style={{ color: "var(--orange)", fontStyle: "italic" }}> safe</span>
+              <br />
+              to go there?
+            </h1>
+            <p
+              className="mx-auto mt-5 max-w-[26rem] text-[0.95rem] leading-relaxed text-[var(--ink-soft)] rise-in"
+              style={{ animationDelay: "0.12s" }}
+            >
+              One honest rating out of 100 for any city or country — built from real databases and
+              re-weighted for who&apos;s actually travelling.
+            </p>
           </div>
-          <h1 className="display-xl rise-in" style={{ animationDelay: "0.08s" }}>
-            Is it
-            <span style={{ color: "var(--accent)", fontStyle: "italic" }}> safe</span>
-            <br />
-            to go there?
-          </h1>
+
+          {/* z-20: the autocomplete drops over the source line below it, and
+              both are animated (each makes its own stacking context) */}
+          <div className="relative z-20 w-full max-w-2xl rise-in" style={{ animationDelay: "0.16s" }}>
+            <SearchBar onSubmit={search} loading={loading} />
+          </div>
+
           <p
-            className="mx-auto mt-5 max-w-md text-[0.98rem] leading-relaxed text-[var(--ink-soft)] rise-in"
-            style={{ animationDelay: "0.16s" }}
+            className="relative z-0 mt-6 text-center text-[0.72rem] text-[var(--ink-faint)] rise-in"
+            style={{ animationDelay: "0.24s" }}
           >
-            Type any city or country. We pull crime statistics, governance data, air
-            quality, nearby hospitals, live disaster alerts and government advisories from
-            15+ sources — then give you one honest verdict and a live map.
+            World Bank · Governance Indicators · UNODC · GDACS · Open-Meteo · CDC
           </p>
         </div>
-
-        <div className="w-full rise-in" style={{ animationDelay: "0.24s" }}>
-          <SearchBar onSubmit={search} loading={loading} />
-        </div>
-
-        <p className="mt-6 text-center text-[0.72rem] text-[var(--ink-faint)] rise-in" style={{ animationDelay: "0.32s" }}>
-          World Bank · Governance Indicators · UNODC · GDACS · Open-Meteo · CDC
-        </p>
 
         {/* Server-rendered latest-reports directory (crawlable) */}
         {children}
@@ -146,17 +178,20 @@ export function HomeClient({ children }: { children?: ReactNode }) {
           <p className="mt-1 text-sm text-[var(--ink-soft)]">{error}</p>
           <button onClick={reset} className="btn mt-4 px-5 py-2.5 text-sm">Try again</button>
         </div>
-      ) : loading && !intel ? (
-        // Hold the whole report until the field research is in — the final
-        // score blends it, so nothing renders before it can be computed.
+      ) : loading && !bundle ? (
+        // Only the pre-database phase is a blank wait. Once the bundle lands
+        // (~4s) the report renders with every database-derived section real;
+        // the score alone stays pending until the field research lands, since
+        // it blends that in — see `scorePending` in TrafficReport.
         <div className="mx-auto max-w-[640px]">
+          {/* bundle is null in this branch by construction — the flag arrives
+              with it, and by then the report itself has taken over */}
           <AssessmentProgress
             geo={geo}
-            hasData={!!bundle}
+            hasData={false}
             hasIntel={!!intel}
             proseLength={prose.length}
             searchQueries={queries}
-            flag={bundle?.country?.flag}
           />
         </div>
       ) : bundle ? (

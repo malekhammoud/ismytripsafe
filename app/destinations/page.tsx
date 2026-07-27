@@ -15,11 +15,15 @@ import {
 
 export const dynamic = "force-dynamic"
 
-export const metadata: Metadata = {
-  title: "All Destination Safety Reports — Scores by Country & City",
-  description:
-    "Every IsMyTripSafe travel safety report, organised by country: composite safety scores, government advisory levels, crime data and field research for each destination.",
-  alternates: { canonical: "/destinations" },
+export async function generateMetadata(): Promise<Metadata> {
+  const year = new Date().getFullYear()
+  return {
+    title: `All Destination Safety Reports ${year} — Scores by Country & City`,
+    description:
+      `Every IsMyTripSafe travel safety report, updated for ${year} and organised by country: composite safety ` +
+      "scores, government advisory levels, crime data and field research for each destination.",
+    alternates: { canonical: "/destinations" },
+  }
 }
 
 /** One country: header row (flag, name, score) + its city reports + overview link. */

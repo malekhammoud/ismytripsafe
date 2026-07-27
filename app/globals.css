@@ -16,6 +16,14 @@
   --sand: #cdd9e8;
   --gold: #c8973f;
 
+  /* Brand — sampled from the badge and banner. The orange is chrome only
+     (mark, rules, wordmark); score colours below own their own meanings. */
+  --navy: #0b2049;
+  --navy-soft: #16304f;
+  --orange: #f36c0a;
+  --orange-bright: #fb9224;
+  --orange-deep: #d9550a;
+
   /* Safety spectrum */
   --safe: #2f9e6f;
   --moderate: #c8973f;
@@ -321,6 +329,9 @@ body::before {
 .scale-in { opacity: 0; animation: scaleIn 0.5s cubic-bezier(0.2,0.8,0.2,1) forwards; }
 .kenburns { animation: kenburns 20s ease-out forwards alternate infinite; }
 .spin { animation: spin 0.8s linear infinite; }
+/* the hero score ring while the field research is still landing — slow enough
+   to read as "settling", not as a spinner */
+.spin-slow { animation: spin 2.2s linear infinite; }
 .pulse { animation: pulse 1.6s ease-in-out infinite; }
 
 .typing::after {
@@ -336,6 +347,67 @@ body::before {
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
   border-radius: 8px;
+}
+
+/* ─── Brand marks ────────────────────────────────────────── */
+/* The banner's signature: a serif line with a hand-drawn orange swash under
+   it. Used for the promise trio, page titles and the about-page headings. */
+.swash {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--navy);
+  position: relative;
+  display: inline-block;
+}
+.swash::after {
+  content: "";
+  position: absolute;
+  left: 2%;
+  right: 2%;
+  bottom: -0.28em;
+  height: 0.11em;
+  min-height: 3px;
+  border-radius: 100px;
+  background: linear-gradient(90deg, var(--orange-bright), var(--orange-deep));
+  transform: rotate(-0.5deg);
+}
+
+/* Photo frame with the badge's navy edge — used for the panels and portraits */
+.photo-frame {
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid rgba(11, 32, 73, 0.16);
+  box-shadow: 0 1px 2px rgba(11, 32, 73, 0.06), 0 18px 40px -22px rgba(11, 32, 73, 0.5);
+  background: var(--paper-deep);
+}
+.photo-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.photo-frame:hover img {
+  transform: scale(1.035);
+}
+
+/* Stoplight cards on the how-it-works page */
+.light-card {
+  border-radius: 4px;
+  padding: 1.1rem 1.15rem 1.25rem;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 12px 28px -18px rgba(20, 30, 48, 0.7);
+}
+.light-card .lamp {
+  width: 14px;
+  height: 14px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22);
+  flex: none;
 }
 
 /* ─── Prose ──────────────────────────────────────────────── */

@@ -13,6 +13,11 @@ import type { GeoPoint, SafetyBundle, SafetyEnrichment, DestinationImages } from
 
 export const CACHE_DIR = process.env.REPORT_CACHE_DIR || "/var/lib/ismytripsafe/reports"
 const TTL_MS = (Number(process.env.REPORT_CACHE_TTL_HOURS) || 168) * 3600 * 1000 // 7 days
+// Past the TTL a report is no longer served as-is, but up to this age it's
+// still good enough to show *immediately* while a fresh one builds in the
+// background — far better than making the reader wait out a full cold build.
+const SWR_MAX_MS =
+  (Number(process.env.REPORT_CACHE_SWR_HOURS) || 720) * 3600 * 1000 // 30 days
 
 const CACHE_VERSION = 1
 
@@ -60,6 +65,20 @@ export async function readCache(key: string): Promise<CachedReport | null> {
   if (!data) return null
   const age = Date.now() - new Date(data.cachedAt).getTime()
   if (!Number.isFinite(age) || age > TTL_MS) return null
+  return data
+}
+
+/**
+ * Read a report that is past its TTL but still within the stale-while-
+ * revalidate window. Callers serve this immediately and rebuild in the
+ * background. Returns null for a fresh report (use `readCache`) or an
+ * ancient one (worth a real rebuild).
+ */
+export async function readStale(key: string): Promise<CachedReport | null> {
+  const data = await readCacheAnyAge(key)
+  if (!data) return null
+  const age = Date.now() - new Date(data.cachedAt).getTime()
+  if (!Number.isFinite(age) || age <= TTL_MS || age > SWR_MAX_MS) return null
   return data
 }
 

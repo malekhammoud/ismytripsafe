@@ -18,6 +18,7 @@ import {
   type RefHit,
 } from "./refdata"
 import { SIGNAL_BANDS } from "../scoring"
+import { timed, withBudget } from "../timing"
 
 // ─── Scoring ─────────────────────────────────────────────────────────
 // Every 0–100 curve lives in lib/scoring.ts, keyed by signal, so the score a
@@ -231,7 +232,7 @@ function wgiBatch(iso2: string): Promise<Map<string, RefHit> | null> {
       try {
         const codes = Object.values(WGI_CODES).join(";")
         const url = `https://api.worldbank.org/v2/country/${iso2}/indicator/${codes}?format=json&mrv=10&source=3&per_page=600`
-        const data = (await fetchJson(url, 14000)) as [unknown, WBBatchRow[] | null]
+        const data = (await fetchJson(url, 8000)) as [unknown, WBBatchRow[] | null]
         const rows = data?.[1]
         if (!Array.isArray(rows)) return null
         const out = new Map<string, RefHit>()
@@ -402,6 +403,9 @@ function sdgPriority(point: SDGDataPoint): number {
   return rank
 }
 
+/** Wall-clock cap for one SDG indicator on a cold country. */
+const SDG_BUDGET_MS = 3_000
+
 // One request per SDG indicator per country; series are filtered locally.
 const sdgDataCache = new Map<string, Promise<SDGDataPoint[] | null>>()
 
@@ -414,7 +418,7 @@ function fetchSdgRows(areaCode: number, indicator: string): Promise<SDGDataPoint
         const url =
           `https://unstats.un.org/SDGAPI/v1/sdg/Indicator/Data` +
           `?indicator=${encodeURIComponent(indicator)}&areaCode=${areaCode}&pageSize=1000`
-        const data = (await fetchJson(url, 12000)) as SDGIndicatorData
+        const data = (await fetchJson(url, 8000)) as SDGIndicatorData
         return Array.isArray(data.data) ? data.data : null
       } catch {
         return null
@@ -476,7 +480,7 @@ async function fetchNumbeoCity(city: string): Promise<NumbeoHit | null> {
     if (!slug) return null
     const html = await fetchText(
       `https://r.jina.ai/http://www.numbeo.com/crime/in/${slug}`,
-      12000
+      4000
     )
     if (!html) return null
     const crime = html.match(/Crime Index:?\s*\|?\s*([0-9]+(?:\.[0-9]+)?)/i)
@@ -497,7 +501,7 @@ async function fetchNumbeoCountry(iso2: string): Promise<NumbeoHit | null> {
   try {
     const html = await fetchText(
       "https://r.jina.ai/http://www.numbeo.com/crime/rankings_by_country.jsp",
-      12000
+      4000
     )
     if (!html) return null
     const variants = countryNameVariants(iso2)
@@ -518,22 +522,30 @@ async function fetchNumbeoCountry(iso2: string): Promise<NumbeoHit | null> {
   }
 }
 
-/** City first, then country — the "expand outward until data exists" ladder. */
+/**
+ * City first, then country — the "expand outward until data exists" ladder.
+ * Both go out at once (they used to run in series, two 12s proxied fetches on
+ * the critical path); the city result still wins when it exists.
+ */
 async function fetchNumbeo(iso2: string, city: string): Promise<NumbeoHit | null> {
   const cityish = city && normalizeCountryName(city) !== normalizeCountryName(englishCountryName(iso2) ?? "")
-  if (cityish) {
-    const hit = await fetchNumbeoCity(city)
-    if (hit) return hit
-  }
-  return fetchNumbeoCountry(iso2)
+  const [cityHit, countryHit] = await Promise.all([
+    cityish ? fetchNumbeoCity(city).catch(() => null) : Promise.resolve(null),
+    fetchNumbeoCountry(iso2).catch(() => null),
+  ])
+  return cityHit ?? countryHit
 }
 
 async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySignal[]> {
-  const [areaCode, numbeo] = await Promise.all([
-    fetchSdgAreaCode(iso2),
-    fetchNumbeo(iso2, city),
-  ])
+  // Numbeo and the SDG series are independent; only the SDG *data* depends on
+  // the area-code lookup. Awaiting both up front chained Numbeo's budget in
+  // front of the SDG wave and made this stage cost the sum of the two (4s + 3s)
+  // instead of the larger of them.
+  const numbeoPromise = timed("crime.numbeo", fetchNumbeo(iso2, city))
+  const areaCode = await timed("crime.sdgArea", fetchSdgAreaCode(iso2))
+  const sdgPromise = areaCode == null ? null : fetchSdgSignals(iso2, areaCode)
 
+  const numbeo = await numbeoPromise
   const signals: SafetySignal[] = []
 
   if (numbeo) {
@@ -559,7 +571,14 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
     })
   }
 
-  if (areaCode == null) return signals
+  if (sdgPromise) signals.push(...(await sdgPromise))
+
+  return signals
+}
+
+/** The UN SDG victimisation/bribery survey series for a country, as signals. */
+async function fetchSdgSignals(iso2: string, areaCode: number): Promise<SafetySignal[]> {
+  const signals: SafetySignal[] = []
 
   const sdgDefs: Array<{
     indicator: string
@@ -617,8 +636,29 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
     },
   ]
 
-  const sdgHits = await Promise.all(
-    sdgDefs.map((d) => fetchSdgLatest(areaCode, d.indicator, d.seriesMatch))
+  // These are country-level survey statistics revised at most yearly, so they
+  // go through the same warm store as every other country stat: a value seen
+  // in the last week is served from disk and revalidated in the background.
+  // That matters here more than anywhere else — SDG 16.2.2 answers with the
+  // entire global dataset (~550KB, ~6.4s), and paying that on every report for
+  // a number that moves once a year was the single largest cost in the bundle.
+  //
+  // The wave is also bounded: one slow indicator must not hold the whole
+  // report hostage. On a country we've never seen, a straggler resolves to "no
+  // data" for that one report and is correct from the next one on, once the
+  // background revalidation has filled the store.
+  const sdgHits = await timed(
+    "crime.sdgData",
+    Promise.all(
+      sdgDefs.map((d) =>
+        withBudget(
+          resolveMetric(`${iso2}:${d.key}`, [
+            () => fetchSdgLatest(areaCode, d.indicator, d.seriesMatch),
+          ]),
+          SDG_BUDGET_MS
+        )
+      )
+    )
   )
 
   sdgDefs.forEach((d, i) => {
@@ -670,11 +710,13 @@ export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
   })
 
   const [defResults, comparisons, environment, crimeExtras, hazards] = await Promise.all([
-    Promise.all(defPromises),
-    fetchComparisons(iso2),
-    getEnvironment(geo),
-    fetchCrimeExtras(iso2, geo.city),
-    getHazards(geo),
+    timed("sig.metrics", Promise.all(defPromises)),
+    // comparison bars are context, not a scored signal — never let the World
+    // Bank's multi-country query (7s timeout, no retries) gate the report
+    timed("sig.comparisons", withBudget(fetchComparisons(iso2), 3_000).then((c) => c ?? [])),
+    timed("sig.environment", getEnvironment(geo)),
+    timed("sig.crimeExtras", fetchCrimeExtras(iso2, geo.city)),
+    timed("sig.hazards", getHazards(geo)),
   ])
 
   const signals: SafetySignal[] = []

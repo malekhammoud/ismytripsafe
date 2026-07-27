@@ -154,7 +154,7 @@ export default async function CountryHubPage({
       ? [
           reportArticleNode({
             meta: countryMeta,
-            headline: `Is ${hub.country} Safe? Travel Safety Report`,
+            headline: `Is ${hub.country} Safe in ${new Date(hub.updatedAt).getFullYear()}? Travel Safety Report`,
             description: capsule.slice(0, 300),
             image: countryReport.images.hero,
           }),

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { Logo } from "@/components/Logo"
+import { SiteFooter } from "@/components/SiteFooter"
 import type { ReportMeta } from "@/lib/reports"
 import type { SafetySignal } from "@/lib/types"
 import { LEVELS, scoreColor } from "@/lib/safety-display"
@@ -40,14 +41,20 @@ export function SiteHeader() {
       }}
     >
       <div className="mx-auto flex h-[54px] max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
-        <Link href="/" className="wordmark flex items-center gap-1.5 text-[0.95rem] text-[var(--ink)]">
-          <Logo size={16} />
-          IsMyTripSafe<span style={{ color: "var(--accent)" }}>.com</span>
+        <Link href="/" className="wordmark flex items-center gap-1.5 text-[0.95rem] text-[var(--navy)]">
+          <Logo size={17} />
+          <span>
+            IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
+          </span>
         </Link>
-        <nav className="flex items-center gap-4 text-[0.8rem] font-medium text-[var(--ink-soft)] sm:gap-5">
-          <Link href="/destinations" className="hover:text-[var(--accent)]">Destinations</Link>
-          <Link href="/methodology" className="hidden hover:text-[var(--accent)] sm:inline">Methodology</Link>
-          <Link href="/" className="btn px-3.5 py-1.5 text-[0.78rem]">Check a place</Link>
+        <nav className="flex items-center gap-4 whitespace-nowrap text-[0.8rem] font-medium text-[var(--ink-soft)] sm:gap-5">
+          <Link href="/destinations" className="hover:text-[var(--orange-deep)]">Destinations</Link>
+          <Link href="/how-it-works" className="hidden hover:text-[var(--orange-deep)] sm:inline">How it works</Link>
+          <Link href="/methodology" className="hidden hover:text-[var(--orange-deep)] sm:inline">Methodology</Link>
+          <Link href="/about" className="hidden hover:text-[var(--orange-deep)] sm:inline">About</Link>
+          <Link href="/" className="btn px-3.5 py-1.5 text-[0.78rem]">
+            Check<span className="hidden sm:inline"> a place</span>
+          </Link>
         </nav>
       </div>
     </header>
@@ -337,29 +344,10 @@ export function ReportLinkGrid({
   )
 }
 
-/** Shared bottom block: honest dates, methodology + about links, disclaimer. */
+/**
+ * Shared bottom block. Kept as a named export because every crawlable page
+ * already ends with it — the markup itself now lives in `SiteFooter`.
+ */
 export function SeoFooter({ updatedAt }: { updatedAt?: string | null }) {
-  return (
-    <footer className="mt-12 border-t border-[var(--hairline)] pt-5 pb-10 text-[0.78rem] leading-relaxed text-[var(--ink-faint)]">
-      {updatedAt && (
-        <p>
-          Data last updated{" "}
-          <time dateTime={updatedAt}>{humanDate(updatedAt)}</time>. Reports refresh as new
-          data arrives from the underlying sources.
-        </p>
-      )}
-      <p className="mt-2">
-        Every score is computed from named public sources — see{" "}
-        <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
-          how we score safety
-        </Link>{" "}
-        and{" "}
-        <Link href="/about" className="font-medium text-[var(--accent-deep)] hover:underline">
-          who runs IsMyTripSafe
-        </Link>
-        . Conditions change quickly; always check your government&apos;s current travel advisory
-        before departure. This is general information, not legal or medical advice.
-      </p>
-    </footer>
-  )
+  return <SiteFooter updatedAt={updatedAt} />
 }
