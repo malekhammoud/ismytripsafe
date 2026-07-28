@@ -256,6 +256,21 @@ function getModels(): string[] {
   return DEFAULT_MODELS
 }
 
+// Paid models, for when the free pool is spent. These bill per token instead of
+// drawing on the free daily allowance, so they are unaffected by the 429 that
+// takes the free tier out once a day.
+//
+// Gemini 2.5 Flash Lite is both the fastest thing measured on the real prompt
+// and among the cheapest: 0.6s to first token, whole report in 2.4s — quicker
+// than the free models it stands in for, and ~$0.0007 per report.
+const DEFAULT_PAID_MODELS = ["google/gemini-2.5-flash-lite"]
+
+function getPaidModels(): string[] {
+  const env = process.env.OPENROUTER_PAID_MODELS
+  if (env) return env.split(",").map((m) => m.trim()).filter(Boolean)
+  return DEFAULT_PAID_MODELS
+}
+
 /**
  * When OpenRouter's *daily* free-model allowance is gone, every model in the
  * chain returns 429 — so each request would spend three round-trips learning
@@ -469,8 +484,19 @@ async function* streamClaudeCli(
 }
 
 /**
- * Everything we can try, in order: the free models while they last, then the
- * local CLI. Each entry hands back a fresh stream of response text.
+ * Everything we can try, in order:
+ *
+ *   1. free OpenRouter models      — the normal path, costs nothing
+ *   2. cheap paid models           — when the free daily allowance is spent
+ *   3. the local Claude CLI        — last resort, when OpenRouter is unusable
+ *
+ * Tiers 2 and 3 are for people, not for bulk work: `allowFallback` is false for
+ * pregeneration and for background refreshes, so neither ever spends money on
+ * something a free model will happily do tomorrow.
+ *
+ * Tier 2 sits above tier 3 because it is both cheaper and far faster — 2.4s
+ * against 55-100s — so the CLI is genuinely a last resort rather than the
+ * first thing a visitor falls into.
  */
 function buildAttempts(
   apiKey: string | undefined,
@@ -481,15 +507,17 @@ function buildAttempts(
   allowFallback = true
 ): Array<{ label: string; stream: () => AsyncGenerator<string> }> {
   const attempts: Array<{ label: string; stream: () => AsyncGenerator<string> }> = []
-  if (apiKey && openRouterAvailable()) {
-    for (const model of getModels()) {
-      attempts.push({
-        label: model,
-        stream: () => streamModel(model, apiKey, system, user, deadline, maxTokens),
-      })
-    }
-  }
+  const openRouter = (model: string) => ({
+    label: model,
+    stream: () => streamModel(model, apiKey!, system, user, deadline, maxTokens),
+  })
+
+  if (apiKey && openRouterAvailable()) attempts.push(...getModels().map(openRouter))
+
   if (allowFallback) {
+    // Paid models bill per token rather than drawing on the free allowance, so
+    // the daily 429 that disables tier 1 does not apply to them.
+    if (apiKey) attempts.push(...getPaidModels().map(openRouter))
     attempts.push({ label: "claude-cli", stream: () => streamClaudeCli(system, user) })
   }
   return attempts
