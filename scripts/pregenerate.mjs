@@ -33,7 +33,12 @@ const flag = (name, fallback) => {
 const has = (name) => argv.includes(`--${name}`)
 
 const host = flag("host", process.env.NEXT_PUBLIC_SITE_URL || "https://ismytripsafe.com")
-const concurrency = Number(flag("concurrency", 2))
+// Concurrency 1 by default. Two parallel reports measured ~22 model calls/min
+// against the free tier's ~20/min ceiling, so ~5% of destinations came back
+// 429. Slowing down costs nothing real: the *daily* 800-call budget is the
+// binding constraint, and one worker still spends it in ~75 minutes. It also
+// leaves headroom for actual visitors, who share the same account limit.
+const concurrency = Number(flag("concurrency", 1))
 const limit = Number(flag("limit", 0)) || Infinity
 const maxTier = Number(flag("tier", 3))
 // Free-tier budget is ~1,000 model calls/day account-wide and each report costs
@@ -120,8 +125,11 @@ console.log(
 // connection-level failure is not a failure: wait for the app to come back and
 // try the same place again.
 
+/** The free tier's per-minute ceiling. "Try later", not "this place is broken". */
+const isRateLimited = (msg) => /\b429\b|rate.?limit|quota/i.test(msg ?? "")
+
 const isConnectionError = (err) =>
-  /fetch failed|ECONNREFUSED|ECONNRESET|socket hang up|other side closed|EAI_AGAIN/i.test(
+  /fetch failed|ECONNREFUSED|ECONNRESET|socket hang up|other side closed|EAI_AGAIN|terminated/i.test(
     err?.message ?? ""
   )
 
@@ -220,6 +228,13 @@ async function worker() {
     for (let attempt = 0; attempt < 3 && !stop; attempt++) {
       try {
         r = await generate(place, refresh)
+        if (r.error && isRateLimited(r.error) && attempt < 2) {
+          const backoffMs = 60_000 * (attempt + 1)
+          console.log(`${label} — rate limited, backing off ${backoffMs / 1000}s`)
+          await new Promise((res) => setTimeout(res, backoffMs))
+          r = null
+          continue
+        }
         lastErr = null
         break
       } catch (err) {
