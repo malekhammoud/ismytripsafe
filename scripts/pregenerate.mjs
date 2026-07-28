@@ -209,18 +209,30 @@ process.on("SIGINT", () => {
   stop = true
 })
 
-/** Block until the next UTC day when today's model budget is spent. */
+/**
+ * Block until the next UTC day when today's model budget is spent. The wait is
+ * chunked into hours so an interrupt is still responsive, but it announces
+ * itself once — a heartbeat every hour for 21 hours is noise that buries the
+ * events worth reading.
+ */
 async function awaitBudget() {
+  let announced = false
   for (;;) {
     const spent = state.spentByDay[today()] ?? 0
-    if (spent + CALLS_PER_REPORT <= dailyBudget) return true
+    if (spent + CALLS_PER_REPORT <= dailyBudget) {
+      if (announced) console.log(`\n  quota reset — resuming\n`)
+      return true
+    }
     const midnight = new Date()
     midnight.setUTCHours(24, 0, 0, 0)
     const waitMs = midnight - Date.now() + 60_000
-    console.log(
-      `\n  daily budget reached (${spent}/${dailyBudget} calls). ` +
-        `Sleeping ${(waitMs / 3600e3).toFixed(1)}h until the quota resets…\n`
-    )
+    if (!announced) {
+      console.log(
+        `\n  daily budget reached (${spent}/${dailyBudget} calls). ` +
+          `Sleeping ${(waitMs / 3600e3).toFixed(1)}h until the quota resets…\n`
+      )
+      announced = true
+    }
     await new Promise((r) => setTimeout(r, Math.min(waitMs, 3600e3)))
     if (stop) return false
   }
