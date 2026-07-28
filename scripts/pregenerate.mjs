@@ -74,7 +74,6 @@ if (has("repair")) {
 } else {
   work = buildDestinations({ maxTier })
 }
-work = work.slice(0, limit)
 
 // ── state ───────────────────────────────────────────────────────────
 function loadState() {
@@ -95,6 +94,9 @@ const today = () => new Date().toISOString().slice(0, 10)
 const state = loadState()
 const done = new Set(state.done)
 if (!has("repair")) work = work.filter((w) => !done.has(w.place))
+// --limit is applied *after* the resume filter, so it means "this many more
+// destinations", not "the first N of the list, minus whatever is done".
+work = work.slice(0, limit)
 
 if (has("dry-run")) {
   console.log(`${work.length} destinations (tier ≤ ${maxTier}), ~${work.length * CALLS_PER_REPORT} model calls`)
@@ -108,6 +110,40 @@ console.log(
     `  concurrency ${concurrency} · daily budget ${dailyBudget} model calls ` +
     `(~${Math.floor(dailyBudget / CALLS_PER_REPORT)} new reports/day)\n`
 )
+
+// ── surviving a deploy ──────────────────────────────────────────────
+// A push restarts the service mid-run. Worse, this script's own long-lived
+// SSE connections are what make that restart slow: systemd waits out the
+// in-flight streams, so the app is unreachable for the best part of a minute.
+// Treating that window as "these destinations failed" would burn a chunk of
+// the work-list every time someone deploys — and this run spans days. So a
+// connection-level failure is not a failure: wait for the app to come back and
+// try the same place again.
+
+const isConnectionError = (err) =>
+  /fetch failed|ECONNREFUSED|ECONNRESET|socket hang up|other side closed|EAI_AGAIN/i.test(
+    err?.message ?? ""
+  )
+
+async function waitForServer(maxWaitMs = 10 * 60_000) {
+  const until = Date.now() + maxWaitMs
+  let announced = false
+  while (Date.now() < until && !stop) {
+    try {
+      const res = await fetch(`${host}/`, { method: "HEAD" })
+      if (res.ok) {
+        if (announced) console.log("  …app is back, resuming")
+        return true
+      }
+    } catch {}
+    if (!announced) {
+      console.log("  app unreachable (deploy?) — waiting for it to come back…")
+      announced = true
+    }
+    await new Promise((r) => setTimeout(r, 5_000))
+  }
+  return false
+}
 
 // ── one report ──────────────────────────────────────────────────────
 async function generate(place, refresh) {
@@ -171,33 +207,49 @@ async function awaitBudget() {
   }
 }
 
-async function worker(id) {
+async function worker() {
   while (!stop) {
     const i = index++
     if (i >= work.length) return
     const { place, refresh } = work[i]
+    const label = `[${i + 1}/${work.length}] ${place}`
     if (!(await awaitBudget())) return
 
-    try {
-      const r = await generate(place, refresh)
-      if (r.error) {
-        failed++
-        console.log(`[${i + 1}/${work.length}] ${place} — error: ${r.error.slice(0, 80)}`)
-      } else if (r.cached) {
-        fromCache++
-        done.add(place)
-        console.log(`[${i + 1}/${work.length}] ${place} — already cached → ${r.outcome}`)
-      } else {
-        ok++
-        done.add(place)
-        state.spentByDay[today()] = (state.spentByDay[today()] ?? 0) + CALLS_PER_REPORT
-        console.log(
-          `[${i + 1}/${work.length}] ${place} — built in ${r.secs.toFixed(0)}s → ${r.outcome}`
-        )
+    let r = null
+    let lastErr = null
+    for (let attempt = 0; attempt < 3 && !stop; attempt++) {
+      try {
+        r = await generate(place, refresh)
+        lastErr = null
+        break
+      } catch (err) {
+        lastErr = err
+        // A real error (bad response, parse failure) is this place's problem —
+        // report it and move on. A connection error means the app is
+        // restarting: hold the place, wait, and try it again.
+        if (!isConnectionError(err)) break
+        if (!(await waitForServer())) break
       }
-    } catch (err) {
+    }
+
+    if (lastErr) {
       failed++
-      console.log(`[${i + 1}/${work.length}] ${place} — failed: ${err.message}`)
+      console.log(`${label} — failed: ${lastErr.message}`)
+    } else if (!r) {
+      failed++
+      console.log(`${label} — skipped`)
+    } else if (r.error) {
+      failed++
+      console.log(`${label} — error: ${r.error.slice(0, 80)}`)
+    } else if (r.cached) {
+      fromCache++
+      done.add(place)
+      console.log(`${label} — already cached \u2192 ${r.outcome}`)
+    } else {
+      ok++
+      done.add(place)
+      state.spentByDay[today()] = (state.spentByDay[today()] ?? 0) + CALLS_PER_REPORT
+      console.log(`${label} — built in ${r.secs.toFixed(0)}s \u2192 ${r.outcome}`)
     }
 
     state.done = [...done]
@@ -205,7 +257,7 @@ async function worker(id) {
   }
 }
 
-await Promise.all(Array.from({ length: concurrency }, (_, i) => worker(i)))
+await Promise.all(Array.from({ length: concurrency }, () => worker()))
 state.done = [...done]
 saveState(state)
 
