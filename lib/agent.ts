@@ -1,3 +1,5 @@
+import { spawn } from "child_process"
+import { tmpdir } from "os"
 import type { SafetyBundle, GeoPoint, StreamEvent, SafetyEnrichment } from "./types"
 import type { WikivoyageSafety } from "./data/wikivoyage"
 import { timeLog } from "./timing"
@@ -254,6 +256,37 @@ function getModels(): string[] {
   return DEFAULT_MODELS
 }
 
+/**
+ * When OpenRouter's *daily* free-model allowance is gone, every model in the
+ * chain returns 429 — so each request would spend three round-trips learning
+ * what the first one already told us. The 429 body carries the reset time;
+ * remember it and skip straight to the fallback until then.
+ */
+let openRouterBlockedUntil = 0
+
+function openRouterAvailable(): boolean {
+  return Date.now() >= openRouterBlockedUntil
+}
+
+/** Record a daily-quota 429 so the rest of the day doesn't re-discover it. */
+function noteRateLimit(body: string): void {
+  if (!/free-models-per-day|openrouter_free_tier_daily/i.test(body)) return
+  const reset = Number(body.match(/"X-RateLimit-Reset":"(\d+)"/)?.[1])
+  // Fall back to the next UTC midnight if the header isn't where we expect.
+  const until = Number.isFinite(reset) && reset > Date.now() ? reset : nextUtcMidnight()
+  if (until > openRouterBlockedUntil) {
+    openRouterBlockedUntil = until
+    const mins = Math.round((until - Date.now()) / 60_000)
+    console.log(`[agent] OpenRouter daily free quota exhausted; using fallback for ~${mins} min`)
+  }
+}
+
+function nextUtcMidnight(): number {
+  const d = new Date()
+  d.setUTCHours(24, 0, 0, 0)
+  return d.getTime()
+}
+
 /** Stream one OpenRouter completion, yielding accumulated content text. */
 async function* streamModel(
   model: string,
@@ -307,6 +340,7 @@ async function* streamModel(
     })
     if (!res.ok || !res.body) {
       const detail = await res.text().catch(() => "")
+      if (res.status === 429) noteRateLimit(detail)
       throw new Error(`OpenRouter ${res.status} for ${model}: ${detail.slice(0, 300)}`)
     }
 
@@ -347,6 +381,118 @@ async function* streamModel(
     clearTimeout(stallTimer)
     clearTimeout(noContentTimer)
   }
+}
+
+// ─── Local Claude CLI fallback ──────────────────────────────────────
+// The free-model pool runs out once a day. When it does, every remaining
+// request used to end at "Couldn't complete the check" — a visitor asking
+// whether a city is safe got an error page because of our supply problem.
+//
+// Claude Code is installed on this box, so it becomes the backstop: same
+// system prompt, same dossier, same START_SAFETY contract, so the output flows
+// through the identical parser and nothing downstream can tell the difference.
+// It needs no tools — the research dossier is already assembled in code and
+// passed in the prompt.
+//
+// This runs ONLY after every free model has failed, so it costs nothing on a
+// normal day. It is slower (~30s vs ~5s) and it is not free, which is exactly
+// the trade you want for "answer the visitor rather than show them an error".
+
+const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude"
+/** Cheapest capable model — this is a fallback, not the main path. */
+const CLAUDE_MODEL = process.env.CLAUDE_FALLBACK_MODEL || "haiku"
+const CLAUDE_TIMEOUT_MS = 120_000
+
+/**
+ * Run one prompt through the local Claude CLI, yielding its output. Shaped as
+ * a generator so it is interchangeable with `streamModel` — the CLI returns
+ * one complete response rather than a token stream, so this yields once.
+ */
+async function* streamClaudeCli(
+  system: string,
+  user: string
+): AsyncGenerator<string> {
+  const text = await new Promise<string>((resolve, reject) => {
+    const proc = spawn(
+      CLAUDE_BIN,
+      [
+        "-p",
+        "--output-format", "text",
+        "--model", CLAUDE_MODEL,
+        // This is a text-generation call: the dossier is already in the
+        // prompt and there is nothing here worth a tool. Lock them off so a
+        // travel-safety prompt can never reach the filesystem or the network.
+        "--strict-mcp-config",
+        "--mcp-config", '{"mcpServers":{}}',
+        "--disallowedTools",
+        "Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch", "WebFetch", "Task",
+        "--append-system-prompt", system,
+      ],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+        // Deliberately NOT the repo. Claude Code reads CLAUDE.md from its
+        // working directory, and this project's tells it to commit and deploy
+        // — instructions that have no business in the context of a prompt
+        // asking whether Lisbon is safe.
+        cwd: tmpdir(),
+        env: { ...process.env, PATH: process.env.PATH ?? "/usr/bin:/root/.local/bin" },
+      }
+    )
+
+    let out = ""
+    let err = ""
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL")
+      reject(new Error(`claude CLI timed out after ${CLAUDE_TIMEOUT_MS}ms`))
+    }, CLAUDE_TIMEOUT_MS)
+
+    proc.stdout.on("data", (d) => (out += d))
+    proc.stderr.on("data", (d) => (err += d))
+    proc.on("error", (e) => {
+      clearTimeout(timer)
+      reject(new Error(`claude CLI unavailable: ${e.message}`))
+    })
+    proc.on("close", (code) => {
+      clearTimeout(timer)
+      if (code !== 0) reject(new Error(`claude CLI exited ${code}: ${err.slice(0, 200)}`))
+      else if (!out.trim()) reject(new Error("claude CLI returned nothing"))
+      else resolve(out)
+    })
+
+    // The prompt goes over stdin — it carries the whole dossier and is far too
+    // big to be comfortable as an argv entry.
+    proc.stdin.write(user)
+    proc.stdin.end()
+  })
+
+  yield text
+}
+
+/**
+ * Everything we can try, in order: the free models while they last, then the
+ * local CLI. Each entry hands back a fresh stream of response text.
+ */
+function buildAttempts(
+  apiKey: string | undefined,
+  system: string,
+  user: string,
+  deadline: number,
+  maxTokens: number,
+  allowFallback = true
+): Array<{ label: string; stream: () => AsyncGenerator<string> }> {
+  const attempts: Array<{ label: string; stream: () => AsyncGenerator<string> }> = []
+  if (apiKey && openRouterAvailable()) {
+    for (const model of getModels()) {
+      attempts.push({
+        label: model,
+        stream: () => streamModel(model, apiKey, system, user, deadline, maxTokens),
+      })
+    }
+  }
+  if (allowFallback) {
+    attempts.push({ label: "claude-cli", stream: () => streamClaudeCli(system, user) })
+  }
+  return attempts
 }
 
 // ─── Output parsing (START_SAFETY block + prose) ────────────────────
@@ -444,13 +590,11 @@ export async function* runSafetyAgent(
   geo: GeoPoint,
   bundle: SafetyBundle,
   wikivoyage: WikivoyageSafety | null = null,
-  dossier: ResearchDossier = { headlines: [], webResults: [], extracts: [] }
+  dossier: ResearchDossier = { headlines: [], webResults: [], extracts: [] },
+  allowFallback = true
 ): AsyncGenerator<StreamEvent> {
+  // No key is no longer fatal — the local CLI can still answer.
   const apiKey = process.env.OPENROUTER_API_KEY
-  if (!apiKey) {
-    yield { type: "error", message: "OPENROUTER_API_KEY is not configured" }
-    return
-  }
 
   // The dossier is gathered by the route in parallel with the safety bundle
   // (see collectResearch) — by the time we get here it's already done.
@@ -461,8 +605,17 @@ export async function* runSafetyAgent(
   const deadline = Date.now() + LLM_DEADLINE_MS
   const errors: string[] = []
 
-  for (const model of getModels()) {
-    if (Date.now() > deadline - 5_000) break
+  for (const { label: model, stream } of buildAttempts(
+    apiKey,
+    SYSTEM_PROMPT,
+    userPrompt,
+    deadline,
+    1500,
+    allowFallback
+  )) {
+    // The CLI fallback runs on its own clock — don't let a spent OpenRouter
+    // deadline skip past the one provider that can still answer.
+    if (model !== "claude-cli" && Date.now() > deadline - 5_000) continue
 
     let accumulated = ""
     let enrichment: { data: SafetyEnrichment; proseOffset: number } | null = null
@@ -472,7 +625,7 @@ export async function* runSafetyAgent(
     let firstChunkAt = 0
 
     try {
-      for await (const chunk of streamModel(model, apiKey, SYSTEM_PROMPT, userPrompt, deadline)) {
+      for await (const chunk of stream()) {
         accumulated += chunk
         if (!firstChunkAt) {
           firstChunkAt = Date.now()
@@ -574,30 +727,29 @@ export async function generateMapZones(
   geo: GeoPoint,
   bundle: SafetyBundle,
   wikivoyage: WikivoyageSafety | null,
-  dossier: ResearchDossier
+  dossier: ResearchDossier,
+  allowFallback = true
 ): Promise<ZonesResult | null> {
   const apiKey = process.env.OPENROUTER_API_KEY
-  if (!apiKey) return null
-
   const userPrompt = buildPrompt(geo, bundle, wikivoyage, formatDossier(dossier, new Date()))
   const deadline = Date.now() + LLM_DEADLINE_MS
 
-  for (const model of getModels()) {
-    if (Date.now() > deadline - 5_000) break
+  for (const { label: model, stream } of buildAttempts(
+    apiKey,
+    ZONES_SYSTEM_PROMPT,
+    userPrompt,
+    deadline,
+    1200,
+    allowFallback
+  )) {
+    if (model !== "claude-cli" && Date.now() > deadline - 5_000) continue
     let accumulated = ""
     try {
-      for await (const chunk of streamModel(
-        model,
-        apiKey,
-        ZONES_SYSTEM_PROMPT,
-        userPrompt,
-        deadline,
-        1200
-      )) {
+      for await (const chunk of stream()) {
         accumulated += chunk
       }
     } catch {
-      // fall through to the next model
+      // fall through to the next provider
     }
 
     const hit = parseJsonBlock(stripThink(accumulated))

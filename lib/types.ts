@@ -203,6 +203,13 @@ export interface SafetyQuery {
   place: string
   placeGeo?: GeoPoint | null
   refresh?: boolean // bypass the cache and regenerate
+  /**
+   * Suppress the local Claude fallback (see lib/agent.ts). A person waiting on
+   * an answer gets it whatever the cost; bulk pregeneration does not — a batch
+   * that fell back for every one of ~800 remaining destinations would be an
+   * expensive way to do work that free models will happily do tomorrow.
+   */
+  noFallback?: boolean
 }
 
 export type StreamEvent =

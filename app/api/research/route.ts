@@ -135,7 +135,8 @@ export async function POST(request: Request) {
         // 4. AI safety enrichment — interpret the real signals, add local intel
         let enrichment: SafetyEnrichment | null = null
         let prose = ""
-        for await (const event of runSafetyAgent(geo, bundle, wikivoyage, dossier)) {
+        const allowFallback = !input.noFallback
+        for await (const event of runSafetyAgent(geo, bundle, wikivoyage, dossier, allowFallback)) {
           if (event.type === "enrichment") enrichment = event.data
           if (event.type === "text") prose += event.content
           if (event.type === "done") {
@@ -165,7 +166,7 @@ export async function POST(request: Request) {
           //    generated after the reader already has their report and merged
           //    into the cached record when they land.
           background.push(async () => {
-            const zones = await generateMapZones(geo, bundle, wikivoyage, dossier)
+            const zones = await generateMapZones(geo, bundle, wikivoyage, dossier, allowFallback)
             if (!zones) return
             await writeCache(key, {
               place: input.place,
@@ -203,7 +204,13 @@ export async function POST(request: Request) {
   })
 }
 
-/** Full cold rebuild of a stale report, run in the background. */
+/**
+ * Full cold rebuild of a stale report, run in the background.
+ *
+ * No paid fallback here: the reader was already served the stored copy
+ * instantly, so nobody is waiting on this. If the free models are spent, the
+ * refresh can happen tomorrow rather than cost money tonight.
+ */
 async function rebuild(geo: GeoPoint, key: string, place: string): Promise<void> {
   const researchPromise = collectResearch(geo)
   const [bundle, wikivoyage] = await Promise.all([
@@ -214,14 +221,14 @@ async function rebuild(geo: GeoPoint, key: string, place: string): Promise<void>
 
   let enrichment: SafetyEnrichment | null = null
   let prose = ""
-  for await (const event of runSafetyAgent(geo, bundle, wikivoyage, dossier)) {
+  for await (const event of runSafetyAgent(geo, bundle, wikivoyage, dossier, false)) {
     if (event.type === "enrichment") enrichment = event.data
     if (event.type === "text") prose += event.content
     if (event.type === "done" || event.type === "error") break
   }
   if (!enrichment) return
 
-  const zones = await generateMapZones(geo, bundle, wikivoyage, dossier)
+  const zones = await generateMapZones(geo, bundle, wikivoyage, dossier, false)
   await writeCache(key, {
     place,
     geo,

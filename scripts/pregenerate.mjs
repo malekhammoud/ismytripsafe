@@ -163,7 +163,10 @@ async function generate(place, refresh) {
   const res = await fetch(`${host}/api/research`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(refresh ? { place, refresh: true } : { place }),
+    // noFallback: bulk generation never reaches for the paid local fallback.
+    // A person waiting on an answer is worth it; 800 queued destinations are
+    // not, when free models will do the same work tomorrow for nothing.
+    body: JSON.stringify({ place, noFallback: true, ...(refresh ? { refresh: true } : {}) }),
   })
   if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
 
