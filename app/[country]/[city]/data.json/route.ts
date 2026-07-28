@@ -111,6 +111,12 @@ export async function GET(
       headers: {
         "Cache-Control": "public, max-age=3600",
         "Access-Control-Allow-Origin": "*",
+        // Linked from every report as the Dataset DataDownload, so crawlers
+        // find it — but it is the same facts as the page it hangs off, with no
+        // canonical of its own to point home. Left indexable it reads as a
+        // duplicate of the report. Humans, researchers and agents can still
+        // fetch it; it just doesn't compete with the page in search.
+        "X-Robots-Tag": "noindex, follow",
       },
     }
   )

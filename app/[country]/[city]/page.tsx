@@ -302,8 +302,13 @@ export default async function CityReportPage({
                   Who&apos;s travelling changes which risks matter. These re-weight {meta.city}&apos;s
                   category data for common trip types — same data, different emphasis. Run your own
                   profile from the{" "}
+                  {/* rel=nofollow: /?place=… renders the landing page, which
+                      canonicalises to "/" — a crawlable link to it from every
+                      report just spends crawl budget re-discovering the home
+                      page. People can still click it. */}
                   <Link
                     href={`/?place=${encodeURIComponent(`${meta.city}, ${meta.country}`)}`}
+                    rel="nofollow"
                     className="font-medium text-[var(--accent-deep)] hover:underline"
                   >
                     interactive checker
