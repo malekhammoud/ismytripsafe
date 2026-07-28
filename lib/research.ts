@@ -196,16 +196,23 @@ export function buildQueryPlan(geo: GeoPoint) {
   const monthYear = now.toLocaleDateString("en-US", { month: "long", year: "numeric" })
   const year = String(now.getFullYear())
   const city = geo.city
+  // EVERY query names the country. City names are not unique: a bare
+  // "Lima crime" search returned stories from Lima, Ohio, and the model
+  // dutifully cited them as recent incidents in Lima, Peru — a fabricated-
+  // looking report built from real articles about the wrong place. The
+  // destination list alone contains London (Canada), Valencia (Venezuela),
+  // Tripoli (Lebanon), Córdoba (Argentina) and Newcastle (Australia).
+  const where = `${city} ${geo.country}`
   return {
     news: [
       `"${city}" ${geo.country} safety tourists`,
-      `"${city}" crime OR robbery OR protest OR unrest`,
+      `"${city}" ${geo.country} crime OR robbery OR protest OR unrest`,
     ],
     web: [
-      `${city} ${geo.country} safe for tourists ${monthYear}`,
-      `${city} neighborhoods to avoid safe areas`,
-      `${city} tourist scams pickpocketing`,
-      `${city} is it safe reddit ${year}`,
+      `${where} safe for tourists ${monthYear}`,
+      `${where} neighborhoods to avoid safe areas`,
+      `${where} tourist scams pickpocketing`,
+      `${where} is it safe reddit ${year}`,
     ],
   }
 }
