@@ -47,6 +47,10 @@ const maxTier = Number(flag("tier", 3))
 const dailyBudget = Number(flag("daily-budget", 800))
 const stateFile = flag("state", "/var/lib/ismytripsafe/pregenerate-state.json")
 const cacheDir = process.env.REPORT_CACHE_DIR || "/var/lib/ismytripsafe/reports"
+// A floor, not a fact: a report costs one call if the primary model answers,
+// but the agent falls through a chain of three on failure and the district pass
+// does the same, so a bad run can cost six. The budget is deliberately
+// conservative because of that, and RATE_LIMIT_GIVE_UP is the real backstop.
 const CALLS_PER_REPORT = 2
 
 const fileArg = argv.find((a) => !a.startsWith("--") && /\.(txt|list)$/.test(a))
@@ -187,6 +191,13 @@ async function generate(place, refresh) {
 }
 
 // ── run ─────────────────────────────────────────────────────────────
+// Consecutive rate limits mean the account's daily free-model allowance is
+// gone, not that we are going too fast — backing off harder just grinds
+// through the work-list turning destinations into failures. Stand down and
+// let the budget gate pick things up after the quota resets.
+const RATE_LIMIT_GIVE_UP = 4
+let consecutiveRateLimits = 0
+
 let ok = 0
 let fromCache = 0
 let failed = 0
@@ -228,12 +239,27 @@ async function worker() {
     for (let attempt = 0; attempt < 3 && !stop; attempt++) {
       try {
         r = await generate(place, refresh)
-        if (r.error && isRateLimited(r.error) && attempt < 2) {
-          const backoffMs = 60_000 * (attempt + 1)
-          console.log(`${label} — rate limited, backing off ${backoffMs / 1000}s`)
-          await new Promise((res) => setTimeout(res, backoffMs))
-          r = null
-          continue
+        if (r.error && isRateLimited(r.error)) {
+          consecutiveRateLimits++
+          if (consecutiveRateLimits >= RATE_LIMIT_GIVE_UP) {
+            console.log(
+              `${label} — rate limited ${consecutiveRateLimits}x in a row; ` +
+                `today's free-model allowance looks spent. Standing down until it resets.`
+            )
+            state.spentByDay[today()] = dailyBudget // trips awaitBudget's sleep
+            saveState(state)
+            r = null
+            break
+          }
+          if (attempt < 2) {
+            const backoffMs = 60_000 * (attempt + 1)
+            console.log(`${label} — rate limited, backing off ${backoffMs / 1000}s`)
+            await new Promise((res) => setTimeout(res, backoffMs))
+            r = null
+            continue
+          }
+        } else if (r.error == null) {
+          consecutiveRateLimits = 0
         }
         lastErr = null
         break
