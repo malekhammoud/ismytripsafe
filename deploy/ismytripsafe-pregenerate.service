@@ -1,0 +1,48 @@
+# Batch report generation, as a service.
+#
+# The run spans days: it spends the free-model allowance, sleeps until the
+# quota resets, and picks up where it left off. Started by hand with nohup it
+# died twice — once when the terminal session ended, once on a reboot — and
+# each time it sat idle until someone noticed. systemd owns it instead.
+#
+# Safe to start, stop and restart at any point: completed destinations are
+# journaled to /var/lib/ismytripsafe/pregenerate-state.json, and anything
+# already cached replays from disk for free, so restarting is the resume path.
+#
+# Install:
+#   cp deploy/ismytripsafe-pregenerate.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now ismytripsafe-pregenerate
+# Watch:
+#   tail -f /var/log/ismytripsafe-pregenerate.log
+# Stop for good once the list is done:
+#   systemctl disable --now ismytripsafe-pregenerate
+
+[Unit]
+Description=IsMyTripSafe batch report generation
+# The app has to be up to answer, though the script also waits for it — that
+# is what carries it through a deploy restart mid-run.
+After=network-online.target ismytripsafe.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/ismytripsafe
+Environment=NODE_ENV=production
+Environment=HOME=/root
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/bin
+
+# Talk to the app directly: nginx rate-limits /api/research to 10 req/min with
+# two concurrent connections, which would throttle this into 429s. Pacing is
+# the script's job (one worker, daily budget), not the proxy's.
+ExecStart=/usr/bin/node scripts/pregenerate.mjs --host http://127.0.0.1:3000 --daily-budget 800
+
+# The script exits 0 when the work-list is finished, so on-failure means a
+# crash gets retried but a completed run stays finished.
+Restart=on-failure
+RestartSec=60
+
+StandardOutput=append:/var/log/ismytripsafe-pregenerate.log
+StandardError=append:/var/log/ismytripsafe-pregenerate.log
+
+[Install]
+WantedBy=multi-user.target
