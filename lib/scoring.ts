@@ -54,6 +54,28 @@ export function band(value: number, points: [number, number][]): number {
   return last[1]
 }
 
+/**
+ * Numbeo's "worries" and "problems" rows: 0–100 where higher is worse. The
+ * curve is deliberately not a straight `100 - v`. These are perception
+ * questions with self-selected samples, so the extremes are softer than they
+ * look — a city at 90 is genuinely troubled, but a city at 5 has mostly told
+ * us its respondents are relaxed, not that it is measurably flawless.
+ */
+function invertedConcern(v: number): number {
+  return band(v, [
+    [5, 96],
+    [15, 90],
+    [25, 80],
+    [35, 70],
+    [45, 59],
+    [55, 48],
+    [65, 36],
+    [75, 24],
+    [85, 13],
+    [100, 3],
+  ])
+}
+
 // ─── Per-signal bands ────────────────────────────────────────────────
 //
 // Every band reaches a true 0 and a true 100 where the underlying reality
@@ -202,6 +224,58 @@ export const SIGNAL_BANDS: Record<string, (v: number) => number> = {
       [65, 0],
     ]),
 
+  // NOTE: urban scale (population) is deliberately NOT scored. It was tried as
+  // a universal city-level input — Numbeo covers only ~7% of the places we
+  // publish, so the long tail has nothing city-specific — and it made the
+  // score worse. Population says "2 million people" identically for a safe
+  // metro and a dangerous one, so it pulled everything toward the middle:
+  // Brazzaville rose 13 points and Algiers 12, on no evidence about either.
+  // Buying separation for a few cities by adding noise to the rest is a bad
+  // trade. It is still gathered and shown as context, just not scored.
+
+  // ── City-level survey signals ──────────────────────────────────────
+  // Everything else scored here is a national statistic, so these are the only
+  // inputs that can separate two cities in one country. Munich and Berlin
+  // score 16.9 and 48.2 on Numbeo's crime index while the published index put
+  // them one point apart, because these were not being read.
+  //
+  // "Safety walking alone" is already 0–100 with higher = safer, which is our
+  // scale exactly, so it maps close to one-to-one — only gently compressed at
+  // the top, because a crowdsourced 95 is not the same evidence as a measured
+  // homicide rate of 0.3.
+  // Calibrated against Numbeo's own labels rather than mapped one-to-one.
+  // Numbeo calls 72 "High" and 88 "Very High" — a city where people are
+  // comfortable walking alone at night is a safe city, and scoring 72 as 72
+  // would drag it below what its homicide rate alone already earns. Mapped
+  // naively, every city on the site lost 7-24 points purely because
+  // perception numbers sit lower than statistic-derived ones.
+  //   Numbeo band:  Very Low <20 · Low 20-40 · Moderate 40-60 · High 60-80 · Very High 80+
+  numbeo_safety_night: (v) =>
+    band(v, [
+      [10, 12],
+      [25, 32],
+      [40, 52],
+      [55, 70],
+      [70, 85],
+      [85, 94],
+      [100, 99],
+    ]),
+  numbeo_safety_day: (v) =>
+    band(v, [
+      [20, 20],
+      [40, 45],
+      [55, 62],
+      [70, 78],
+      [85, 91],
+      [100, 99],
+    ]),
+
+  // Worry/problem rows run the other way: 0–100 where higher = worse.
+  numbeo_worry_mugged: (v) => invertedConcern(v),
+  numbeo_violent_crime: (v) => invertedConcern(v),
+  numbeo_property_crime: (v) => invertedConcern(v),
+  numbeo_drugs: (v) => invertedConcern(v),
+
   // Numbeo's crowdsourced crime index (0–100, higher = more crime). Sample
   // sizes are thin and self-selected, so it is compressed toward the middle
   // rather than mapped one-to-one as it was before.
@@ -291,20 +365,42 @@ export interface PillarDef {
 
 export const PILLARS: PillarDef[] = [
   {
+    // Crime is where a city can genuinely differ from its country, so it is
+    // also where city-level evidence earns most of the weight.
+    //
+    // This pillar used to be 88% national statistics, which is why every
+    // German city landed on 87-88 and every Thai city on 68: the only
+    // city-level input was numbeo_crime_index at 0.12, worth ~3.6% of the
+    // published score. Munich and Berlin differ by 31 points on that very
+    // index and by 23 on how safe people feel walking at night.
+    //
+    // City signals now carry 0.55 of the pillar. When Numbeo has no page for a
+    // place — smaller towns, most of the long tail — they resolve to null and
+    // the pillar renormalises onto the national statistics, which is the old
+    // behaviour. So this sharpens the cities we have evidence for without
+    // inventing precision for the ones we don't.
     key: "crime",
     label: "Crime",
     weight: 0.3,
     core: true,
     signals: {
-      homicide: 0.34,
-      safe_walking_dark: 0.16,
-      violence_victimization: 0.13,
-      numbeo_crime_index: 0.12,
-      sexual_violence: 0.09,
-      bribery_contact_rate: 0.06,
-      human_trafficking_victims: 0.04,
-      firm_crime_losses: 0.03,
-      crime_major_constraint: 0.03,
+      // ── city-level (0.55) ──
+      numbeo_safety_night: 0.16,
+      numbeo_crime_index: 0.11,
+      numbeo_violent_crime: 0.10,
+      numbeo_worry_mugged: 0.08,
+      numbeo_property_crime: 0.05,
+      numbeo_safety_day: 0.03,
+      numbeo_drugs: 0.02,
+      // ── national (0.45) ──
+      homicide: 0.20,
+      safe_walking_dark: 0.08,
+      violence_victimization: 0.07,
+      sexual_violence: 0.05,
+      bribery_contact_rate: 0.03,
+      human_trafficking_victims: 0.01,
+      firm_crime_losses: 0.005,
+      crime_major_constraint: 0.005,
     },
   },
   {

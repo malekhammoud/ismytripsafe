@@ -3,7 +3,7 @@ import { runSafetyAgent, collectResearch, generateMapZones } from "@/lib/agent"
 import { timeLog } from "@/lib/timing"
 import { geocode, gatherSafety } from "@/lib/data"
 import { getWikivoyageSafety } from "@/lib/data/wikivoyage"
-import { cacheKey, readCache, readStale, writeCache } from "@/lib/cache"
+import { cacheKey, readCache, readCacheAnyAge, readStale, writeCache } from "@/lib/cache"
 import { pathForGeo } from "@/lib/reports"
 import { pingIndexNow } from "@/lib/seo/indexnow"
 import type { SafetyQuery, StreamEvent, SafetyEnrichment, GeoPoint } from "@/lib/types"
@@ -61,9 +61,63 @@ export async function POST(request: Request) {
           return
         }
 
+        const key = cacheKey(geo)
+
+        // 1a. Rescore: re-gather the databases and recompute, keeping the
+        //     stored field research and briefing. After a scoring change the
+        //     narrative is still true — only the numbers behind it moved — so
+        //     there is no reason to pay a model to write it again.
+        if (input.rescore) {
+          const prior = await readCacheAnyAge(key)
+          if (!prior) {
+            send({ type: "error", message: `No stored report for ${input.place} to rescore.` })
+            return
+          }
+          const [bundle, wikivoyage] = await Promise.all([
+            gatherSafety(geo),
+            getWikivoyageSafety(geo).catch(() => null),
+          ])
+          void wikivoyage
+
+          // Refuse to overwrite a good report with a worse-informed one. A
+          // rescore re-fetches ~20 upstream sources; when one of them flakes,
+          // the affected pillar is imputed from a pessimistic prior and the
+          // score swings hard. Seen in testing: a failed World Bank governance
+          // fetch put Munich below Berlin on identical national data. Losing a
+          // rescore is nothing — losing the stored report to a transient
+          // network error is real.
+          const priorImputed = (prior.bundle.safety.pillars ?? []).filter((p) => p.imputed).length
+          const freshImputed = (bundle.safety.pillars ?? []).filter((p) => p.imputed).length
+          if (freshImputed > priorImputed) {
+            send({
+              type: "error",
+              message:
+                `Rescore skipped for ${prior.place}: ${freshImputed} pillar(s) came back ` +
+                `without data (was ${priorImputed}). Keeping the stored report.`,
+            })
+            return
+          }
+
+          send({ type: "geo", place: geo })
+          send({ type: "safety", bundle })
+          send({ type: "enrichment", data: prior.enrichment })
+          if (prior.prose) send({ type: "text", content: prior.prose })
+          await writeCache(key, {
+            place: prior.place,
+            geo,
+            images: bundle.images.hero || bundle.images.gallery.length ? bundle.images : prior.images,
+            bundle,
+            enrichment: prior.enrichment,
+            prose: prior.prose,
+            // Keep the original publish date; the research did not change.
+            cachedAt: prior.cachedAt,
+          })
+          send({ type: "done", cached: false, path: pathForGeo(geo) })
+          return
+        }
+
         // 1b. Cache: if this place's report was built recently, replay it
         //     instantly — no databases, no model run.
-        const key = cacheKey(geo)
         if (!input.refresh) {
           const hit = await readCache(key)
           if (hit) {

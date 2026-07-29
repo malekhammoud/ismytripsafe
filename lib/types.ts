@@ -210,6 +210,13 @@ export interface SafetyQuery {
    * expensive way to do work that free models will happily do tomorrow.
    */
   noFallback?: boolean
+  /**
+   * Re-gather the databases and recompute the score, keeping the existing
+   * field research and briefing. Used after a scoring change: the narrative is
+   * still accurate, only the numbers behind it moved, so there is no reason to
+   * pay a model to write it again. Costs zero model calls.
+   */
+  rescore?: boolean
 }
 
 export type StreamEvent =

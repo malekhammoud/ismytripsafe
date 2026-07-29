@@ -71,8 +71,23 @@ function repairList() {
   return out
 }
 
+/** Every stored report, for re-running the scoring over what already exists. */
+function rescoreList() {
+  const out = []
+  for (const name of readdirSync(cacheDir)) {
+    if (!name.endsWith(".json") || name.includes(".tmp")) continue
+    try {
+      const d = JSON.parse(readFileSync(`${cacheDir}/${name}`, "utf8"))
+      out.push({ place: `${d.geo.city}, ${d.geo.country}`, tier: 0, rescore: true })
+    } catch {}
+  }
+  return out
+}
+
 let work
-if (has("repair")) {
+if (has("rescore")) {
+  work = rescoreList()
+} else if (has("repair")) {
   work = repairList()
 } else if (fileArg) {
   work = readFileSync(fileArg, "utf8")
@@ -102,7 +117,9 @@ const today = () => new Date().toISOString().slice(0, 10)
 
 const state = loadState()
 const done = new Set(state.done)
-if (!has("repair")) work = work.filter((w) => !done.has(w.place))
+// Repair and rescore pass over reports that are already done by definition, so
+// the resume filter would empty them out.
+if (!has("repair") && !has("rescore")) work = work.filter((w) => !done.has(w.place))
 // --limit is applied *after* the resume filter, so it means "this many more
 // destinations", not "the first N of the list, minus whatever is done".
 work = work.slice(0, limit)
@@ -158,7 +175,7 @@ async function waitForServer(maxWaitMs = 10 * 60_000) {
 }
 
 // ── one report ──────────────────────────────────────────────────────
-async function generate(place, refresh) {
+async function generate(place, refresh, rescore) {
   const started = Date.now()
   const res = await fetch(`${host}/api/research`, {
     method: "POST",
@@ -166,7 +183,11 @@ async function generate(place, refresh) {
     // noFallback: bulk generation never reaches for the paid local fallback.
     // A person waiting on an answer is worth it; 800 queued destinations are
     // not, when free models will do the same work tomorrow for nothing.
-    body: JSON.stringify({ place, noFallback: true, ...(refresh ? { refresh: true } : {}) }),
+    body: JSON.stringify({
+      place,
+      noFallback: true,
+      ...(rescore ? { rescore: true } : refresh ? { refresh: true } : {}),
+    }),
   })
   if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
 
@@ -245,15 +266,17 @@ async function worker() {
   while (!stop) {
     const i = index++
     if (i >= work.length) return
-    const { place, refresh } = work[i]
+    const { place, refresh, rescore } = work[i]
     const label = `[${i + 1}/${work.length}] ${place}`
-    if (!(await awaitBudget())) return
+    // A rescore re-reads databases and recomputes; it never calls a model, so
+    // it neither waits on the daily budget nor spends from it.
+    if (!rescore && !(await awaitBudget())) return
 
     let r = null
     let lastErr = null
     for (let attempt = 0; attempt < 3 && !stop; attempt++) {
       try {
-        r = await generate(place, refresh)
+        r = await generate(place, refresh, rescore)
         if (r.error && isRateLimited(r.error)) {
           consecutiveRateLimits++
           if (consecutiveRateLimits >= RATE_LIMIT_GIVE_UP) {
@@ -304,7 +327,7 @@ async function worker() {
     } else {
       ok++
       done.add(place)
-      state.spentByDay[today()] = (state.spentByDay[today()] ?? 0) + CALLS_PER_REPORT
+      if (!rescore) state.spentByDay[today()] = (state.spentByDay[today()] ?? 0) + CALLS_PER_REPORT
       console.log(`${label} — built in ${r.secs.toFixed(0)}s \u2192 ${r.outcome}`)
     }
 

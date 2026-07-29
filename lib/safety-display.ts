@@ -355,13 +355,23 @@ export function computeCategories(
       section: "sec-crime",
       tier: 1,
       signalKeys: [
+        // City-level first — these are the ones that describe this place
+        // rather than its country, and they now carry most of the pillar.
+        "numbeo_safety_night",
+        "numbeo_safety_day",
+        "numbeo_worry_mugged",
+        "numbeo_violent_crime",
+        "numbeo_property_crime",
+        "numbeo_drugs",
+        "numbeo_crime_index",
+        "city_scale",
+        // National statistics.
         "homicide",
         "safe_walking_dark",
         "violence_victimization",
         "sexual_violence",
         "human_trafficking_victims",
         "bribery_contact_rate",
-        "numbeo_crime_index",
         "firm_crime_losses",
         "crime_major_constraint",
       ],

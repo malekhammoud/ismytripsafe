@@ -466,6 +466,25 @@ interface NumbeoHit {
   crimeIndex: number
   safetyIndex: number
   scope: "city" | "country"
+  /**
+   * The city-level detail panel. Every other scored signal in this file is a
+   * national statistic, which is why cities in one country used to land within
+   * a couple of points of each other — Munich and Berlin both scored 87-88
+   * while Numbeo rated their crime 16.9 and 48.2. These are the numbers that
+   * tell those two apart, and they only exist for city pages.
+   */
+  detail?: NumbeoDetail
+}
+
+interface NumbeoDetail {
+  /** 0–100, higher = safer. Already on our scale, no banding needed. */
+  safetyNight?: number
+  safetyDay?: number
+  /** 0–100, higher = worse. */
+  worryMugged?: number
+  problemViolentCrime?: number
+  problemPropertyCrime?: number
+  problemDrugs?: number
 }
 
 /** City-level Numbeo crime page — the finest-grained crime read we have. */
@@ -491,7 +510,29 @@ async function fetchNumbeoCity(city: string): Promise<NumbeoHit | null> {
     if (!Number.isFinite(crimeIndex) || !Number.isFinite(safetyIndex)) return null
     // The page renders zeros when a city has too few contributors.
     if (crimeIndex === 0 && safetyIndex === 0) return null
-    return { crimeIndex, safetyIndex, scope: "city" }
+
+    // The same page carries a breakdown that is far more useful to a traveller
+    // than the headline index: how safe people feel walking alone at night,
+    // and how much they worry about being mugged. Rows read
+    // "<label> <value> <band>", e.g. "Safety walking alone during night 72.17 High".
+    const row = (label: string): number | undefined => {
+      const m = html.match(
+        new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+([0-9]+(?:\\.[0-9]+)?)", "i")
+      )
+      const v = m ? Number(m[1]) : NaN
+      return Number.isFinite(v) ? v : undefined
+    }
+    const detail: NumbeoDetail = {
+      safetyNight: row("Safety walking alone during night"),
+      safetyDay: row("Safety walking alone during daylight"),
+      worryMugged: row("Worries being mugged or robbed"),
+      problemViolentCrime: row("Problem violent crimes such as assault and armed robbery"),
+      problemPropertyCrime: row("Problem property crimes such as vandalism and theft"),
+      problemDrugs: row("Problem people using or dealing drugs"),
+    }
+    const hasDetail = Object.values(detail).some((v) => v != null)
+
+    return { crimeIndex, safetyIndex, scope: "city", ...(hasDetail ? { detail } : {}) }
   } catch {
     return null
   }
@@ -569,6 +610,51 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
       lowerIsBetter: true,
       note: `${scopeNote} Higher index = more perceived crime. Self-selected samples, so it is weighted below the recorded-crime statistics.`,
     })
+
+    // The city-level breakdown. These are the only signals in the whole set
+    // that describe *this city* rather than its country, so they carry the
+    // weight that separates one city from another (see PILLARS in scoring.ts).
+    const d = numbeo.detail
+    if (d) {
+      const cityNote = (what: string) =>
+        `${what} in ${city} itself, from Numbeo's resident survey. City-level — this is what distinguishes ${city} from elsewhere in ${englishCountryName(iso2) ?? "the country"}.`
+
+      const add = (
+        key: string,
+        label: string,
+        value: number | undefined,
+        lowerIsBetter: boolean,
+        fmt: (v: number) => string,
+        what: string
+      ) => {
+        if (value == null) return
+        signals.push({
+          key,
+          label,
+          group: "Violent crime",
+          source: "Numbeo (city survey)",
+          value,
+          display: fmt(value),
+          year: null,
+          score: scoreFor(key, value),
+          lowerIsBetter,
+          note: cityNote(what),
+        })
+      }
+
+      add("numbeo_safety_night", "Feeling safe walking alone at night", d.safetyNight, false,
+        (v) => `${v.toFixed(0)} / 100`, "How safe residents feel walking alone after dark")
+      add("numbeo_safety_day", "Feeling safe walking alone in daylight", d.safetyDay, false,
+        (v) => `${v.toFixed(0)} / 100`, "How safe residents feel walking alone by day")
+      add("numbeo_worry_mugged", "Worry about being mugged or robbed", d.worryMugged, true,
+        (v) => `${v.toFixed(0)} / 100`, "How much residents worry about mugging and robbery")
+      add("numbeo_violent_crime", "Violent crime as a local problem", d.problemViolentCrime, true,
+        (v) => `${v.toFixed(0)} / 100`, "How much of a problem assault and armed robbery are")
+      add("numbeo_property_crime", "Property crime as a local problem", d.problemPropertyCrime, true,
+        (v) => `${v.toFixed(0)} / 100`, "How much of a problem vandalism and theft are")
+      add("numbeo_drugs", "Drug dealing or use as a local problem", d.problemDrugs, true,
+        (v) => `${v.toFixed(0)} / 100`, "How visible drug use and dealing are")
+    }
   }
 
   if (sdgPromise) signals.push(...(await sdgPromise))
@@ -740,6 +826,32 @@ export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
       note: d.note,
     })
   })
+
+  // Urban scale — the one city-level input available for nearly every place.
+  // Numbeo has pages for major cities only, so without this the long tail of
+  // secondary cities carries no city-specific evidence at all and simply
+  // inherits its country's score.
+  if (geo.population && geo.population > 0) {
+    const p = geo.population
+    const pretty =
+      p >= 1_000_000 ? `${(p / 1_000_000).toFixed(1)}M` : `${Math.round(p / 1000)}k`
+    signals.push({
+      key: "city_scale",
+      label: "Urban scale",
+      group: "Violent crime",
+      source: "Open-Meteo Geocoding",
+      value: p,
+      display: `${pretty} residents`,
+      year: null,
+      // Context, not a scored signal. Tried as one and it made the index
+      // worse: population reads the same for a safe metro and a dangerous one,
+      // so it dragged every un-surveyed city toward the middle. See the note
+      // in lib/scoring.ts.
+      score: null,
+      lowerIsBetter: true,
+      note: `${geo.city} has about ${pretty} residents. Shown for context — bigger cities generally expose visitors to more pickpocketing and opportunistic theft — but population alone says nothing about how safe a particular city is, so it does not feed the score.`,
+    })
+  }
 
   signals.push(...crimeExtras)
 
