@@ -95,7 +95,12 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
           advisory before departure. This is general information, not legal, medical or security
           advice.
         </p>
-        <p className="mt-2.5">© {year} IsMyTripSafe. Founded 2026.</p>
+        <p className="mt-2.5">
+          © {year} IsMyTripSafe. Founded 2026. ·{" "}
+          <Link href="/disclaimer" className="hover:text-[var(--accent-deep)] hover:underline">
+            Disclaimer
+          </Link>
+        </p>
       </div>
     </footer>
   )
