@@ -4,17 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { feature } from "topojson-client"
-import {
-  AmbientLight,
-  BufferGeometry,
-  Color,
-  DirectionalLight,
-  DoubleSide,
-  Float32BufferAttribute,
-  Mesh,
-  MeshBasicMaterial,
-  MeshPhongMaterial,
-} from "three"
+import { AmbientLight, Color, DirectionalLight, MeshPhongMaterial } from "three"
 import type { Topology, GeometryCollection } from "topojson-specification"
 import { Search, X, Pause, Play, Compass, Maximize2, Crosshair } from "lucide-react"
 import type { GlobeCountry, GlobePayload, GlobePoint } from "@/lib/globe-data"
@@ -70,24 +60,20 @@ const MAX_LABELS = 22
 /**
  * The layer stack, as altitudes above the sphere (1.0 = one globe radius).
  *
- * Order matters and it is only enforced by these numbers, so they live
- * together rather than scattered through the render props. City data sits on
- * top of country data by design: a country tint is an average, and the whole
- * point of the city layer is to show where a place departs from it.
+ * Order matters and is only enforced by these numbers, so they live together
+ * rather than scattered through the render props.
  *
  *   sea            0
- *   country fill   ALT_COUNTRY          ← the average
+ *   country fill   ALT_COUNTRY          ← score by country
  *   country lifted ALT_COUNTRY_ACTIVE   ← hover / selected
- *   city patches   ALT_PATCH            ← the exception to the average
  *   city labels    ALT_LABEL            ← always readable, never buried
  *
- * The gaps are deliberately small. Earlier the lifted country rose to 0.09
- * — nine units on a globe of radius 100 — which put it clean over the city
- * patches and hid exactly the cities you had just clicked in to look at.
+ * The lifted country stays below the labels. It used to rise to 0.09 — nine
+ * units on a globe of radius 100 — which swallowed anything drawn near the
+ * surface around it.
  */
 const ALT_COUNTRY = 0.01
-const ALT_COUNTRY_ACTIVE = 0.019
-const ALT_PATCH = 0.027
+const ALT_COUNTRY_ACTIVE = 0.028
 const ALT_LABEL = 0.034
 
 const LEGEND = [
@@ -135,8 +121,8 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
       emissiveIntensity: 0.85,
       shininess: 18,
       specular: new Color("#7fd4de"),
-      // Opaque on purpose: a see-through sphere lets city patches on the far
-      // side of the planet bleed through to the near side.
+      // Opaque on purpose: a see-through sphere lets the far side of the
+      // planet bleed through to the near side.
       transparent: false,
       opacity: 1,
     })
@@ -403,10 +389,8 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     (o: object) => {
       const d = o as Poly
       const c = byNumericId.get(String(d.id))
-      // Countries stay low so the city layer above them is never occluded.
-      // Emphasis for hover/selected comes from `capColor` — full-strength
-      // tint instead of a lift — with only a slight rise to separate the
-      // active country's edge from its neighbours.
+      // A modest lift plus a bright outline (see polygonStrokeColor) marks
+      // the active country. Kept under ALT_LABEL so city names stay on top.
       if (!c || !visibleIds.has(c.id)) return ALT_COUNTRY * 0.6
       if (selected?.id === c.id || hover === d) return ALT_COUNTRY_ACTIVE
       return ALT_COUNTRY
@@ -517,126 +501,6 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     el.dataset.behind = String(!isVisible)
   }, [])
 
-  // ─── City colour patches ───────────────────────────────────────────
-
-  /**
-   * A soft disc of colour over each city, on top of its country's fill.
-   *
-   * A country tint is an average, and averages hide the thing you most need
-   * to see: a city that is nothing like the country around it. Tinting the
-   * city's own patch means a high-risk city inside an otherwise safe country
-   * shows up red on green, where before it was invisible.
-   *
-   * All of them are baked into ONE merged mesh — a single geometry, one draw
-   * call — rather than a thousand objects. The globe's frame budget is not
-   * something this page can be careless with (see the pause-on-navigate
-   * handler above for what happens when it runs out).
-   */
-  const [patchMesh, setPatchMesh] = useState<Mesh | null>(null)
-
-  useEffect(() => {
-    const g = globeRef.current
-    if (!g || !ready || !inRegion.length) {
-      setPatchMesh(null)
-      return
-    }
-
-    const RIM = 14 // rim vertices per disc — smooth enough at any zoom
-    const ALT = ALT_PATCH
-    const CORE_ALPHA = 0.72
-    // Each patch is a solid core out to CORE_FRAC of its radius and then a
-    // fade to nothing. A pure centre-to-rim gradient reads as a smudge; a
-    // core reads as a place with an edge.
-    const CORE_FRAC = 0.5
-    const toRad = Math.PI / 180
-    const positions: number[] = []
-    const colors: number[] = []
-    const c = new Color()
-
-    for (const p of inRegion) {
-      // Radius grows with population but flattens fast — this is a "roughly
-      // the metro area" mark, not a scale drawing.
-      // Kept modest. These sit on top of the country fill now, so they read
-      // clearly at low strength — and at full strength a country with many
-      // reports turns into a rash of blobs rather than a map.
-      const rDeg = Math.min(1.15, 0.4 + Math.sqrt(p.population ?? 40_000) / 3200)
-      const d = rDeg * toRad
-      const lat = p.lat * toRad
-      const lng = p.lng * toRad
-      const sinLat = Math.sin(lat)
-      const cosLat = Math.cos(lat)
-      const sinD = Math.sin(d)
-      const cosD = Math.cos(d)
-
-      c.set(tintSolid(p.score))
-      const centre = g.getCoords(p.lat, p.lng, ALT)
-
-      // Ring points by the great-circle destination formula, so each patch
-      // sits ON the sphere rather than as a flat card cutting through it.
-      const ringAt = (frac: number) => {
-        const dd = d * frac
-        const sD = Math.sin(dd)
-        const cD = Math.cos(dd)
-        const out: { x: number; y: number; z: number }[] = []
-        for (let i = 0; i <= RIM; i++) {
-          const brg = (i / RIM) * Math.PI * 2
-          const lat2 = Math.asin(sinLat * cD + cosLat * sD * Math.cos(brg))
-          const lng2 =
-            lng + Math.atan2(Math.sin(brg) * sD * cosLat, cD - sinLat * Math.sin(lat2))
-          out.push(g.getCoords(lat2 / toRad, lng2 / toRad, ALT))
-        }
-        return out
-      }
-      const core = ringAt(CORE_FRAC)
-      const edge = ringAt(1)
-
-      for (let i = 0; i < RIM; i++) {
-        const a = core[i]
-        const b = core[i + 1]
-        // solid core
-        positions.push(centre.x, centre.y, centre.z, a.x, a.y, a.z, b.x, b.y, b.z)
-        colors.push(
-          c.r, c.g, c.b, CORE_ALPHA,
-          c.r, c.g, c.b, CORE_ALPHA,
-          c.r, c.g, c.b, CORE_ALPHA
-        )
-        // falloff to the rim
-        const e = edge[i]
-        const f = edge[i + 1]
-        positions.push(a.x, a.y, a.z, e.x, e.y, e.z, f.x, f.y, f.z)
-        colors.push(c.r, c.g, c.b, CORE_ALPHA, c.r, c.g, c.b, 0, c.r, c.g, c.b, 0)
-        positions.push(a.x, a.y, a.z, f.x, f.y, f.z, b.x, b.y, b.z)
-        colors.push(c.r, c.g, c.b, CORE_ALPHA, c.r, c.g, c.b, 0, c.r, c.g, c.b, CORE_ALPHA)
-      }
-    }
-
-    const geom = new BufferGeometry()
-    geom.setAttribute("position", new Float32BufferAttribute(positions, 3))
-    geom.setAttribute("color", new Float32BufferAttribute(colors, 4))
-    const mesh = new Mesh(
-      geom,
-      new MeshBasicMaterial({
-        vertexColors: true,
-        transparent: true,
-        // No depth writing: patches overlap each other and must blend, not
-        // punch holes. Depth *testing* stays on, so the sphere still hides
-        // the ones on the far side — which is also why DoubleSide is safe
-        // here, and why it is needed: the fan winding runs the other way
-        // round, so FrontSide culls every patch on the globe.
-        depthWrite: false,
-        side: DoubleSide,
-      })
-    )
-    mesh.renderOrder = 2
-    setPatchMesh(mesh)
-
-    return () => {
-      geom.dispose()
-      ;(mesh.material as MeshBasicMaterial).dispose()
-    }
-  }, [ready, inRegion])
-
-  const patchLayer = useMemo(() => (patchMesh ? [patchMesh] : []), [patchMesh])
 
   const selectedPoints = selected ? pointsBySlug.get(selected.slug) ?? [] : []
 
@@ -729,9 +593,6 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
             htmlElement={makePin}
             htmlElementVisibilityModifier={pinVisibility}
             htmlTransitionDuration={220}
-            /* One merged mesh of per-city colour patches. */
-            customLayerData={patchLayer}
-            customThreeObject={(o: object) => o as Mesh}
           />
           </Suspense>
         )}
