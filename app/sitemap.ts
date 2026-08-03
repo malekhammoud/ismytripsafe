@@ -18,6 +18,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: absUrl("/how-it-works") },
     { url: absUrl("/methodology") },
     { url: absUrl("/about") },
+    { url: absUrl("/credits") },
   ]
 
   const countryPages: MetadataRoute.Sitemap = countries.map((c) => ({

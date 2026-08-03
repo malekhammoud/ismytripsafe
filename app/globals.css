@@ -557,7 +557,6 @@ body::after {
   background: linear-gradient(180deg, var(--sky), var(--foam));
   box-shadow: inset 0 0 0 1px rgba(29, 47, 56, 0.09);
 }
-.postcard-art > svg,
 .postcard-art > img {
   display: block;
   width: 100%;
@@ -565,20 +564,21 @@ body::after {
   object-fit: cover;
   transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.postcard:hover .postcard-art > svg,
 .postcard:hover .postcard-art > img {
   transform: scale(1.05);
 }
 
-/* Sun-faded wash over the art — the "left in the glovebox for a summer" look */
+/* A light sun-faded grade over the photograph — enough to tie a wall of
+   different cameras and different weather into one set, not enough to stop
+   it looking like a photograph. */
 .postcard-art::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(120% 80% at 80% 0%, rgba(255, 214, 140, 0.34), transparent 58%),
-    linear-gradient(200deg, rgba(255, 245, 220, 0.22), transparent 42%);
+    radial-gradient(120% 80% at 80% 0%, rgba(255, 214, 140, 0.16), transparent 62%),
+    linear-gradient(200deg, rgba(255, 245, 220, 0.1), transparent 46%);
 }
 
 /* "GREETINGS FROM —" hand-lettered strip along the caption */
@@ -1027,5 +1027,23 @@ body::after {
 /* far side of the globe */
 .globe-pin[data-behind="true"] {
   opacity: 0;
+  pointer-events: none;
+}
+
+/* Where a destination has no photograph of its own, its card borrows one —
+   and says whose beach it actually is. Small, bottom-right, over the art. */
+.photo-elsewhere {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  z-index: 2;
+  padding: 1px 5px;
+  border-radius: 2px;
+  background: rgba(9, 42, 55, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  font: 500 0.6rem/1.35 system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  color: rgba(255, 253, 246, 0.92);
   pointer-events: none;
 }

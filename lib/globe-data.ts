@@ -39,6 +39,8 @@ export interface GlobeCountry {
   reports: number
   cities: number
   updatedAt: string
+  /** A photograph of the country, borrowed from its best-documented report. */
+  image: string | null
 }
 
 /** One city report as a point on the globe. */
@@ -54,6 +56,7 @@ export interface GlobePoint {
   levelLabel: string
   flag: string
   population: number | null
+  image: string | null
 }
 
 export interface GlobePayload {
@@ -85,6 +88,13 @@ export async function getGlobePayload(): Promise<GlobePayload> {
       reports: h.cities.length + (h.countryReport ? 1 : 0),
       cities: h.cities.length,
       updatedAt: h.updatedAt,
+      // The country's own report first, then its largest city — whichever
+      // actually has a photograph.
+      image:
+        h.countryReport?.image ??
+        [...h.cities].sort((a, b) => (b.population ?? 0) - (a.population ?? 0)).find((c) => c.image)
+          ?.image ??
+        null,
     })
   }
 
@@ -105,6 +115,7 @@ export async function getGlobePayload(): Promise<GlobePayload> {
     levelLabel: LEVELS[m.level].label,
     flag: m.flag,
     population: m.population,
+    image: m.image,
   }))
 
   // One city per country in each deck. Without this the "safest" row is six

@@ -99,6 +99,10 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
           © {year} IsMyTripSafe. Founded 2026. ·{" "}
           <Link href="/disclaimer" className="hover:text-[var(--accent-deep)] hover:underline">
             Disclaimer
+          </Link>{" "}
+          ·{" "}
+          <Link href="/credits" className="hover:text-[var(--accent-deep)] hover:underline">
+            Photo credits
           </Link>
         </p>
       </div>

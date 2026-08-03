@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
 import { SiteHeader } from "@/components/SiteHeader"
-import { PanoramaArt } from "@/components/beach/PosterArt"
+import { HERO_PHOTO } from "@/lib/photos"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
@@ -15,17 +15,24 @@ import { profileFromParams, profileToParams, type TravelerProfile } from "@/lib/
 import type { SafetyQuery } from "@/lib/types"
 
 /**
- * The panoramic beach that sits behind the hero: pinned to the bottom of
- * the block, faded into the page so the search stays the loudest thing on
- * screen, and hidden from assistive tech — it says nothing the copy doesn't.
+ * The photograph behind the hero: pinned to the bottom of the block, masked
+ * into the page so the search stays the loudest thing on screen, and hidden
+ * from assistive tech — it says nothing the copy doesn't. Credited on
+ * /credits like every other pool photo.
  */
 function BeachHero() {
   return (
     // Dropped below the block's own baseline so the horizon and the figures
     // clear the source line above them rather than sitting behind the words.
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 -bottom-16 -z-10 select-none">
-      <div className="relative h-[17rem] w-full overflow-hidden sm:h-[20rem]">
-        <PanoramaArt className="hero-band-mask absolute inset-0 h-full w-full opacity-[0.72]" />
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-2 -z-10 select-none">
+      <div className="relative h-[15rem] w-full overflow-hidden sm:h-[18rem]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={HERO_PHOTO.file}
+          alt=""
+          fetchPriority="high"
+          className="hero-band-mask absolute inset-0 h-full w-full object-cover opacity-[0.62] [object-position:50%_38%]"
+        />
       </div>
     </div>
   )

@@ -1,12 +1,13 @@
 import Link from "next/link"
-import { PosterArt, SCENES } from "@/components/beach/PosterArt"
+import { poolPhotoFor, sized } from "@/lib/photos"
+import { Photo } from "@/components/beach/Photo"
 import { LEVELS } from "@/lib/safety-display"
 import type { ReportMeta } from "@/lib/reports"
 
 // ─────────────────────────────────────────────────────────────────────
 // A destination as a postcard.
 //
-// Front: illustrated beach scene inside a white deckle, the safety score
+// Front: a photograph inside a white deckle, the safety score
 // ink-stamped in the top-left corner (the first place the eye lands), a
 // rubber postmark top-right, and a "GREETINGS FROM —" caption strip.
 //
@@ -66,22 +67,23 @@ export function Postmark({ code, iso }: { code: string; iso: string }) {
 
 export function Postcard({
   meta,
-  scene,
-  palette,
-  index,
+  index = 0,
 }: {
   meta: ReportMeta
-  scene?: string
-  palette?: string
   /**
-   * Position in its deck. Six scenes exist and decks hold six cards, so
-   * passing the index turns scene choice into a permutation — no two cards
-   * in a row show the same beach. Palette still comes from the destination,
-   * so a city keeps its own light.
+   * Position in its deck. Only used to spread the fallback pool: cards
+   * without a photo of their own would otherwise be free to collide, and two
+   * identical beaches side by side look like a bug.
    */
   index?: number
 }) {
   const level = LEVELS[meta.level]
+  // A photograph of the actual place if the report found one; otherwise a
+  // coastal photo from the house pool, picked from the destination's own path
+  // so it stays put between renders.
+  const own = !!meta.image
+  const stand_in = poolPhotoFor(meta.path, index)
+  const photo = own ? sized(meta.image as string) : stand_in.file
   const message =
     meta.verdict?.trim() ||
     `${level.answer}. Scored ${meta.score}/100 against crime, governance, health, hazards and the current official advisory.`
@@ -100,11 +102,21 @@ export function Postcard({
           <ScoreStamp score={meta.score} />
           <Postmark code={meta.countryCode} iso={meta.updatedAt} />
           <div className="postcard-art aspect-[3/2]">
-            <PosterArt
-              seed={meta.path}
-              scene={scene ?? (index == null ? undefined : SCENES[index % SCENES.length].key)}
-              palette={palette}
+            <Photo
+              src={photo}
+              original={meta.image}
+              fallback={stand_in.file}
+              alt={own ? `${meta.city}, ${meta.country}` : stand_in.place ?? ""}
+              width={960}
+              height={640}
             />
+            {/* When the photograph isn't of this place, say where it is.
+                A card headed "Greetings from Monte Carlo" over an unlabelled
+                beach in Rhodes is a small lie, and this site is supposed to
+                be the one that doesn't tell them. */}
+            {!own && stand_in.place && (
+              <span className="photo-elsewhere">{stand_in.place}</span>
+            )}
           </div>
           <div className="flex items-end justify-between gap-3 px-1 pb-2.5 pt-2">
             <div className="min-w-0">

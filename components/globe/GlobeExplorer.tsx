@@ -8,7 +8,8 @@ import { AmbientLight, Color, DirectionalLight, MeshPhongMaterial } from "three"
 import type { Topology, GeometryCollection } from "topojson-specification"
 import { Search, X, Pause, Play, Compass, Maximize2, Crosshair } from "lucide-react"
 import type { GlobeCountry, GlobePayload, GlobePoint } from "@/lib/globe-data"
-import { PosterArt } from "@/components/beach/PosterArt"
+import { poolPhotoFor, sized } from "@/lib/photos"
+import { Photo } from "@/components/beach/Photo"
 
 // react-globe.gl reaches for WebGL at import time — it can only ever run in
 // the browser, so it loads lazily and never renders on the server.
@@ -751,7 +752,12 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
         <aside className="globe-panel absolute right-3 top-16 bottom-24 z-30 flex w-[min(21rem,calc(100%-1.5rem))] flex-col overflow-hidden sm:right-5 sm:top-[4.6rem]">
           <div className="relative shrink-0">
             <div className="postcard-art aspect-[3/2]">
-              <PosterArt seed={selected.slug} />
+              <Photo
+                src={selected.image ? sized(selected.image) : poolPhotoFor(selected.slug).file}
+                original={selected.image}
+                fallback={poolPhotoFor(selected.slug).file}
+                alt={selected.image ? selected.name : ""}
+              />
             </div>
             <span
               className="score-stamp"

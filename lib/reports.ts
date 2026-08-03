@@ -36,6 +36,13 @@ export interface ReportMeta {
   lon: number
   updatedAt: string // ISO — last data refresh
   createdAt: string // ISO — first build
+  /**
+   * The destination's own lead photograph, if the report found one — see
+   * `lib/data/images.ts`. About three reports in four have one. Carried on
+   * the metadata so cards and panels can show a picture of the actual place
+   * without loading the whole report.
+   */
+  image: string | null
 }
 
 export function countrySlugFor(countryCode: string, countryName: string): string {
@@ -48,6 +55,11 @@ export function pathForGeo(geo: { city: string; country: string; countryCode: st
   const city = slug(geo.city)
   if (!cs || !city || city === cs) return `/${cs || city}`
   return `/${cs}/${city}`
+}
+
+/** Flags, coats of arms, locator maps and SVGs are not photographs. */
+function usablePhoto(url: string | null | undefined): url is string {
+  return !!url && !/flag_of|coat_of_arms|locator|_map\b|\.svg/i.test(url)
 }
 
 function metaFromReport(report: CachedReport): ReportMeta | null {
@@ -79,6 +91,7 @@ function metaFromReport(report: CachedReport): ReportMeta | null {
     lon: geo.lon,
     updatedAt: report.cachedAt,
     createdAt: report.createdAt || report.cachedAt,
+    image: usablePhoto(report.images?.hero) ? report.images.hero : null,
   }
 }
 
