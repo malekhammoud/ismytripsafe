@@ -200,7 +200,7 @@ export function CityAutocomplete({
                 onMouseEnter={() => setActive(i)}
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
                 style={{
-                  background: i === active ? "rgba(31,116,207,0.1)" : "transparent",
+                  background: i === active ? "rgba(15,155,171,0.1)" : "transparent",
                 }}
               >
                 <span className="text-lg leading-none">{flagOf(s.countryCode)}</span>

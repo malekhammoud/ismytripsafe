@@ -13,7 +13,7 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body style={{ background: "#eef2f8", color: "#141922" }}>
+      <body style={{ background: "#fbf4e6", color: "#1d2f38" }}>
         <title>Something went wrong | IsMyTripSafe</title>
         <main
           style={{
@@ -50,7 +50,7 @@ export default function GlobalError({
             style={{
               marginTop: "1.5rem",
               background: "#141922",
-              color: "#eef2f8",
+              color: "#fbf4e6",
               border: "none",
               borderRadius: 14,
               padding: "0.7rem 1.3rem",

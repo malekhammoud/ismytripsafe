@@ -176,7 +176,7 @@ function ContextHover({ comparison }: { comparison: Comparison | undefined }) {
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v) }}
         className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.08em] opacity-70 transition-opacity hover:opacity-100"
-        style={{ color: "var(--accent-deep)", background: "rgba(31,116,207,0.1)" }}
+        style={{ color: "var(--accent-deep)", background: "rgba(15,155,171,0.1)" }}
       >
         <Eye size={11} strokeWidth={2.3} /> context
       </button>

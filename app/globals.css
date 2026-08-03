@@ -1,47 +1,65 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════════
+   BETA — "Postcard" beach theme.
+
+   Deliberately the same variable NAMES as production so every page that
+   already reads --accent / --navy / --orange re-skins for free. Only the
+   values move: cool mist paper → sun-bleached sand, cerulean → lagoon
+   turquoise, the brand orange → a sunset coral.
+   ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Canvas — cool mist paper */
-  --paper: #eef2f8;
-  --paper-deep: #e0e7f1;
-  --ink: #141922;
-  --ink-soft: #3e4756;
-  --ink-faint: #7f8b9c;
+  /* Canvas — sun-bleached postcard stock */
+  --paper: #fbf4e6;
+  --paper-deep: #f2e5cd;
+  --ink: #1d2f38;
+  --ink-soft: #46606d;
+  --ink-faint: #8b9ca4;
 
-  /* Accents — cerulean ocean + deep teal */
-  --accent: #1f74cf;
-  --accent-deep: #14538f;
-  --teal: #0e6e78;
-  --teal-bright: #149ba8;
-  --sand: #cdd9e8;
-  --gold: #c8973f;
+  /* Accents — lagoon turquoise + deep water */
+  --accent: #0f9bab;
+  --accent-deep: #05646f;
+  --teal: #0b7b86;
+  --teal-bright: #23bcc7;
+  --sand: #e9d6b2;
+  --sand-deep: #d9bf90;
+  --gold: #e0a13c;
 
-  /* Brand — sampled from the badge and banner. The orange is chrome only
-     (mark, rules, wordmark); score colours below own their own meanings. */
-  --navy: #0b2049;
-  --navy-soft: #16304f;
-  --orange: #f36c0a;
-  --orange-bright: #fb9224;
-  --orange-deep: #d9550a;
+  /* Brand chrome — the postcard's ink stamp is deep ocean, the swash is a
+     sunset coral. Score colours below still own their own meanings. */
+  --navy: #0d3b4d;
+  --navy-soft: #165065;
+  --orange: #f2704a;
+  --orange-bright: #ff9a5c;
+  --orange-deep: #d84a29;
 
-  /* Safety spectrum */
-  --safe: #2f9e6f;
-  --moderate: #c8973f;
-  --caution: #e08a3b;
-  --risky: #d4503a;
+  /* Sun & sea — the theme's own extras (no production equivalent) */
+  --sun: #ffc857;
+  --sun-deep: #f5a63c;
+  --sky: #bfe6ef;
+  --sea: #1a8fa3;
+  --sea-deep: #0b5c72;
+  --foam: #e4f5f4;
+  --palm: #2f7d5c;
+
+  /* Safety spectrum — warmed to sit inside the sand/sea palette */
+  --safe: #17a07a;
+  --moderate: #e0a13c;
+  --caution: #ef8348;
+  --risky: #e0544a;
 
   /* Glass */
-  --glass: rgba(255, 255, 255, 0.72);
-  --glass-strong: rgba(255, 255, 255, 0.9);
-  --glass-border: rgba(255, 255, 255, 0.62);
-  --hairline: rgba(20, 30, 48, 0.1);
+  --glass: rgba(255, 252, 244, 0.74);
+  --glass-strong: rgba(255, 253, 247, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.66);
+  --hairline: rgba(29, 47, 56, 0.12);
 
-  --shadow-card: 0 1px 2px rgba(20, 30, 48, 0.04),
-    0 8px 24px -8px rgba(20, 30, 48, 0.12),
-    0 24px 48px -24px rgba(20, 30, 48, 0.18);
-  --shadow-float: 0 2px 8px rgba(20, 30, 48, 0.08),
-    0 16px 40px -12px rgba(20, 30, 48, 0.22),
-    0 40px 80px -32px rgba(20, 30, 48, 0.3);
+  --shadow-card: 0 1px 2px rgba(29, 47, 56, 0.05),
+    0 8px 24px -8px rgba(29, 47, 56, 0.14),
+    0 24px 48px -24px rgba(29, 47, 56, 0.2);
+  --shadow-float: 0 2px 8px rgba(29, 47, 56, 0.09),
+    0 16px 40px -12px rgba(29, 47, 56, 0.24),
+    0 40px 80px -32px rgba(29, 47, 56, 0.32);
 
   --font-display: "Fraunces", Georgia, serif;
   --font-sans: var(--font-sans), system-ui, sans-serif;
@@ -63,15 +81,29 @@ body {
   position: relative;
 }
 
-/* Paper grain texture overlay */
+/* Paper grain — coarser here, so the canvas reads as postcard card stock */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.5;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+  opacity: 0.55;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.07'/%3E%3C/svg%3E");
+}
+
+/* Low sun in the corner + a haze off the water at the foot of the page.
+   Fixed and behind everything, so scrolling feels like the light stays put. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 88% -8%, rgba(255, 200, 87, 0.3), transparent 62%),
+    radial-gradient(46rem 30rem at 6% 4%, rgba(255, 154, 92, 0.16), transparent 60%),
+    linear-gradient(180deg, transparent 55%, rgba(35, 188, 199, 0.11) 100%);
 }
 
 ::-webkit-scrollbar {
@@ -143,7 +175,7 @@ body::before {
 }
 
 .card {
-  background: #ffffff;
+  background: #fffdf7;
   border: 1px solid var(--hairline);
   border-radius: 16px;
   box-shadow: var(--shadow-card);
@@ -206,7 +238,7 @@ body::before {
 .disclosure {
   border: 1px solid var(--hairline);
   border-radius: 14px;
-  background: #fff;
+  background: #fffdf7;
 }
 .disclosure > summary {
   cursor: pointer;
@@ -241,7 +273,7 @@ body::before {
 .field:focus {
   border-color: var(--accent);
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(31,116,207, 0.1);
+  box-shadow: 0 0 0 4px rgba(15, 155, 171, 0.14);
 }
 .field::placeholder {
   color: var(--ink-faint);
@@ -262,7 +294,7 @@ body::before {
 .btn:hover {
   background: var(--accent);
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px -6px rgba(31,116,207, 0.5);
+  box-shadow: 0 8px 24px -6px rgba(15, 155, 171, 0.45);
 }
 .btn:active {
   transform: translateY(0);
@@ -343,7 +375,7 @@ body::before {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--paper-deep) 0%, #eaf0f7 50%, var(--paper-deep) 100%);
+  background: linear-gradient(90deg, var(--paper-deep) 0%, #fbf2df 50%, var(--paper-deep) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
   border-radius: 8px;
@@ -412,8 +444,8 @@ body::before {
 .photo-frame {
   overflow: hidden;
   border-radius: 4px;
-  border: 1px solid rgba(11, 32, 73, 0.16);
-  box-shadow: 0 1px 2px rgba(11, 32, 73, 0.06), 0 18px 40px -22px rgba(11, 32, 73, 0.5);
+  border: 1px solid rgba(13, 59, 77, 0.16);
+  box-shadow: 0 1px 2px rgba(13, 59, 77, 0.06), 0 18px 40px -22px rgba(13, 59, 77, 0.5);
   background: var(--paper-deep);
 }
 .photo-frame img {
@@ -470,3 +502,480 @@ body::before {
 .prose-brief ul { margin: 0 0 1.15rem 1.1rem; }
 .prose-brief li { margin-bottom: 0.4rem; }
 .prose-brief hr { border: none; height: 1px; background: var(--hairline); margin: 1.5rem 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BEACH THEME — postcards, stamps, sea & sand
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── The postcard ───────────────────────────────────────────
+   A real 4×6 card: thick white deckle, art bleeding to the inner edge,
+   a caption strip along the bottom. Cards sit at a slight angle in a
+   stack and straighten when you reach for them. */
+.postcard {
+  position: relative;
+  background: #fffdf6;
+  border-radius: 3px;
+  padding: 10px 10px 0;
+  box-shadow:
+    0 1px 1px rgba(29, 47, 56, 0.1),
+    0 10px 24px -10px rgba(29, 47, 56, 0.34),
+    0 30px 60px -34px rgba(29, 47, 56, 0.42);
+  transition: transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.42s;
+  transform: rotate(var(--tilt, -1.1deg));
+  will-change: transform;
+}
+.postcard::before {
+  /* card-stock tooth, so the white border isn't a flat digital white */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  pointer-events: none;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.05'/%3E%3C/svg%3E");
+}
+.postcard:hover,
+.postcard:focus-within {
+  transform: rotate(0deg) translateY(-7px) scale(1.018);
+  box-shadow:
+    0 2px 2px rgba(29, 47, 56, 0.1),
+    0 20px 40px -12px rgba(29, 47, 56, 0.38),
+    0 48px 90px -40px rgba(29, 47, 56, 0.5);
+}
+
+/* Alternating tilts so a grid of cards reads as a scattered stack */
+.postcard-deck > *:nth-child(3n + 1) { --tilt: -1.4deg; }
+.postcard-deck > *:nth-child(3n + 2) { --tilt: 0.9deg; }
+.postcard-deck > *:nth-child(3n + 3) { --tilt: -0.5deg; }
+
+/* The art window inside the deckle */
+.postcard-art {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1px;
+  background: linear-gradient(180deg, var(--sky), var(--foam));
+  box-shadow: inset 0 0 0 1px rgba(29, 47, 56, 0.09);
+}
+.postcard-art > svg,
+.postcard-art > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.postcard:hover .postcard-art > svg,
+.postcard:hover .postcard-art > img {
+  transform: scale(1.05);
+}
+
+/* Sun-faded wash over the art — the "left in the glovebox for a summer" look */
+.postcard-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 80% 0%, rgba(255, 214, 140, 0.34), transparent 58%),
+    linear-gradient(200deg, rgba(255, 245, 220, 0.22), transparent 42%);
+}
+
+/* "GREETINGS FROM —" hand-lettered strip along the caption */
+.postcard-greeting {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-style: italic;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--orange-deep);
+}
+
+/* ─── The score stamp (top-left of every postcard) ───────────
+   Perforated edge, ink-stamped score. It is the one thing that has to
+   read instantly, so it sits in the corner the eye lands on first. */
+.score-stamp {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 3;
+  width: 54px;
+  padding: 5px 4px 4px;
+  text-align: center;
+  color: #fff;
+  background: var(--stamp, var(--sea));
+  filter: drop-shadow(0 3px 6px rgba(29, 47, 56, 0.4));
+  /* Perforated edge, cut with clip-path so it survives on the dark globe
+     stage as well as on white card stock. */
+  clip-path: polygon(
+    0% 4%, 4% 0%, 12% 4%, 20% 0%, 28% 4%, 36% 0%, 44% 4%, 52% 0%, 60% 4%,
+    68% 0%, 76% 4%, 84% 0%, 92% 4%, 100% 0%,
+    96% 8%, 100% 16%, 96% 24%, 100% 32%, 96% 40%, 100% 48%, 96% 56%,
+    100% 64%, 96% 72%, 100% 80%, 96% 88%, 100% 96%,
+    92% 100%, 84% 96%, 76% 100%, 68% 96%, 60% 100%, 52% 96%, 44% 100%,
+    36% 96%, 28% 100%, 20% 96%, 12% 100%, 4% 96%, 0% 100%,
+    4% 92%, 0% 84%, 4% 76%, 0% 68%, 4% 60%, 0% 52%, 4% 44%, 0% 36%,
+    4% 28%, 0% 20%, 4% 12%, 0% 8%
+  );
+}
+.score-stamp .n {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.42rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+.score-stamp .cap {
+  display: block;
+  margin-top: 1px;
+  font-size: 0.42rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.92;
+}
+
+/* ─── Rubber postmark ────────────────────────────────────────
+   Smudged circular date stamp, rotated, sitting over the top-right. */
+.postmark {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 3;
+  width: 62px;
+  height: 62px;
+  border: 1.5px solid var(--navy);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  color: var(--navy);
+  opacity: 0.42;
+  transform: rotate(-13deg);
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.postmark::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px dashed currentColor;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+.postmark .top,
+.postmark .bot {
+  font-size: 0.36rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.postmark .mid {
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  border-top: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  padding: 1.5px 3px;
+  line-height: 1;
+}
+
+/* ─── Ruled address lines (postcard reverse) ─────────────────── */
+.address-lines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 17px,
+    rgba(29, 47, 56, 0.16) 17px 18px
+  );
+}
+
+/* ─── Sea, sand, sun motifs ──────────────────────────────────── */
+
+/* Torn-paper shoreline used to separate page bands */
+.shoreline {
+  position: relative;
+  height: 46px;
+  background: linear-gradient(180deg, transparent, rgba(35, 188, 199, 0.14));
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 46' preserveAspectRatio='none'%3E%3Cpath d='M0 46V20c40-9 78 6 120 4s76-15 118-12 74 17 116 15 76-16 118-14 74 15 116 13 78-16 120-13 76 15 118 13 76-14 118-11 78 9 118 3v28z' fill='%23000'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 46' preserveAspectRatio='none'%3E%3Cpath d='M0 46V20c40-9 78 6 120 4s76-15 118-12 74 17 116 15 76-16 118-14 74 15 116 13 78-16 120-13 76 15 118 13 76-14 118-11 78 9 118 3v28z' fill='%23000'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+/* Lazy foam lines that drift, like the last of a wave on wet sand */
+@keyframes drift {
+  0%   { transform: translateX(-2%); opacity: 0.5; }
+  50%  { transform: translateX(2%);  opacity: 0.85; }
+  100% { transform: translateX(-2%); opacity: 0.5; }
+}
+.drift { animation: drift 9s ease-in-out infinite; }
+.drift-slow { animation: drift 15s ease-in-out infinite; }
+
+/* Sun-bleached deckled divider */
+.deckle {
+  height: 3px;
+  border-radius: 100px;
+  background: linear-gradient(90deg, transparent, var(--sand-deep), var(--orange-bright), var(--sand-deep), transparent);
+  opacity: 0.7;
+}
+
+/* Ticket / boarding-pass pill used for chips and filters */
+.ticket {
+  position: relative;
+  background: #fffdf6;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: 0.32rem 0.7rem;
+  transition: color 0.18s, border-color 0.18s, background 0.18s, transform 0.18s;
+}
+.ticket:hover {
+  color: var(--accent-deep);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.ticket[data-on="true"] {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+  color: #fff;
+}
+
+/* ─── Globe surround ─────────────────────────────────────────── */
+.globe-stage {
+  position: relative;
+  background:
+    radial-gradient(60% 55% at 50% 42%, rgba(35, 188, 199, 0.2), transparent 70%),
+    linear-gradient(180deg, #072d3d 0%, #0b4356 44%, #0d5a6b 100%);
+  overflow: hidden;
+}
+/* the sun sitting low behind the globe */
+.globe-stage::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: min(78vmin, 760px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 200, 87, 0.2) 0%, rgba(255, 154, 92, 0.1) 42%, transparent 66%);
+}
+/* horizon haze at the foot of the stage */
+.globe-stage::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 42%;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(7, 45, 61, 0.72));
+}
+
+/* Floating glass panel over the globe */
+.globe-panel {
+  background: rgba(255, 253, 246, 0.93);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 4px;
+  box-shadow:
+    0 1px 2px rgba(7, 45, 61, 0.2),
+    0 24px 60px -18px rgba(7, 45, 61, 0.66);
+}
+
+/* Chips that sit ON the dark globe stage */
+.sea-chip {
+  background: rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 100px;
+  color: #eaf7f8;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.34rem 0.8rem;
+  transition: background 0.18s, border-color 0.18s, transform 0.18s;
+}
+.sea-chip:hover {
+  background: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.42);
+  transform: translateY(-1px);
+}
+.sea-chip[data-on="true"] {
+  background: rgba(255, 200, 87, 0.92);
+  border-color: rgba(255, 200, 87, 1);
+  color: #0b3040;
+}
+
+/* Respect reduced-motion for every ambient loop in this theme */
+@media (prefers-reduced-motion: reduce) {
+  .drift, .drift-slow, .kenburns, .pulse { animation: none; }
+  .postcard { transition: none; }
+  .postcard:hover, .postcard:focus-within { transform: none; }
+}
+
+/* ─── Postcard flip ──────────────────────────────────────────
+   Hover (or keyboard focus) turns the card over to its written side —
+   the message, the ruled address block and the reason for the score. */
+.postcard-flip {
+  perspective: 1400px;
+}
+.postcard-flip .postcard {
+  transform-style: preserve-3d;
+  transition: transform 0.72s cubic-bezier(0.22, 0.72, 0.2, 1), box-shadow 0.4s;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.postcard-flip .postcard::before { content: none; }
+/* The link itself is the hover/focus target — the faces are inside it. */
+.postcard-flip:hover .postcard,
+.postcard-flip:focus-visible .postcard,
+.postcard-flip:focus-within .postcard {
+  transform: rotateY(180deg) translateY(-6px);
+}
+.postcard-face {
+  position: relative;
+  background: #fffdf6;
+  border-radius: 3px;
+  padding: 10px 10px 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow:
+    0 1px 1px rgba(29, 47, 56, 0.1),
+    0 10px 24px -10px rgba(29, 47, 56, 0.34),
+    0 30px 60px -34px rgba(29, 47, 56, 0.42);
+}
+.postcard-face--back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+}
+/* Vertical rule down the middle of the reverse — message left, address right */
+.postcard-face--back .divider {
+  position: absolute;
+  top: 46px;
+  bottom: 14px;
+  left: 52%;
+  width: 1px;
+  background: rgba(29, 47, 56, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .postcard-flip .postcard { transition: none; }
+  .postcard-flip:hover .postcard,
+  .postcard-flip:focus-visible .postcard,
+  .postcard-flip:focus-within .postcard { transform: rotateY(180deg); }
+}
+
+/* Hero panorama: dissolved with a mask rather than an overlay. Painting a
+   paper-coloured fade on top would punch an opaque rectangle through the
+   page's own sun/sea wash — visible as a lighter box. Masking removes the
+   art's own pixels instead, so there is nothing to see an edge of. */
+.hero-band-mask {
+  -webkit-mask-image:
+    linear-gradient(180deg, transparent 0%, #000 42%, #000 74%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
+  mask-image:
+    linear-gradient(180deg, transparent 0%, #000 42%, #000 74%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+/* ─── City pins on the globe ─────────────────────────────────
+   Real DOM markers rather than shader dots: a score chip, the city name
+   and a stem down to the exact coordinate. They have to be legible over
+   both the sand-coloured land and the dark sea, hence the ink backing. */
+.globe-pin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(-100%);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: opacity 0.35s, transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+  -webkit-user-select: none;
+  user-select: none;
+  text-decoration: none;
+}
+.globe-pin:hover {
+  transform: translateY(-100%) scale(1.14);
+  z-index: 40;
+}
+.globe-pin .flag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2.5px 4px 2.5px 2.5px;
+  border-radius: 3px;
+  background: rgba(9, 42, 55, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.globe-pin:hover .flag {
+  background: rgba(255, 253, 246, 0.97);
+  border-color: #fff;
+}
+.globe-pin .chip {
+  display: block;
+  min-width: 21px;
+  padding: 1px 3px;
+  border-radius: 2px;
+  font: 700 10.5px/1.3 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: #fff;
+}
+.globe-pin .name {
+  font: 600 10.5px/1.3 system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  color: #eaf7f8;
+  max-width: 118px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.globe-pin:hover .name { color: #0d3b4d; }
+.globe-pin .stem {
+  width: 1.5px;
+  height: 13px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.15));
+}
+.globe-pin .dot {
+  width: 7px;
+  height: 7px;
+  margin-top: -1px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 3px rgba(9, 42, 55, 0.45), 0 0 10px 2px rgba(255, 200, 87, 0.35);
+}
+/* far side of the globe */
+.globe-pin[data-behind="true"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Stem height is dealt per pin (see PinCity.tier) so clustered cities fan
+   out vertically while their dots stay on the real coordinate. */
+.globe-pin .stem { height: var(--stem, 13px); }
+
+/* Labels step sideways as well as upward — see PinCity.tier. The stem and
+   dot stay put, so the coordinate stays truthful. */
+.globe-pin .flag { transform: translateX(var(--nudge, 0)); }

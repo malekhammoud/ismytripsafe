@@ -71,9 +71,9 @@ function OptionChip<T extends string>({
       style={
         selected
           ? {
-              background: "rgba(31,116,207,0.09)",
+              background: "rgba(15,155,171,0.09)",
               border: "1.5px solid var(--accent)",
-              boxShadow: "0 2px 12px -4px rgba(31,116,207,0.35)",
+              boxShadow: "0 2px 12px -4px rgba(15,155,171,0.35)",
             }
           : {
               background: "rgba(255,255,255,0.6)",

@@ -15,15 +15,15 @@ import { humanDate } from "@/lib/site"
 // same bordered-document surface — so the page reads as one report, not
 // a report card with loose text underneath.
 
-const INK = "#141922"
-const RULE = "rgba(20, 25, 34, 0.4)" // document border, matches TrafficReport
-const HAIR = "rgba(20, 25, 34, 0.1)" // row dividers inside the document
+const INK = "#1d2f38"
+const RULE = "rgba(29, 47, 56, 0.34)" // document border, matches TrafficReport
+const HAIR = "rgba(29, 47, 56, 0.11)" // row dividers inside the document
 
 export function scoreTint(score: number): string {
-  if (score >= 70) return "#2f9e6f"
-  if (score >= 55) return "#c8973f"
-  if (score >= 40) return "#e08a3b"
-  return "#d4503a"
+  if (score >= 70) return "#17a07a"
+  if (score >= 55) return "#e0a13c"
+  if (score >= 40) return "#ef8348"
+  return "#e0544a"
 }
 
 // ─── Site chrome ─────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export function SectionHeading({ children, note }: { children: React.ReactNode; 
 export function ReportDoc({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="mx-auto max-w-[640px] overflow-hidden bg-white sm:rounded-[3px]"
+      className="mx-auto max-w-[640px] overflow-hidden bg-[#fffdf7] sm:rounded-[3px]"
       style={{ border: `1px solid ${RULE}`, boxShadow: "var(--shadow-float)" }}
     >
       {children}
@@ -116,7 +116,7 @@ export function DocSection({
         {pill && (
           <span
             className="mt-0.5 shrink-0 rounded-full px-3 py-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.12em]"
-            style={{ color: "var(--ink-faint)", border: `1px solid ${HAIR}`, background: "rgba(20,25,34,0.03)" }}
+            style={{ color: "var(--ink-faint)", border: `1px solid ${HAIR}`, background: "rgba(29,47,56,0.035)" }}
           >
             {pill}
           </span>
@@ -171,7 +171,7 @@ export function SignalTable({ signals }: { signals: SafetySignal[] }) {
                   <span className="flex items-center gap-2">
                     <span
                       className="hidden h-[5px] w-12 overflow-hidden rounded-full sm:block"
-                      style={{ background: "rgba(20,25,34,0.08)" }}
+                      style={{ background: "rgba(29,47,56,0.09)" }}
                       aria-hidden
                     >
                       <span
@@ -241,7 +241,7 @@ export function RankedCityList({ items }: { items: ReportMeta[] }) {
           </span>
           <span
             className="hidden h-[5px] w-24 shrink-0 overflow-hidden rounded-full sm:block"
-            style={{ background: "rgba(20,25,34,0.08)" }}
+            style={{ background: "rgba(29,47,56,0.09)" }}
             aria-hidden
           >
             <span className="block h-full rounded-full" style={{ width: `${m.score}%`, background: scoreTint(m.score) }} />
@@ -271,14 +271,36 @@ export function FaqList({ items }: { items: { q: string; a: React.ReactNode }[] 
 
 // ─── Link modules (outside the document) ─────────────────────────────
 
-/** Compact link card for a related report: flag, name, score, verdict word. */
+/**
+ * Compact link card for a related report.
+ *
+ * Report pages carry a lot of these — three grids of six — so they stay as
+ * rows rather than full postcards. The perforated score stamp is what ties
+ * them to the cards elsewhere: same mark, a fraction of the weight.
+ */
 export function ReportLink({ meta, anchor }: { meta: ReportMeta; anchor?: string }) {
   return (
     <Link
       href={meta.path}
-      className="card flex items-center justify-between gap-3 px-4 py-3 transition-shadow hover:shadow-[var(--shadow-float)]"
+      className="card flex items-center justify-between gap-3 py-3 pl-3 pr-4 transition-shadow hover:shadow-[var(--shadow-float)]"
     >
-      <span className="min-w-0">
+      <span
+        className="score-stamp"
+        style={
+          {
+            position: "static",
+            width: 38,
+            flex: "none",
+            "--stamp": scoreTint(meta.score),
+          } as React.CSSProperties
+        }
+        aria-label={`Safety score ${meta.score} out of 100`}
+      >
+        <span className="n" style={{ fontSize: "1rem" }}>
+          {meta.score}
+        </span>
+      </span>
+      <span className="min-w-0 flex-1">
         <span className="block truncate text-[0.88rem] font-semibold text-[var(--ink)]">
           {meta.flag && <span className="mr-1.5">{meta.flag}</span>}
           {anchor ?? `Is ${meta.city} safe?`}
@@ -287,7 +309,6 @@ export function ReportLink({ meta, anchor }: { meta: ReportMeta; anchor?: string
           {LEVELS[meta.level].label} · {meta.country}
         </span>
       </span>
-      <ScoreBadge score={meta.score} />
     </Link>
   )
 }

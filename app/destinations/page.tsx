@@ -1,98 +1,39 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { listCountries, type CountryHub } from "@/lib/reports"
-import { LEVELS } from "@/lib/safety-display"
+import { getGlobePayload } from "@/lib/globe-data"
 import { absUrl, humanDate } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
-import {
-  Breadcrumbs,
-  ScoreBadge,
-  SectionHeading,
-  SeoFooter,
-  SiteHeader,
-  scoreTint,
-} from "@/components/seo/shared"
+import { Breadcrumbs, SectionHeading, SeoFooter, SiteHeader } from "@/components/seo/shared"
+import { GlobeExplorer } from "@/components/globe/GlobeExplorer"
+import { Postcard } from "@/components/beach/Postcard"
 
 export const dynamic = "force-dynamic"
 
 export async function generateMetadata(): Promise<Metadata> {
   const year = new Date().getFullYear()
   return {
-    title: `All Destination Safety Reports ${year} — Scores by Country & City`,
+    title: `The Safety Globe ${year} — Every Destination, Scored`,
     description:
-      `Every IsMyTripSafe travel safety report, updated for ${year} and organised by country: composite safety ` +
-      "scores, government advisory levels, crime data and field research for each destination.",
+      `Spin the globe and open any country. ${year} travel safety scores for every destination we've ` +
+      "researched, built from official advisories, crime and governance data, live environmental feeds " +
+      "and AI field research.",
     alternates: { canonical: "/destinations" },
   }
 }
 
-/** One country: header row (flag, name, score) + its city reports + overview link. */
-function CountryCard({ c }: { c: CountryHub }) {
-  const score = c.countryReport?.score ?? c.avgScore
-  return (
-    <div className="card flex flex-col overflow-hidden">
-      <Link
-        href={`/${c.countrySlug}`}
-        className="group flex items-center justify-between gap-3 px-4 py-3.5 transition-colors hover:bg-[rgba(31,116,207,0.05)]"
-      >
-        <span className="font-display min-w-0 truncate text-[1.05rem] font-medium tracking-tight text-[var(--ink)] group-hover:text-[var(--accent-deep)]">
-          {c.flag && <span className="mr-2">{c.flag}</span>}
-          Is {c.country} safe?
-        </span>
-        {score != null && <ScoreBadge score={score} size={34} />}
-      </Link>
-      {c.cities.length > 0 && (
-        <ul className="border-t border-[var(--hairline)]">
-          {c.cities.map((m) => (
-            <li key={m.path}>
-              <Link
-                href={m.path}
-                className="flex items-center justify-between gap-3 px-4 py-2 text-[0.85rem] transition-colors hover:bg-[rgba(31,116,207,0.05)]"
-              >
-                <span className="min-w-0 truncate font-medium text-[var(--ink)]">{m.city}</span>
-                <span className="flex shrink-0 items-center gap-2 text-[0.72rem] text-[var(--ink-faint)]">
-                  {LEVELS[m.level].label}
-                  <span
-                    className="tnum inline-flex w-8 justify-center rounded-full py-0.5 text-[0.7rem] font-bold text-white"
-                    style={{ background: scoreTint(m.score) }}
-                  >
-                    {m.score}
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="mt-auto flex items-center justify-between border-t border-[var(--hairline)] px-4 py-2 text-[0.72rem] text-[var(--ink-faint)]">
-        Updated {humanDate(c.updatedAt)}
-        <Link href={`/${c.countrySlug}`} className="font-semibold text-[var(--accent-deep)] hover:underline">
-          {c.country} overview →
-        </Link>
-      </p>
-    </div>
-  )
-}
-
 export default async function DestinationsPage() {
-  const countries = await listCountries()
-  const total = countries.reduce(
-    (n, c) => n + c.cities.length + (c.countryReport ? 1 : 0),
-    0
-  )
-  const updatedAt = countries.map((c) => c.updatedAt).sort().at(-1) ?? null
+  const payload = await getGlobePayload()
+  const { totals, updatedAt, highlights } = payload
 
-  // Group by continent/region so the country → city structure reads at a glance.
-  const regions = new Map<string, CountryHub[]>()
-  for (const c of countries) {
-    const key = c.region || "Other regions"
-    regions.set(key, [...(regions.get(key) ?? []), c])
+  // Country slug → its city reports, best first. Feeds the crawlable index
+  // at the foot of the page (the globe holds the same data client-side).
+  const cityIndex = new Map<string, typeof payload.points>()
+  for (const p of payload.points) {
+    const arr = cityIndex.get(p.countrySlug)
+    if (arr) arr.push(p)
+    else cityIndex.set(p.countrySlug, [p])
   }
-  const regionEntries = [...regions.entries()].sort(
-    (a, b) =>
-      b[1].reduce((n, c) => n + c.cities.length + 1, 0) -
-      a[1].reduce((n, c) => n + c.cities.length + 1, 0)
-  )
+  for (const arr of cityIndex.values()) arr.sort((a, b) => b.score - a.score)
 
   const trail = [
     { name: "Home", href: "/" },
@@ -110,51 +51,145 @@ export default async function DestinationsPage() {
   return (
     <>
       <SiteHeader />
-      <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-        <div className="mx-auto max-w-[760px]">
-          <Breadcrumbs trail={trail} />
-          <h1 className="font-display text-[clamp(1.7rem,5vw,2.3rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
-            Destination safety reports
-          </h1>
-          <p className="mt-3 max-w-[640px] text-[0.95rem] leading-relaxed text-[var(--ink-soft)]">
-            {total} independent safety report{total === 1 ? "" : "s"} across {countries.length}{" "}
-            countr{countries.length === 1 ? "y" : "ies"}, each combining official advisories,
-            crime and governance data, live environmental feeds and AI field research into one
-            0–100 score. Don&apos;t see your destination?{" "}
-            <Link href="/" className="font-medium text-[var(--accent-deep)] hover:underline">
-              Generate its report in about a minute
-            </Link>
-            .
-          </p>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
 
-          {countries.length === 0 && (
-            <p className="mt-8 text-[0.9rem] text-[var(--ink-soft)]">
-              No reports published yet —{" "}
-              <Link href="/" className="font-medium text-[var(--accent-deep)] hover:underline">
-                run the first one
-              </Link>
-              .
+      {/* ── Masthead ── */}
+      <div className="relative z-10 mx-auto max-w-6xl px-4 pb-6 pt-7 sm:px-6">
+        <Breadcrumbs trail={trail} />
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+          <div className="max-w-[38rem]">
+            <p className="postcard-greeting">Wish you were here</p>
+            <h1 className="font-display mt-1 text-[clamp(1.9rem,5.2vw,2.9rem)] font-medium leading-[1.04] tracking-tight text-[var(--navy)]">
+              Every destination we&apos;ve checked, on one globe
+            </h1>
+            <p className="mt-3.5 text-[0.95rem] leading-relaxed text-[var(--ink-soft)]">
+              {totals.reports} independent safety reports across {totals.countries} countries. Drag to
+              spin it, scroll to come in closer, and click any country to open what we found there.
             </p>
-          )}
+          </div>
+          <dl className="flex gap-7">
+            {[
+              { n: totals.reports, l: "reports" },
+              { n: totals.countries, l: "countries" },
+              { n: totals.cities, l: "cities" },
+            ].map((s) => (
+              <div key={s.l}>
+                <dt className="sr-only">{s.l}</dt>
+                <dd className="font-display tnum text-[1.9rem] font-medium leading-none text-[var(--accent-deep)]">
+                  {s.n}
+                </dd>
+                <p className="label mt-1">{s.l}</p>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </div>
 
-          <div className="mt-9 space-y-10">
-            {regionEntries.map(([region, list]) => (
-              <section key={region}>
-                <SectionHeading
-                  note={`${list.reduce((n, c) => n + c.cities.length + (c.countryReport ? 1 : 0), 0)} reports`}
-                >
-                  {region}
-                </SectionHeading>
-                <div className="mt-3.5 grid items-start gap-3 sm:grid-cols-2">
-                  {list.map((c) => (
-                    <CountryCard key={c.countrySlug} c={c} />
-                  ))}
-                </div>
-              </section>
+      {/* ── The globe ── */}
+      <div className="relative z-10">
+        <GlobeExplorer payload={payload} />
+        <div className="shoreline relative z-10 -mt-2" aria-hidden />
+      </div>
+
+      <main className="relative z-10 mx-auto max-w-6xl px-4 pb-2 sm:px-6">
+        {/* ── Postcard decks ── */}
+        <section className="mt-10">
+          <SectionHeading note="highest scoring">Postcards from the safe end</SectionHeading>
+          <div className="postcard-deck mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {highlights.safest.map((m, i) => (
+              <Postcard key={m.path} meta={m} index={i} />
             ))}
           </div>
+        </section>
 
+        <section className="mt-14">
+          <SectionHeading note="most searched">The big ones</SectionHeading>
+          <div className="postcard-deck mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {highlights.biggest.map((m, i) => (
+              <Postcard key={m.path} meta={m} index={i} />
+            ))}
+          </div>
+        </section>
+
+        <section className="mt-14">
+          <SectionHeading note="lowest scoring">Where we&apos;d think twice</SectionHeading>
+          <p className="mt-2 max-w-[42rem] text-[0.86rem] leading-relaxed text-[var(--ink-soft)]">
+            A low score isn&apos;t a verdict on a place or its people — it&apos;s what the data says
+            about the conditions a visitor would land in this month. Every one of these opens onto the
+            sources behind it.
+          </p>
+          <div className="postcard-deck mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {highlights.hardest.map((m, i) => (
+              <Postcard key={m.path} meta={m} index={i} />
+            ))}
+          </div>
+        </section>
+
+        {/* ── The full index ──
+            The globe is WebGL and client-only, so on its own it would strip
+            every internal link off this page and leave anyone without a GPU
+            with nothing. This stays: server-rendered, complete, collapsed. */}
+        <section className="mt-16">
+          <SectionHeading note={`${payload.countries.length} countries`}>
+            The full index
+          </SectionHeading>
+          {/* prefetch={false} throughout: this index is ~1,000 links. Letting
+              Next prefetch them floods the router with requests the browser
+              then aborts, which poisons its cache and leaves navigation
+              hanging on entries that never resolve. */}
+          <details className="disclosure mt-3.5">
+            <summary>
+              Every country and city as a plain list
+              <span className="text-[0.72rem] font-normal text-[var(--ink-faint)]">
+                open ▾
+              </span>
+            </summary>
+            <div className="disclosure-body">
+              <ul className="columns-1 gap-x-8 sm:columns-2 lg:columns-3">
+                {[...payload.countries]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((c) => (
+                    <li key={c.slug} className="mb-3 break-inside-avoid">
+                      <Link
+                        href={`/${c.slug}`}
+                        prefetch={false}
+                        className="font-semibold text-[var(--navy)] hover:text-[var(--accent-deep)] hover:underline"
+                      >
+                        {c.flag} {c.name}
+                      </Link>
+                      <span className="tnum ml-1.5 text-[0.7rem] text-[var(--ink-faint)]">{c.score}</span>
+                      {(cityIndex.get(c.slug) ?? []).length > 0 && (
+                        <span className="mt-0.5 block text-[0.76rem] leading-relaxed text-[var(--ink-soft)]">
+                          {(cityIndex.get(c.slug) ?? []).map((p, i) => (
+                            <span key={p.path}>
+                              {i > 0 && " · "}
+                              <Link
+                                href={p.path}
+                                prefetch={false}
+                                className="hover:text-[var(--accent-deep)] hover:underline"
+                              >
+                                {p.city}
+                              </Link>
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          </details>
+        </section>
+
+        <div className="mx-auto mt-14 max-w-[760px]">
+          <div className="deckle" aria-hidden />
+          <p className="mt-6 text-center text-[0.9rem] leading-relaxed text-[var(--ink-soft)]">
+            Don&apos;t see your destination on the globe?{" "}
+            <Link href="/" className="font-semibold text-[var(--accent-deep)] hover:underline">
+              Generate its report in about a minute
+            </Link>
+            {updatedAt && <> · last refresh {humanDate(updatedAt)}</>}
+          </p>
           <SeoFooter updatedAt={updatedAt} />
         </div>
       </main>

@@ -3,7 +3,7 @@ import Link from "next/link"
 import { HomeClient } from "@/components/HomeClient"
 import { listCountries, listReports } from "@/lib/reports"
 import { graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
-import { ReportLink } from "@/components/seo/shared"
+import { Postcard } from "@/components/beach/Postcard"
 import { SiteFooter } from "@/components/SiteFooter"
 
 // Server-rendered so crawlers land on real HTML with real links; the
@@ -50,13 +50,20 @@ export default async function Home() {
       <HomeClient>
         {(featured.length > 0 || countries.length > 0) && (
           <section className="mt-8 w-full rise-in" style={{ animationDelay: "0.4s" }}>
-            <h2 className="text-center text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--ink-faint)]">
-              Latest safety reports
-            </h2>
+            <div className="text-center">
+              <p className="postcard-greeting">Postcards from the road</p>
+              <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
+                Somewhere we&apos;ve already checked
+              </h2>
+              <p className="mx-auto mt-2 max-w-[30rem] text-[0.83rem] leading-relaxed text-[var(--ink-soft)]">
+                Hover a card to read what we found. Every score is the same 0–100 scale,
+                built from the same sources.
+              </p>
+            </div>
             {featured.length > 0 && (
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                {featured.map((m) => (
-                  <ReportLink key={m.path} meta={m} />
+              <div className="postcard-deck mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {featured.slice(0, 6).map((m, i) => (
+                  <Postcard key={m.path} meta={m} index={i} />
                 ))}
               </div>
             )}
@@ -68,7 +75,7 @@ export default async function Home() {
                   </Link>
                 ))}
                 <Link href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
-                  All destinations →
+                  Spin the globe →
                 </Link>
               </p>
             )}

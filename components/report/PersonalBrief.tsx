@@ -82,7 +82,7 @@ export function PersonalBrief({
             <span
               key={chip}
               className="rounded-full px-2.5 py-1 font-semibold"
-              style={{ background: "rgba(31,116,207,0.1)", color: "var(--accent-deep)" }}
+              style={{ background: "rgba(15,155,171,0.1)", color: "var(--accent-deep)" }}
             >
               {chip}
             </span>

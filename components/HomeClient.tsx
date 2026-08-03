@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { ShieldCheck } from "lucide-react"
 import { SiteHeader } from "@/components/SiteHeader"
-import { BadgeWash } from "@/components/brand/BadgeWash"
+import { PanoramaArt } from "@/components/beach/PosterArt"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
@@ -13,6 +13,23 @@ import { TopNav } from "@/components/report/TopNav"
 import { useReport } from "@/lib/store"
 import { profileFromParams, profileToParams, type TravelerProfile } from "@/lib/profile"
 import type { SafetyQuery } from "@/lib/types"
+
+/**
+ * The panoramic beach that sits behind the hero: pinned to the bottom of
+ * the block, faded into the page so the search stays the loudest thing on
+ * screen, and hidden from assistive tech — it says nothing the copy doesn't.
+ */
+function BeachHero() {
+  return (
+    // Dropped below the block's own baseline so the horizon and the figures
+    // clear the source line above them rather than sitting behind the words.
+    <div aria-hidden className="pointer-events-none absolute inset-x-0 -bottom-16 -z-10 select-none">
+      <div className="relative h-[17rem] w-full overflow-hidden sm:h-[20rem]">
+        <PanoramaArt className="hero-band-mask absolute inset-0 h-full w-full opacity-[0.72]" />
+      </div>
+    </div>
+  )
+}
 
 /**
  * The interactive checker (search → profile → streaming report). Server-
@@ -80,7 +97,7 @@ export function HomeClient({ children }: { children?: ReactNode }) {
           className="pointer-events-none fixed inset-0 -z-10"
           style={{
             background:
-              "radial-gradient(55% 50% at 80% 8%, rgba(31,116,207,0.12), transparent 70%), radial-gradient(45% 45% at 8% 92%, rgba(20,157,90,0.1), transparent 70%)",
+              "radial-gradient(55% 50% at 80% 8%, rgba(15,155,171,0.12), transparent 70%), radial-gradient(45% 45% at 8% 92%, rgba(255,200,87,0.1), transparent 70%)",
           }}
         />
         <ProfileSetup
@@ -103,19 +120,19 @@ export function HomeClient({ children }: { children?: ReactNode }) {
           className="pointer-events-none fixed inset-0 -z-10"
           style={{
             background:
-              "radial-gradient(55% 50% at 80% 8%, rgba(31,116,207,0.12), transparent 70%), radial-gradient(45% 45% at 8% 92%, rgba(20,157,90,0.1), transparent 70%)",
+              "radial-gradient(55% 50% at 80% 8%, rgba(15,155,171,0.12), transparent 70%), radial-gradient(45% 45% at 8% 92%, rgba(255,200,87,0.1), transparent 70%)",
           }}
         />
 
         {/* Hero — the search is the product, so it sits high and alone */}
         <div className="relative flex flex-col items-center py-14 sm:py-20">
-          <BadgeWash />
+          <BeachHero />
           <div className="mb-8 text-center">
             <div
               className="mb-5 inline-flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.1em] rise-in sm:text-xs"
               style={{
-                background: "rgba(243,108,10,0.08)",
-                border: "1px solid rgba(243,108,10,0.22)",
+                background: "rgba(242,112,74,0.1)",
+                border: "1px solid rgba(242,112,74,0.26)",
                 color: "var(--orange-deep)",
               }}
             >

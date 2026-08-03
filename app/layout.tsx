@@ -2,6 +2,7 @@ import type { Metadata } from "next"
 import { Geist } from "next/font/google"
 import { Fraunces } from "next/font/google"
 import { SITE_URL } from "@/lib/site"
+import { BetaRibbon, IS_BETA } from "@/components/beach/BetaRibbon"
 import "./globals.css"
 
 const geistSans = Geist({
@@ -27,7 +28,11 @@ export const metadata: Metadata = {
     siteName: "IsMyTripSafe",
     type: "website",
   },
-  robots: { index: true, follow: true },
+  // Beta is a second copy of the same 1000+ reports on a second hostname —
+  // it must never be indexed. Belt and braces with app/robots.ts.
+  robots: IS_BETA
+    ? { index: false, follow: false, nocache: true, googleBot: { index: false, follow: false } }
+    : { index: true, follow: true },
 }
 
 export default function RootLayout({
@@ -40,7 +45,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${fraunces.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <BetaRibbon />
+        {children}
+      </body>
     </html>
   )
 }

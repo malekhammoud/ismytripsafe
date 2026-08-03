@@ -29,7 +29,7 @@ export function SiteHeader() {
     <header
       className="sticky top-0 z-40 border-b border-[var(--hairline)]"
       style={{
-        background: "rgba(238, 242, 248, 0.86)",
+        background: "rgba(251, 244, 230, 0.88)",
         backdropFilter: "blur(16px) saturate(1.4)",
         WebkitBackdropFilter: "blur(16px) saturate(1.4)",
       }}
@@ -74,7 +74,7 @@ export function SiteHeader() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-label={open ? "Close menu" : "Open menu"}
-          className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[rgba(20,30,48,0.06)] sm:hidden"
+          className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[rgba(29,47,56,0.07)] sm:hidden"
         >
           {open ? <X size={19} /> : <Menu size={19} />}
         </button>
@@ -83,7 +83,7 @@ export function SiteHeader() {
       {open && (
         <nav
           className="border-t border-[var(--hairline)] px-4 pb-4 pt-2 sm:hidden"
-          style={{ background: "rgba(238, 242, 248, 0.96)" }}
+          style={{ background: "rgba(251, 244, 230, 0.97)" }}
         >
           {LINKS.map((l) => {
             const active = pathname === l.href
