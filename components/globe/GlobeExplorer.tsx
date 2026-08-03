@@ -67,6 +67,29 @@ type PinCity = GlobePoint & { row: number }
 /** How many city names may sit on the globe at once before it reads as noise. */
 const MAX_LABELS = 22
 
+/**
+ * The layer stack, as altitudes above the sphere (1.0 = one globe radius).
+ *
+ * Order matters and it is only enforced by these numbers, so they live
+ * together rather than scattered through the render props. City data sits on
+ * top of country data by design: a country tint is an average, and the whole
+ * point of the city layer is to show where a place departs from it.
+ *
+ *   sea            0
+ *   country fill   ALT_COUNTRY          ← the average
+ *   country lifted ALT_COUNTRY_ACTIVE   ← hover / selected
+ *   city patches   ALT_PATCH            ← the exception to the average
+ *   city labels    ALT_LABEL            ← always readable, never buried
+ *
+ * The gaps are deliberately small. Earlier the lifted country rose to 0.09
+ * — nine units on a globe of radius 100 — which put it clean over the city
+ * patches and hid exactly the cities you had just clicked in to look at.
+ */
+const ALT_COUNTRY = 0.01
+const ALT_COUNTRY_ACTIVE = 0.019
+const ALT_PATCH = 0.027
+const ALT_LABEL = 0.034
+
 const LEGEND = [
   { label: "70+ · safe", color: "#1aba8c" },
   { label: "55–69 · moderate", color: "#ebb042" },
@@ -112,8 +135,10 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
       emissiveIntensity: 0.85,
       shininess: 18,
       specular: new Color("#7fd4de"),
-      transparent: true,
-      opacity: 0.97,
+      // Opaque on purpose: a see-through sphere lets city patches on the far
+      // side of the planet bleed through to the near side.
+      transparent: false,
+      opacity: 1,
     })
     return m
   }, [])
@@ -378,10 +403,13 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     (o: object) => {
       const d = o as Poly
       const c = byNumericId.get(String(d.id))
-      if (!c || !visibleIds.has(c.id)) return 0.006
-      if (selected?.id === c.id) return 0.09
-      if (hover === d) return 0.075
-      return 0.014 + (c.reports > 8 ? 0.012 : 0)
+      // Countries stay low so the city layer above them is never occluded.
+      // Emphasis for hover/selected comes from `capColor` — full-strength
+      // tint instead of a lift — with only a slight rise to separate the
+      // active country's edge from its neighbours.
+      if (!c || !visibleIds.has(c.id)) return ALT_COUNTRY * 0.6
+      if (selected?.id === c.id || hover === d) return ALT_COUNTRY_ACTIVE
+      return ALT_COUNTRY
     },
     [byNumericId, visibleIds, hover, selected]
   )
@@ -514,8 +542,8 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     }
 
     const RIM = 14 // rim vertices per disc — smooth enough at any zoom
-    const ALT = 0.017 // just clear of the country polygons underneath
-    const CORE_ALPHA = 0.92
+    const ALT = ALT_PATCH
+    const CORE_ALPHA = 0.72
     // Each patch is a solid core out to CORE_FRAC of its radius and then a
     // fade to nothing. A pure centre-to-rim gradient reads as a smudge; a
     // core reads as a place with an edge.
@@ -528,7 +556,10 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     for (const p of inRegion) {
       // Radius grows with population but flattens fast — this is a "roughly
       // the metro area" mark, not a scale drawing.
-      const rDeg = Math.min(1.6, 0.5 + Math.sqrt(p.population ?? 40_000) / 2600)
+      // Kept modest. These sit on top of the country fill now, so they read
+      // clearly at low strength — and at full strength a country with many
+      // reports turns into a rash of blobs rather than a map.
+      const rDeg = Math.min(1.15, 0.4 + Math.sqrt(p.population ?? 40_000) / 3200)
       const d = rDeg * toRad
       const lat = p.lat * toRad
       const lng = p.lng * toRad
@@ -587,6 +618,11 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
       new MeshBasicMaterial({
         vertexColors: true,
         transparent: true,
+        // No depth writing: patches overlap each other and must blend, not
+        // punch holes. Depth *testing* stays on, so the sphere still hides
+        // the ones on the far side — which is also why DoubleSide is safe
+        // here, and why it is needed: the fan winding runs the other way
+        // round, so FrontSide culls every patch on the globe.
         depthWrite: false,
         side: DoubleSide,
       })
@@ -665,7 +701,15 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
             polygonAltitude={altOf}
             polygonCapColor={capColor}
             polygonSideColor={() => "rgba(11, 92, 114, 0.5)"}
-            polygonStrokeColor={() => "rgba(255, 253, 246, 0.26)"}
+            polygonStrokeColor={(o: object) => {
+              // The active country is now marked by its outline rather than
+              // by height, since height would put it over the city layer.
+              const d = o as Poly
+              const c = byNumericId.get(String(d.id))
+              return c && (selected?.id === c.id || hover === d)
+                ? "rgba(255, 246, 226, 0.95)"
+                : "rgba(255, 253, 246, 0.24)"
+            }}
             polygonLabel={polygonLabel}
             polygonsTransitionDuration={200}
             polygonCapCurvatureResolution={7}
@@ -681,7 +725,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
             htmlElementsData={pinCities}
             htmlLat="lat"
             htmlLng="lng"
-            htmlAltitude={0.01}
+            htmlAltitude={ALT_LABEL}
             htmlElement={makePin}
             htmlElementVisibilityModifier={pinVisibility}
             htmlTransitionDuration={220}
