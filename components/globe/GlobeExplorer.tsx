@@ -4,7 +4,17 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import dynamic from "next/dynamic"
 import Link from "next/link"
 import { feature } from "topojson-client"
-import { AmbientLight, Color, DirectionalLight, MeshPhongMaterial } from "three"
+import {
+  AmbientLight,
+  BufferGeometry,
+  Color,
+  DirectionalLight,
+  DoubleSide,
+  Float32BufferAttribute,
+  Mesh,
+  MeshBasicMaterial,
+  MeshPhongMaterial,
+} from "three"
 import type { Topology, GeometryCollection } from "topojson-specification"
 import { Search, X, Pause, Play, Compass, Maximize2, Crosshair } from "lucide-react"
 import type { GlobeCountry, GlobePayload, GlobePoint } from "@/lib/globe-data"
@@ -55,7 +65,7 @@ type Poly = Feat & { __c?: GlobeCountry }
 type PinCity = GlobePoint & { row: number }
 
 /** How many city names may sit on the globe at once before it reads as noise. */
-const MAX_LABELS = 26
+const MAX_LABELS = 22
 
 const LEGEND = [
   { label: "70+ · safe", color: "#1aba8c" },
@@ -187,7 +197,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
      * latitude means the pair that would collide is the pair that gets split.
      */
     const stagger = (list: GlobePoint[]): PinCity[] =>
-      [...list].sort((a, b) => b.lat - a.lat).map((p, i) => ({ ...p, row: i % 2 }))
+      [...list].sort((a, b) => b.lat - a.lat).map((p, i) => ({ ...p, row: i % 3 }))
 
     if (selected) {
       return stagger(
@@ -421,16 +431,54 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
       // put green names on green countries — the one thing the label must
       // never be is the same colour as what it sits on.
       el.style.setProperty("--score", tintSolid(p.score))
-      el.style.setProperty("--row", p.row ? "-8px" : "7px")
+      el.style.setProperty("--row", ["0px", "-15px", "14px"][p.row] ?? "0px")
       el.href = p.path
-      el.title = `${p.city}, ${p.country} — ${p.score}/100, ${p.levelLabel}`
       el.setAttribute(
         "aria-label",
         `${p.city}, ${p.country}. Safety score ${p.score} out of 100, ${p.levelLabel}`
       )
+
+      // The name, always visible.
+      const name = document.createElement("span")
+      name.className = "pin-name"
       // textContent, not innerHTML — city names are data, and one of them
       // will eventually contain an apostrophe or an ampersand.
-      el.textContent = p.city
+      name.textContent = p.city
+
+      // The card, on hover. Built as a child of the label rather than as a
+      // shared floating tooltip so it needs no positioning code: it follows
+      // its own label around the globe for free.
+      const card = document.createElement("span")
+      card.className = "pin-card"
+
+      const score = document.createElement("span")
+      score.className = "pin-card-score"
+      score.style.background = tintSolid(p.score)
+      score.textContent = String(p.score)
+
+      const body = document.createElement("span")
+      body.className = "pin-card-body"
+      const title = document.createElement("b")
+      title.textContent = p.city
+      const meta = document.createElement("span")
+      meta.className = "pin-card-meta"
+      meta.textContent = `${p.flag ? `${p.flag} ` : ""}${p.country} · ${p.levelLabel}`
+      const cta = document.createElement("span")
+      cta.className = "pin-card-cta"
+      cta.textContent = "Open the report →"
+      body.append(title, meta, cta)
+
+      card.append(score, body)
+      el.append(name, card)
+
+      // Open state is a class, not a bare :hover rule. These nodes live in
+      // three-globe's own container with its transforms and per-frame style
+      // writes, and the CSS-only version did not reliably take effect there —
+      // an explicit class does, and it's testable.
+      el.addEventListener("mouseenter", () => el.classList.add("is-open"))
+      el.addEventListener("mouseleave", () => el.classList.remove("is-open"))
+      el.addEventListener("focus", () => el.classList.add("is-open"))
+      el.addEventListener("blur", () => el.classList.remove("is-open"))
       return el
     },
     []
@@ -440,6 +488,119 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
   const pinVisibility = useCallback((el: HTMLElement, isVisible: boolean) => {
     el.dataset.behind = String(!isVisible)
   }, [])
+
+  // ─── City colour patches ───────────────────────────────────────────
+
+  /**
+   * A soft disc of colour over each city, on top of its country's fill.
+   *
+   * A country tint is an average, and averages hide the thing you most need
+   * to see: a city that is nothing like the country around it. Tinting the
+   * city's own patch means a high-risk city inside an otherwise safe country
+   * shows up red on green, where before it was invisible.
+   *
+   * All of them are baked into ONE merged mesh — a single geometry, one draw
+   * call — rather than a thousand objects. The globe's frame budget is not
+   * something this page can be careless with (see the pause-on-navigate
+   * handler above for what happens when it runs out).
+   */
+  const [patchMesh, setPatchMesh] = useState<Mesh | null>(null)
+
+  useEffect(() => {
+    const g = globeRef.current
+    if (!g || !ready || !inRegion.length) {
+      setPatchMesh(null)
+      return
+    }
+
+    const RIM = 14 // rim vertices per disc — smooth enough at any zoom
+    const ALT = 0.017 // just clear of the country polygons underneath
+    const CORE_ALPHA = 0.92
+    // Each patch is a solid core out to CORE_FRAC of its radius and then a
+    // fade to nothing. A pure centre-to-rim gradient reads as a smudge; a
+    // core reads as a place with an edge.
+    const CORE_FRAC = 0.5
+    const toRad = Math.PI / 180
+    const positions: number[] = []
+    const colors: number[] = []
+    const c = new Color()
+
+    for (const p of inRegion) {
+      // Radius grows with population but flattens fast — this is a "roughly
+      // the metro area" mark, not a scale drawing.
+      const rDeg = Math.min(1.6, 0.5 + Math.sqrt(p.population ?? 40_000) / 2600)
+      const d = rDeg * toRad
+      const lat = p.lat * toRad
+      const lng = p.lng * toRad
+      const sinLat = Math.sin(lat)
+      const cosLat = Math.cos(lat)
+      const sinD = Math.sin(d)
+      const cosD = Math.cos(d)
+
+      c.set(tintSolid(p.score))
+      const centre = g.getCoords(p.lat, p.lng, ALT)
+
+      // Ring points by the great-circle destination formula, so each patch
+      // sits ON the sphere rather than as a flat card cutting through it.
+      const ringAt = (frac: number) => {
+        const dd = d * frac
+        const sD = Math.sin(dd)
+        const cD = Math.cos(dd)
+        const out: { x: number; y: number; z: number }[] = []
+        for (let i = 0; i <= RIM; i++) {
+          const brg = (i / RIM) * Math.PI * 2
+          const lat2 = Math.asin(sinLat * cD + cosLat * sD * Math.cos(brg))
+          const lng2 =
+            lng + Math.atan2(Math.sin(brg) * sD * cosLat, cD - sinLat * Math.sin(lat2))
+          out.push(g.getCoords(lat2 / toRad, lng2 / toRad, ALT))
+        }
+        return out
+      }
+      const core = ringAt(CORE_FRAC)
+      const edge = ringAt(1)
+
+      for (let i = 0; i < RIM; i++) {
+        const a = core[i]
+        const b = core[i + 1]
+        // solid core
+        positions.push(centre.x, centre.y, centre.z, a.x, a.y, a.z, b.x, b.y, b.z)
+        colors.push(
+          c.r, c.g, c.b, CORE_ALPHA,
+          c.r, c.g, c.b, CORE_ALPHA,
+          c.r, c.g, c.b, CORE_ALPHA
+        )
+        // falloff to the rim
+        const e = edge[i]
+        const f = edge[i + 1]
+        positions.push(a.x, a.y, a.z, e.x, e.y, e.z, f.x, f.y, f.z)
+        colors.push(c.r, c.g, c.b, CORE_ALPHA, c.r, c.g, c.b, 0, c.r, c.g, c.b, 0)
+        positions.push(a.x, a.y, a.z, f.x, f.y, f.z, b.x, b.y, b.z)
+        colors.push(c.r, c.g, c.b, CORE_ALPHA, c.r, c.g, c.b, 0, c.r, c.g, c.b, CORE_ALPHA)
+      }
+    }
+
+    const geom = new BufferGeometry()
+    geom.setAttribute("position", new Float32BufferAttribute(positions, 3))
+    geom.setAttribute("color", new Float32BufferAttribute(colors, 4))
+    const mesh = new Mesh(
+      geom,
+      new MeshBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        side: DoubleSide,
+      })
+    )
+    mesh.renderOrder = 2
+    setPatchMesh(mesh)
+
+    return () => {
+      geom.dispose()
+      ;(mesh.material as MeshBasicMaterial).dispose()
+    }
+  }, [ready, inRegion])
+
+  const patchLayer = useMemo(() => (patchMesh ? [patchMesh] : []), [patchMesh])
 
   const selectedPoints = selected ? pointsBySlug.get(selected.slug) ?? [] : []
 
@@ -524,6 +685,9 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
             htmlElement={makePin}
             htmlElementVisibilityModifier={pinVisibility}
             htmlTransitionDuration={220}
+            /* One merged mesh of per-city colour patches. */
+            customLayerData={patchLayer}
+            customThreeObject={(o: object) => o as Mesh}
           />
           </Suspense>
         )}
