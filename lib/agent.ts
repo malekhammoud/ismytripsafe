@@ -398,6 +398,73 @@ async function* streamModel(
   }
 }
 
+/** Stream one Gemini Flash completion (Google Anti-Gravity / Gemini API), yielding content text. */
+async function* streamGeminiFlash(
+  apiKey: string,
+  system: string,
+  user: string,
+  deadline: number,
+  maxTokens = 1500,
+  modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash"
+): AsyncGenerator<string> {
+  const controller = new AbortController()
+  const hardTimer = setTimeout(
+    () => controller.abort(),
+    Math.max(1, deadline - Date.now())
+  )
+  let stallTimer = setTimeout(() => controller.abort(), STALL_TIMEOUT_MS)
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:streamGenerateContent?alt=sse&key=${apiKey}`
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: user }] }],
+        generationConfig: {
+          temperature: 0.35,
+          maxOutputTokens: maxTokens,
+        },
+      }),
+      signal: controller.signal,
+    })
+
+    if (!res.ok || !res.body) {
+      const detail = await res.text().catch(() => "")
+      throw new Error(`Gemini API ${res.status}: ${detail.slice(0, 300)}`)
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      clearTimeout(stallTimer)
+      stallTimer = setTimeout(() => controller.abort(), STALL_TIMEOUT_MS)
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
+      buffer = lines.pop() ?? ""
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith("data:")) continue
+        const payload = trimmed.slice(5).trim()
+        if (!payload) continue
+        try {
+          const json = JSON.parse(payload)
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text
+          if (text) yield text
+        } catch {}
+      }
+    }
+  } finally {
+    clearTimeout(hardTimer)
+    clearTimeout(stallTimer)
+  }
+}
+
 // ─── Local Claude CLI fallback ──────────────────────────────────────
 // The free-model pool runs out once a day. When it does, every remaining
 // request used to end at "Couldn't complete the check" — a visitor asking
@@ -413,7 +480,7 @@ async function* streamModel(
 // normal day. It is slower (~30s vs ~5s) and it is not free, which is exactly
 // the trade you want for "answer the visitor rather than show them an error".
 
-const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude"
+const CLAUDE_BIN = process.env.CLAUDE_BIN || "/root/.local/bin/claude"
 /** Cheapest capable model — this is a fallback, not the main path. */
 const CLAUDE_MODEL = process.env.CLAUDE_FALLBACK_MODEL || "haiku"
 const CLAUDE_TIMEOUT_MS = 120_000
@@ -483,6 +550,59 @@ async function* streamClaudeCli(
   yield text
 }
 
+const AGY_BIN = process.env.AGY_BIN || "/root/.local/bin/agy"
+const AGY_MODEL = process.env.AGY_MODEL || "gemini-2.5-flash"
+
+/**
+ * Run prompt through Google Antigravity CLI (agy), using Gemini 3.6 Flash.
+ */
+async function* streamAntigravityCli(
+  system: string,
+  user: string
+): AsyncGenerator<string> {
+  const text = await new Promise<string>((resolve, reject) => {
+    const fullPrompt = `System instructions:\n${system}\n\n${user}`
+    const proc = spawn(
+      AGY_BIN,
+      [
+        "-p",
+        "--model", AGY_MODEL,
+        "--dangerously-skip-permissions",
+      ],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+        cwd: tmpdir(),
+        env: { ...process.env, PATH: process.env.PATH ?? "/usr/bin:/root/.local/bin" },
+      }
+    )
+
+    let out = ""
+    let err = ""
+    const timer = setTimeout(() => {
+      proc.kill("SIGKILL")
+      reject(new Error(`agy CLI timed out after ${CLAUDE_TIMEOUT_MS}ms`))
+    }, CLAUDE_TIMEOUT_MS)
+
+    proc.stdout.on("data", (d) => (out += d))
+    proc.stderr.on("data", (d) => (err += d))
+    proc.on("error", (e) => {
+      clearTimeout(timer)
+      reject(new Error(`agy CLI unavailable: ${e.message}`))
+    })
+    proc.on("close", (code) => {
+      clearTimeout(timer)
+      if (code !== 0) reject(new Error(`agy CLI exited ${code}: ${err.slice(0, 200)}`))
+      else if (!out.trim()) reject(new Error("agy CLI returned nothing"))
+      else resolve(out)
+    })
+
+    proc.stdin.write(fullPrompt)
+    proc.stdin.end()
+  })
+
+  yield text
+}
+
 /**
  * Everything we can try, in order:
  *
@@ -504,9 +624,31 @@ function buildAttempts(
   user: string,
   deadline: number,
   maxTokens: number,
-  allowFallback = true
+  allowFallback = true,
+  provider?: string | null
 ): Array<{ label: string; stream: () => AsyncGenerator<string> }> {
   const attempts: Array<{ label: string; stream: () => AsyncGenerator<string> }> = []
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+
+  if (provider === "antigravity" || provider === "gemini") {
+    attempts.push({ label: "antigravity-cli", stream: () => streamAntigravityCli(system, user) })
+    if (geminiKey) {
+      attempts.push({
+        label: "gemini-2.5-flash",
+        stream: () => streamGeminiFlash(geminiKey, system, user, deadline, maxTokens),
+      })
+    }
+    attempts.push({ label: "claude-cli", stream: () => streamClaudeCli(system, user) })
+  }
+
+  // If Gemini API key is configured, put Gemini Flash first (Google Anti-Gravity option)
+  if (geminiKey && !attempts.some((a) => a.label === "gemini-2.5-flash")) {
+    attempts.push({
+      label: "gemini-2.5-flash",
+      stream: () => streamGeminiFlash(geminiKey, system, user, deadline, maxTokens),
+    })
+  }
+
   const openRouter = (model: string) => ({
     label: model,
     stream: () => streamModel(model, apiKey!, system, user, deadline, maxTokens),
@@ -515,10 +657,11 @@ function buildAttempts(
   if (apiKey && openRouterAvailable()) attempts.push(...getModels().map(openRouter))
 
   if (allowFallback) {
-    // Paid models bill per token rather than drawing on the free allowance, so
-    // the daily 429 that disables tier 1 does not apply to them.
+    // Paid models bill per token rather than drawing on the free allowance
     if (apiKey) attempts.push(...getPaidModels().map(openRouter))
-    attempts.push({ label: "claude-cli", stream: () => streamClaudeCli(system, user) })
+    if (!attempts.some((a) => a.label === "claude-cli")) {
+      attempts.push({ label: "claude-cli", stream: () => streamClaudeCli(system, user) })
+    }
   }
   return attempts
 }
@@ -619,7 +762,8 @@ export async function* runSafetyAgent(
   bundle: SafetyBundle,
   wikivoyage: WikivoyageSafety | null = null,
   dossier: ResearchDossier = { headlines: [], webResults: [], extracts: [] },
-  allowFallback = true
+  allowFallback = true,
+  provider?: string | null
 ): AsyncGenerator<StreamEvent> {
   // No key is no longer fatal — the local CLI can still answer.
   const apiKey = process.env.OPENROUTER_API_KEY
@@ -639,7 +783,8 @@ export async function* runSafetyAgent(
     userPrompt,
     deadline,
     1500,
-    allowFallback
+    allowFallback,
+    provider
   )) {
     // The CLI fallback runs on its own clock — don't let a spent OpenRouter
     // deadline skip past the one provider that can still answer.
@@ -756,7 +901,8 @@ export async function generateMapZones(
   bundle: SafetyBundle,
   wikivoyage: WikivoyageSafety | null,
   dossier: ResearchDossier,
-  allowFallback = true
+  allowFallback = true,
+  provider?: string | null
 ): Promise<ZonesResult | null> {
   const apiKey = process.env.OPENROUTER_API_KEY
   const userPrompt = buildPrompt(geo, bundle, wikivoyage, formatDossier(dossier, new Date()))
@@ -768,7 +914,8 @@ export async function generateMapZones(
     userPrompt,
     deadline,
     1200,
-    allowFallback
+    allowFallback,
+    provider
   )) {
     if (model !== "claude-cli" && Date.now() > deadline - 5_000) continue
     let accumulated = ""
