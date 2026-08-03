@@ -22,9 +22,9 @@ const Globe = dynamic(() => import("react-globe.gl"), {
 //
 // Drag to spin, scroll to zoom, click a country to fly to it. Countries
 // we've published a report for are tinted by their safety score; the rest
-// are sand-coloured and inert. City reports are pins — thinned out when
-// you're far away so the planet doesn't turn into a rash of dots, and
-// revealed in full as you come in.
+// are sand-coloured and inert. City reports are small names set on the map
+// itself — nothing standing off the surface, and only ever the handful you
+// are actually looking at.
 // ─────────────────────────────────────────────────────────────────────
 
 const SEA = "#0d5f74"
@@ -51,8 +51,11 @@ interface Feat {
 
 type Poly = Feat & { __c?: GlobeCountry }
 
-/** A city pin: the report, plus which stem height it was dealt. */
-type PinCity = GlobePoint & { tier: number }
+/** A city label on the globe, plus the row it was dealt (see `stagger`). */
+type PinCity = GlobePoint & { row: number }
+
+/** How many city names may sit on the globe at once before it reads as noise. */
+const MAX_LABELS = 26
 
 const LEGEND = [
   { label: "70+ · safe", color: "#1aba8c" },
@@ -81,7 +84,6 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
    * is scheduled, and it never gets a chance to commit.
    */
   const [pov, setPov] = useState({ lat: 22, lng: -22, altitude: 2.4 })
-  const altitude = pov.altitude
   const [spinning, setSpinning] = useState(true)
   const [query, setQuery] = useState("")
   const [region, setRegion] = useState<string>("All")
@@ -166,41 +168,34 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
   )
 
   /**
-   * The dot layer: one small mark per city, so you can see at a glance where
-   * we have coverage. Thinned when you're far out — a thousand dots on a
-   * globe this size is a texture, not information. These are scenery; the
-   * pins below are what you actually click.
-   */
-  const points = useMemo(() => {
-    if (altitude > 1.7) return inRegion.filter((p) => (p.population ?? 0) > 1_500_000)
-    return inRegion
-  }, [inRegion, altitude])
-
-  /**
-   * The pin layer: named, score-tagged, clickable markers. Only ever the
-   * cities you're actually looking at —
+   * The city layer: a place name, small, sitting on its own coordinate.
+   * Only ever the cities you're actually looking at —
    *
-   *   • a country is open  → all of its cities, however far out you are
+   *   • a country is open  → its cities, biggest first
    *   • zoomed in close    → the nearest cities to the centre of the view
-   *   • otherwise          → none; the dots carry it
+   *   • otherwise          → none
    *
-   * Capped at 48 so the globe never turns into a wall of labels, and the
-   * point-of-view is snapped to a coarse grid so gently rotating the planet
-   * doesn't rebuild the whole DOM layer on every frame.
+   * Capped so the globe never turns into a wall of type, and the point of
+   * view is snapped to a coarse grid so gently rotating the planet doesn't
+   * rebuild the whole DOM layer on every frame.
    */
   const nextPins = useMemo((): PinCity[] => {
     /**
-     * Cities cluster. Left at one height their labels pile into an unreadable
-     * stack, so each pin gets a stem tier — sorted north to south, then
-     * round-robin — which fans neighbours apart vertically while every dot
-     * stays on its true coordinate.
+     * Nudge alternate labels a few pixels up and down. Neighbours a short
+     * drive apart land on nearly the same pixel when you're zoomed out, and
+     * two names printed over each other are worth less than one. Ordering by
+     * latitude means the pair that would collide is the pair that gets split.
      */
     const stagger = (list: GlobePoint[]): PinCity[] =>
-      [...list]
-        .sort((a, b) => b.lat - a.lat)
-        .map((p, i) => ({ ...p, tier: i % 5 }))
+      [...list].sort((a, b) => b.lat - a.lat).map((p, i) => ({ ...p, row: i % 2 }))
 
-    if (selected) return stagger((pointsBySlug.get(selected.slug) ?? []).slice(0, 48))
+    if (selected) {
+      return stagger(
+        [...(pointsBySlug.get(selected.slug) ?? [])]
+          .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
+          .slice(0, MAX_LABELS)
+      )
+    }
     if (pov.altitude > 1.15) return []
 
     // Angular distance from the centre of the view, on the unit sphere.
@@ -220,13 +215,13 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
       .filter((x) => x.d < 0.55 + pov.altitude * 0.45)
       .sort((a, b) => a.d - b.d)
 
-    // Closest first, but break ties toward the bigger places — a capital
-    // should not lose its label to a village six miles nearer the centre.
+    // Nearest the centre first, then the biggest of those — a capital should
+    // not lose its label to a village six miles nearer the middle.
     return stagger(
       near
-        .slice(0, 140)
+        .slice(0, 120)
         .sort((a, b) => (b.p.population ?? 0) - (a.p.population ?? 0))
-        .slice(0, 48)
+        .slice(0, MAX_LABELS)
         .map((x) => x.p)
     )
   }, [selected, pointsBySlug, inRegion, pov])
@@ -236,22 +231,16 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
    *
    * Without this the memo above returns a fresh array on every point-of-view
    * tick, three-globe treats that as new data, and it tears down and rebuilds
-   * every pin element continuously — which drops the DOM node out from under
-   * your cursor between mousedown and mouseup, so pins can't be clicked while
-   * the globe is moving at all.
+   * every label element continuously — which drops the DOM node out from
+   * under your cursor between mousedown and mouseup, so labels can't be
+   * clicked while the globe is moving at all.
    */
   const pinsRef = useRef<PinCity[]>([])
   const pinCities = useMemo(() => {
-    const sig = nextPins.map((p) => `${p.path}:${p.tier}`).join("|")
-    const prev = pinsRef.current
-    const prevSig = prev.map((p) => `${p.path}:${p.tier}`).join("|")
-    if (sig !== prevSig) pinsRef.current = nextPins
+    const sig = nextPins.map((p) => p.path).join("|")
+    if (sig !== pinsRef.current.map((p) => p.path).join("|")) pinsRef.current = nextPins
     return pinsRef.current
   }, [nextPins])
-
-  /** Cities that already have a pin don't also need a dot underneath it. */
-  const pinnedPaths = useMemo(() => new Set(pinCities.map((p) => p.path)), [pinCities])
-  const dots = useMemo(() => points.filter((p) => !pinnedPaths.has(p.path)), [points, pinnedPaths])
 
   // ─── Load the country outlines ─────────────────────────────────────
 
@@ -411,17 +400,6 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     [byNumericId]
   )
 
-  const pointLabel = useCallback((o: object) => {
-    const p = o as GlobePoint
-    return `<div style="font:500 12px/1.45 system-ui;background:rgba(255,253,246,.97);color:#0d3b4d;
-      padding:7px 10px;border-radius:4px;box-shadow:0 8px 26px rgba(0,0,0,.45)">
-      <div style="display:flex;align-items:center;gap:8px;justify-content:space-between">
-        <b>${p.city}</b>
-        <span style="background:${tintSolid(p.score)};color:#fff;font-weight:700;
-          border-radius:3px;padding:1px 6px;font-size:12px">${p.score}</span>
-      </div>
-      <div style="opacity:.62;font-size:11px;margin-top:2px">${p.levelLabel} · ${p.country}</div></div>`
-  }, [])
 
   /**
    * Build one city pin: a real anchor with a real href, so it has a URL,
@@ -439,25 +417,20 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
       const p = o as PinCity
       const el = document.createElement("a")
       el.className = "globe-pin"
-      el.style.setProperty("--stem", `${13 + p.tier * 27}px`)
-      // Alternate the label left and right of its stem as well as up and
-      // down: cities in a narrow longitude band (Portugal, Chile, Norway)
-      // stack on top of each other otherwise.
-      el.style.setProperty("--nudge", `${[0, -54, 54, -30, 30][p.tier]}px`)
+      // The score tints the tick, not the type. Colouring the words by score
+      // put green names on green countries — the one thing the label must
+      // never be is the same colour as what it sits on.
+      el.style.setProperty("--score", tintSolid(p.score))
+      el.style.setProperty("--row", p.row ? "-8px" : "7px")
       el.href = p.path
-      el.title = `${p.city}, ${p.country} — ${p.levelLabel}`
-      el.setAttribute("aria-label", `${p.city}, ${p.country}. Safety score ${p.score} out of 100, ${p.levelLabel}`)
-      el.innerHTML =
-        `<span class="flag">` +
-        `<span class="chip" style="background:${tintSolid(p.score)}">${p.score}</span>` +
-        `<span class="name"></span>` +
-        `</span>` +
-        `<span class="stem"></span>` +
-        `<span class="dot" style="background:${tintSolid(p.score)}"></span>`
+      el.title = `${p.city}, ${p.country} — ${p.score}/100, ${p.levelLabel}`
+      el.setAttribute(
+        "aria-label",
+        `${p.city}, ${p.country}. Safety score ${p.score} out of 100, ${p.levelLabel}`
+      )
       // textContent, not innerHTML — city names are data, and one of them
       // will eventually contain an apostrophe or an ampersand.
-      const name = el.querySelector(".name")
-      if (name) name.textContent = p.city
+      el.textContent = p.city
       return el
     },
     []
@@ -540,26 +513,14 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
               const c = byNumericId.get(String((p as Poly).id))
               if (c) openCountry(c)
             }}
-            /* Scenery: where coverage exists. Clicking one brings its pin up
-               rather than navigating — a 4px dot is not a click target. */
-            pointsData={dots}
-            pointLat="lat"
-            pointLng="lng"
-            pointColor={(o: object) => tintSolid((o as GlobePoint).score)}
-            pointAltitude={0.014}
-            pointRadius={altitude > 1.7 ? 0.4 : 0.26}
-            pointsMerge={false}
-            pointsTransitionDuration={0}
-            pointLabel={pointLabel}
-            onPointClick={(o: object) => {
-              const p = o as GlobePoint
-              flyTo(p.lat, p.lng, Math.min(pov.altitude, 0.62))
-            }}
-            /* The real city layer: named, scored, clickable. */
+            /* One city layer, and it's text. globe.gl's points layer draws
+               extruded cylinders standing off the surface, which read as
+               debris rather than as places — city names sitting flat on the
+               map say the same thing and say it better. */
             htmlElementsData={pinCities}
             htmlLat="lat"
             htmlLng="lng"
-            htmlAltitude={0.02}
+            htmlAltitude={0.01}
             htmlElement={makePin}
             htmlElementVisibilityModifier={pinVisibility}
             htmlTransitionDuration={220}
