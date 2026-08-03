@@ -356,7 +356,10 @@ export function computeCategories(
       tier: 1,
       signalKeys: [
         // City-level first — these are the ones that describe this place
-        // rather than its country, and they now carry most of the pillar.
+        // rather than its country, and carry most of the pillar.
+        "research_robbery_risk",
+        "research_pickpocket_risk",
+        "research_sentiment_score",
         "numbeo_safety_night",
         "numbeo_safety_day",
         "numbeo_worry_mugged",
@@ -364,6 +367,7 @@ export function computeCategories(
         "numbeo_property_crime",
         "numbeo_drugs",
         "numbeo_crime_index",
+        "city_population_scale",
         "city_scale",
         // National statistics.
         "homicide",

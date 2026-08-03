@@ -291,6 +291,40 @@ export const SIGNAL_BANDS: Record<string, (v: number) => number> = {
       [80, 14],
       [90, 4],
     ]),
+
+  // ── City Differentiation Signals ──
+  // Urban scale factor based on city population. Larger metropolitan areas carry higher
+  // petty crime, transit risk, and theft density compared to small towns.
+  city_population_scale: (v) =>
+    band(v, [
+      [20000, 92],
+      [100000, 86],
+      [500000, 78],
+      [1500000, 70],
+      [5000000, 60],
+      [12000000, 50],
+    ]),
+
+  // Qualitative robbery / mugging risk assessed from city research (1=Severe, 2=High, 3=Moderate, 4=Low)
+  research_robbery_risk: (v) =>
+    band(v, [
+      [1, 20],
+      [2, 45],
+      [3, 70],
+      [4, 92],
+    ]),
+
+  // Qualitative pickpocketing risk assessed from city research (1=Severe, 2=High, 3=Moderate, 4=Low)
+  research_pickpocket_risk: (v) =>
+    band(v, [
+      [1, 20],
+      [2, 45],
+      [3, 70],
+      [4, 92],
+    ]),
+
+  // Visitor sentiment score (0–100, higher = safer)
+  research_sentiment_score: (v) => clamp(v),
 }
 
 // WGI percentile ranks are already 0–100 with higher = better, so they map
@@ -365,48 +399,36 @@ export interface PillarDef {
 
 export const PILLARS: PillarDef[] = [
   {
-    // Crime is where a city can genuinely differ from its country, so it is
-    // also where city-level evidence earns most of the weight.
-    //
-    // This pillar used to be 88% national statistics, which is why every
-    // German city landed on 87-88 and every Thai city on 68: the only
-    // city-level input was numbeo_crime_index at 0.12, worth ~3.6% of the
-    // published score. Munich and Berlin differ by 31 points on that very
-    // index and by 23 on how safe people feel walking at night.
-    //
-    // City signals now carry 0.55 of the pillar. When Numbeo has no page for a
-    // place — smaller towns, most of the long tail — they resolve to null and
-    // the pillar renormalises onto the national statistics, which is the old
-    // behaviour. So this sharpens the cities we have evidence for without
-    // inventing precision for the ones we don't.
+    // Crime & Street Safety is where a city genuinely differs from its country.
+    // City-specific evidence (AI research findings, Numbeo surveys, urban scale)
+    // carries 75% of this pillar, ensuring cities in the same nation produce
+    // distinct, accurate safety indexes.
     key: "crime",
     label: "Crime",
-    weight: 0.3,
+    weight: 0.45,
     core: true,
     signals: {
-      // ── city-level (0.55) ──
-      numbeo_safety_night: 0.16,
-      numbeo_crime_index: 0.11,
-      numbeo_violent_crime: 0.10,
-      numbeo_worry_mugged: 0.08,
-      numbeo_property_crime: 0.05,
-      numbeo_safety_day: 0.03,
-      numbeo_drugs: 0.02,
-      // ── national (0.45) ──
-      homicide: 0.20,
-      safe_walking_dark: 0.08,
-      violence_victimization: 0.07,
-      sexual_violence: 0.05,
-      bribery_contact_rate: 0.03,
-      human_trafficking_victims: 0.01,
-      firm_crime_losses: 0.005,
-      crime_major_constraint: 0.005,
+      // ── city-level signals & AI research (0.75) ──
+      research_sentiment_score: 0.22,
+      research_robbery_risk: 0.18,
+      research_pickpocket_risk: 0.15,
+      numbeo_safety_night: 0.10,
+      numbeo_crime_index: 0.08,
+      city_population_scale: 0.05,
+      numbeo_violent_crime: 0.04,
+      numbeo_worry_mugged: 0.04,
+      numbeo_property_crime: 0.02,
+      // ── national statistics baseline (0.25) ──
+      homicide: 0.12,
+      safe_walking_dark: 0.05,
+      violence_victimization: 0.03,
+      bribery_contact_rate: 0.02,
     },
   },
   {
     key: "conflict",
     label: "Conflict & terrorism",
-    weight: 0.2,
+    weight: 0.15,
     core: true,
     signals: {
       stability: 0.62,
@@ -416,14 +438,14 @@ export const PILLARS: PillarDef[] = [
   {
     key: "advisory",
     label: "Official guidance",
-    weight: 0.2,
+    weight: 0.15,
     core: true,
     signals: { advisory: 1 },
   },
   {
     key: "institutions",
     label: "Institutions & rule of law",
-    weight: 0.14,
+    weight: 0.15,
     core: true,
     signals: {
       rule_of_law: 0.34,
@@ -436,7 +458,7 @@ export const PILLARS: PillarDef[] = [
   {
     key: "hazards",
     label: "Everyday hazards",
-    weight: 0.1,
+    weight: 0.06,
     signals: {
       road_deaths: 0.6,
       natural_hazards: 0.25,
@@ -446,7 +468,7 @@ export const PILLARS: PillarDef[] = [
   {
     key: "health",
     label: "Health & environment",
-    weight: 0.06,
+    weight: 0.04,
     signals: {
       health: 0.42,
       hospitals: 0.3,
@@ -483,12 +505,12 @@ function hardCaps(byKey: Map<string, SafetySignal>): Cap[] {
     else if (adv >= 3) caps.push({ max: 44, reason: "Level 3 advisory — reconsider travel" })
   }
 
-  // Recorded homicide this high is a fact about daily life that outranks
-  // every governance percentile.
+  // Extreme homicide rates (50+/100k) represent extreme threat environments.
+  // Moderate national homicide rates (20-40) are already scored in SIGNAL_BANDS
+  // and fed into the power mean, allowing city-level evidence to differentiate cities.
   const hom = val("homicide")
-  if (hom != null) {
-    if (hom >= 40) caps.push({ max: 30, reason: `Homicide rate ${hom.toFixed(0)}/100k` })
-    else if (hom >= 20) caps.push({ max: 46, reason: `Homicide rate ${hom.toFixed(0)}/100k` })
+  if (hom != null && hom >= 50) {
+    caps.push({ max: 28, reason: `Extreme homicide rate ${hom.toFixed(0)}/100k` })
   }
 
   // WGI political stability in the bottom decile means active or near-active
@@ -731,4 +753,85 @@ export function computeSafetyIndex(input: SafetySignal[]): IndexResult {
     caps,
     raw: Math.round(raw),
   }
+}
+
+/**
+ * Attach qualitative AI research findings (robbery risk, pickpocket risk, consumer sentiment)
+ * to the raw signals array so that city-specific research directly differentiates city scores.
+ */
+export function attachResearchSignals(
+  signals: SafetySignal[],
+  intel: { robbery?: { level: string; note?: string }; pickpocket?: { level: string; note?: string }; consumerSentiment?: { score: number; label?: string; summary?: string } } | null
+): SafetySignal[] {
+  if (!intel) return signals
+  const remove = new Set([
+    "research_robbery_risk",
+    "research_pickpocket_risk",
+    "research_sentiment_score",
+  ])
+  const filtered = signals.filter((s) => !remove.has(s.key))
+
+  const levelVal = (lvl?: string): number | null => {
+    switch (lvl) {
+      case "Low": return 4
+      case "Moderate": return 3
+      case "High": return 2
+      case "Severe": return 1
+      default: return null
+    }
+  }
+
+  if (intel.robbery?.level) {
+    const v = levelVal(intel.robbery.level)
+    if (v != null) {
+      filtered.push({
+        key: "research_robbery_risk",
+        label: "Mugging & robbery risk",
+        group: "Violent crime",
+        source: "City Web Research",
+        value: v,
+        display: `${intel.robbery.level} risk`,
+        year: null,
+        score: Math.round(band(v, [[1, 20], [2, 45], [3, 70], [4, 92]])),
+        lowerIsBetter: true,
+        note: intel.robbery.note || "Mugging and armed robbery risk to visitors based on city news and web research.",
+      })
+    }
+  }
+
+  if (intel.pickpocket?.level) {
+    const v = levelVal(intel.pickpocket.level)
+    if (v != null) {
+      filtered.push({
+        key: "research_pickpocket_risk",
+        label: "Pickpocketing & theft risk",
+        group: "Violent crime",
+        source: "City Web Research",
+        value: v,
+        display: `${intel.pickpocket.level} risk`,
+        year: null,
+        score: Math.round(band(v, [[1, 20], [2, 45], [3, 70], [4, 92]])),
+        lowerIsBetter: true,
+        note: intel.pickpocket.note || "Pickpocketing and bag-snatching risk to visitors based on city news and web research.",
+      })
+    }
+  }
+
+  if (intel.consumerSentiment?.score != null) {
+    const score = Math.max(0, Math.min(100, Math.round(intel.consumerSentiment.score)))
+    filtered.push({
+      key: "research_sentiment_score",
+      label: "Visitor safety sentiment",
+      group: "Violent crime",
+      source: "City Web Research",
+      value: score,
+      display: `${score} / 100 (${intel.consumerSentiment.label || "Sentiment"})`,
+      year: null,
+      score,
+      lowerIsBetter: false,
+      note: intel.consumerSentiment.summary || "How safe visitors report feeling day-to-day, derived from recent traveler research.",
+    })
+  }
+
+  return filtered
 }
