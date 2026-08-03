@@ -156,8 +156,17 @@ function SignalRow({ signal, extra }: { signal: SafetySignal | undefined; extra?
           {has ? signal.score : "—"}
         </span>
       </div>
-      <p className="mt-1 flex items-center gap-1 text-[0.66rem]" style={{ color: `${INK}88` }}>
-        {signal.source}
+      <p className="mt-1 flex items-center gap-1.5 text-[0.66rem]" style={{ color: `${INK}88` }}>
+        {(signal.key.startsWith("research_") || signal.key.startsWith("numbeo_") || signal.key === "city_population_scale" || signal.source.includes("City")) ? (
+          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-[0.08em] bg-[rgba(31,157,90,0.15)] text-[#157a44]">
+            City Signal
+          </span>
+        ) : (
+          <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[0.58rem] font-medium uppercase tracking-[0.08em] bg-[rgba(20,25,34,0.06)] text-[var(--ink-soft)]">
+            Country Baseline
+          </span>
+        )}
+        <span>{signal.source}</span>
         {signal.year ? ` · ${signal.year}` : ""}
         {src && <SourceLink href={src} label={signal.source} color={`${INK}99`} />}
       </p>
@@ -596,10 +605,16 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
         delay={200}
       >
         <div>
+          <SignalRow signal={sig("research_robbery_risk")} />
+          <SignalRow signal={sig("research_pickpocket_risk")} />
+          <SignalRow signal={sig("research_sentiment_score")} />
+          <SignalRow signal={sig("numbeo_safety_night")} />
+          <SignalRow signal={sig("numbeo_safety_day")} />
+          <SignalRow signal={sig("city_population_scale")} />
+          <SignalRow signal={sig("numbeo_crime_index")} />
           <SignalRow signal={sig("homicide")} extra={<ContextHover comparison={homicideCmp} />} />
           <SignalRow signal={sig("safe_walking_dark")} />
           <SignalRow signal={sig("violence_victimization")} />
-          <SignalRow signal={sig("numbeo_crime_index")} />
           <RiskRow
             label="Robbery / mugging"
             rating={intel?.robbery}

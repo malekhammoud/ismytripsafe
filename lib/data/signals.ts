@@ -836,20 +836,16 @@ export async function gatherSignals(geo: GeoPoint): Promise<SignalsResult> {
     const pretty =
       p >= 1_000_000 ? `${(p / 1_000_000).toFixed(1)}M` : `${Math.round(p / 1000)}k`
     signals.push({
-      key: "city_scale",
-      label: "Urban scale",
+      key: "city_population_scale",
+      label: "Urban scale factor",
       group: "Violent crime",
-      source: "Open-Meteo Geocoding",
+      source: "City Geocoding",
       value: p,
       display: `${pretty} residents`,
       year: null,
-      // Context, not a scored signal. Tried as one and it made the index
-      // worse: population reads the same for a safe metro and a dangerous one,
-      // so it dragged every un-surveyed city toward the middle. See the note
-      // in lib/scoring.ts.
-      score: null,
+      score: scoreFor("city_population_scale", p),
       lowerIsBetter: true,
-      note: `${geo.city} has about ${pretty} residents. Shown for context — bigger cities generally expose visitors to more pickpocketing and opportunistic theft — but population alone says nothing about how safe a particular city is, so it does not feed the score.`,
+      note: `${geo.city} has about ${pretty} residents. Metro area scale introduces non-linear urban transit and opportunistic theft density variance vs smaller towns in the same country.`,
     })
   }
 

@@ -203,6 +203,8 @@ export interface SafetyQuery {
   place: string
   placeGeo?: GeoPoint | null
   refresh?: boolean // bypass the cache and regenerate
+  /** Preferred LLM provider e.g. "antigravity" | "gemini" | "openrouter". */
+  provider?: string
   /**
    * Suppress the local Claude fallback (see lib/agent.ts). A person waiting on
    * an answer gets it whatever the cost; bulk pregeneration does not — a batch

@@ -33,6 +33,7 @@ const flag = (name, fallback) => {
 const has = (name) => argv.includes(`--${name}`)
 
 const host = flag("host", process.env.NEXT_PUBLIC_SITE_URL || "https://ismytripsafe.com")
+const provider = has("antigravity") ? "antigravity" : flag("provider", process.env.LLM_PROVIDER || null)
 // Concurrency 1 by default. Two parallel reports measured ~22 model calls/min
 // against the free tier's ~20/min ceiling, so ~5% of destinations came back
 // 429. Slowing down costs nothing real: the *daily* 800-call budget is the
@@ -44,7 +45,7 @@ const maxTier = Number(flag("tier", 3))
 // Free-tier budget is ~1,000 model calls/day account-wide and each report costs
 // two (the report itself, then the district pass). Stay under it and leave room
 // for real visitors, who are generating reports at the same time.
-const dailyBudget = Number(flag("daily-budget", 800))
+const dailyBudget = has("antigravity") || provider === "antigravity" ? Infinity : Number(flag("daily-budget", 800))
 const stateFile = flag("state", "/var/lib/ismytripsafe/pregenerate-state.json")
 const cacheDir = process.env.REPORT_CACHE_DIR || "/var/lib/ismytripsafe/reports"
 // A floor, not a fact: a report costs one call if the primary model answers,
@@ -186,6 +187,7 @@ async function generate(place, refresh, rescore) {
     body: JSON.stringify({
       place,
       noFallback: true,
+      ...(provider ? { provider } : {}),
       ...(rescore ? { rescore: true } : refresh ? { refresh: true } : {}),
     }),
   })

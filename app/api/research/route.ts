@@ -6,6 +6,7 @@ import { getWikivoyageSafety } from "@/lib/data/wikivoyage"
 import { cacheKey, readCache, readCacheAnyAge, readStale, writeCache } from "@/lib/cache"
 import { pathForGeo } from "@/lib/reports"
 import { pingIndexNow } from "@/lib/seo/indexnow"
+import { computeSafetyIndex, attachResearchSignals } from "@/lib/scoring"
 import type { SafetyQuery, StreamEvent, SafetyEnrichment, GeoPoint } from "@/lib/types"
 
 export const maxDuration = 300
@@ -96,6 +97,20 @@ export async function POST(request: Request) {
                 `without data (was ${priorImputed}). Keeping the stored report.`,
             })
             return
+          }
+
+          // Fold prior research signals into the bundle to re-score city-level research
+          const enrichedSignals = attachResearchSignals(bundle.safety.signals, prior.enrichment)
+          const rescored = computeSafetyIndex(enrichedSignals)
+          bundle.safety = {
+            ...bundle.safety,
+            index: rescored.index,
+            level: rescored.level,
+            saferThanPct: rescored.saferThanPct,
+            pillars: rescored.pillars,
+            confidence: rescored.confidence,
+            caps: rescored.caps,
+            signals: enrichedSignals,
           }
 
           send({ type: "geo", place: geo })
@@ -189,8 +204,8 @@ export async function POST(request: Request) {
         // 4. AI safety enrichment — interpret the real signals, add local intel
         let enrichment: SafetyEnrichment | null = null
         let prose = ""
-        const allowFallback = !input.noFallback
-        for await (const event of runSafetyAgent(geo, bundle, wikivoyage, dossier, allowFallback)) {
+        const allowFallback = input.provider === "antigravity" || !input.noFallback
+        for await (const event of runSafetyAgent(geo, bundle, wikivoyage, dossier, allowFallback, input.provider)) {
           if (event.type === "enrichment") enrichment = event.data
           if (event.type === "text") prose += event.content
           if (event.type === "done") {
@@ -206,6 +221,19 @@ export async function POST(request: Request) {
         //    search engines about it (IndexNow → Bing → ChatGPT's index).
         if (enrichment) {
           const settled = enrichment
+          const enrichedSignals = attachResearchSignals(bundle.safety.signals, settled)
+          const rescored = computeSafetyIndex(enrichedSignals)
+          bundle.safety = {
+            ...bundle.safety,
+            index: rescored.index,
+            level: rescored.level,
+            saferThanPct: rescored.saferThanPct,
+            pillars: rescored.pillars,
+            confidence: rescored.confidence,
+            caps: rescored.caps,
+            signals: enrichedSignals,
+          }
+
           await writeCache(key, {
             place: input.place,
             geo,
@@ -220,7 +248,7 @@ export async function POST(request: Request) {
           //    generated after the reader already has their report and merged
           //    into the cached record when they land.
           background.push(async () => {
-            const zones = await generateMapZones(geo, bundle, wikivoyage, dossier, allowFallback)
+            const zones = await generateMapZones(geo, bundle, wikivoyage, dossier, allowFallback, input.provider)
             if (!zones) return
             await writeCache(key, {
               place: input.place,
