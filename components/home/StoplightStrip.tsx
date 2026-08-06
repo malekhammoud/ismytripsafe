@@ -13,11 +13,14 @@ export function StoplightStrip({ footer }: { footer?: ReactNode }) {
       <div className="grid gap-2.5 sm:grid-cols-3">
         {LIGHTS.map((l) => (
           <div key={l.label} className="light-card" style={{ background: l.color }}>
-            <p className="flex items-center gap-2 text-[0.82rem] font-bold uppercase tracking-[0.08em]">
+            {/* Mono: the label is the reading, not the prose. It also stops
+                "Yellow light" wrapping onto two lines and leaving the three
+                cards at three different heights. */}
+            <p className="meta flex items-center gap-2 text-[0.62rem]">
               <span className="lamp" aria-hidden />
               {l.label}
             </p>
-            <p className="mt-2 text-[0.8rem] leading-relaxed" style={{ color: "rgba(255,255,255,0.94)" }}>
+            <p className="mt-2.5 text-[0.85rem] leading-relaxed" style={{ color: "rgba(255,255,255,0.94)" }}>
               {l.body}
             </p>
           </div>

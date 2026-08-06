@@ -61,12 +61,25 @@
     0 16px 40px -12px rgba(29, 47, 56, 0.24),
     0 40px 80px -32px rgba(29, 47, 56, 0.32);
 
+  /* Night — the home page's first screen. A warm black, not a cool one: this
+     is lamplight on a wooden table, not a dashboard at 2am. */
+  --night: #17110b;
+  --night-soft: #241a11;
+  --night-line: rgba(246, 234, 212, 0.14);
+  --lamp: #f6ead4;
+  --lamp-dim: rgba(246, 234, 212, 0.62);
+  --lamp-faint: rgba(246, 234, 212, 0.4);
+
   /* Composed from the next/font variables set on <html> in app/layout.tsx.
-     They are named `-src` there so these two don't reference themselves — an
+     They are named `-src` there so these don't reference themselves — an
      earlier version did, which made the token invalid and quietly discarded
-     next/font's size-adjusted fallback metrics. */
-  --font-display: var(--font-display-src), "Didot", "Bodoni MT", Georgia, serif;
-  --font-sans: var(--font-sans-src), system-ui, -apple-system, sans-serif;
+     next/font's size-adjusted fallback metrics.
+
+     The split is the point: display carries feeling, sans carries reading,
+     mono carries measurement. See the note in app/layout.tsx. */
+  --font-display: var(--font-display-src), "Didot", Georgia, serif;
+  --font-sans: var(--font-text-src), Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-mono-src), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
 * {
@@ -128,39 +141,56 @@ body::after {
   font-optical-sizing: auto;
 }
 
-/* Bodoni carries less ink and a smaller x-height than the face this replaced,
-   so the display sizes run a little larger and the tracking a little looser —
-   a Didone set tight loses the space its hairlines need to stay visible. */
+/* Instrument Serif is drawn tight and only comes in one weight, so the display
+   sizes lean on size and leading for hierarchy rather than on boldness. */
 .display-xl {
   font-family: var(--font-display);
-  font-weight: 500;
-  font-size: clamp(2.8rem, 7.4vw, 5.9rem);
-  line-height: 0.98;
-  letter-spacing: -0.012em;
-  font-optical-sizing: auto;
+  font-weight: 400;
+  font-size: clamp(3rem, 8vw, 6.2rem);
+  line-height: 0.94;
+  letter-spacing: -0.018em;
 }
 
 .display-lg {
   font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  line-height: 1;
+  letter-spacing: -0.014em;
+}
+
+/* ─── Measurement ─────────────────────────────────────────
+   Anything that is a fact rather than a feeling. Mono, wide-tracked,
+   small — it should read as an instrument panel next to the prose. */
+.meta {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
   font-weight: 500;
-  font-size: clamp(2.1rem, 5.2vw, 3.6rem);
-  line-height: 1.04;
-  letter-spacing: -0.008em;
-  font-optical-sizing: auto;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.02em;
 }
 
 .eyebrow {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink-faint);
 }
 
 .label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--ink-faint);
 }
@@ -196,8 +226,10 @@ body::after {
 
 /* ─── Trust / document utilities ─────────────────────────── */
 .tnum {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
+  letter-spacing: -0.02em;
 }
 
 /* Numbered section header — gives the report a documentary rhythm */
@@ -208,7 +240,7 @@ body::after {
   margin: 0.25rem 0 0.1rem;
 }
 .section-num {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -577,91 +609,182 @@ body::after {
   transform: translateY(-5px);
 }
 
-/* The plate — a picture that brought its own border.
-   The commissioned set is drawn with a torn cream deckle painted into the
-   pixels, so the CSS frame comes off and the photograph runs to the card's
-   edge. Everything that would have sat on the white stock now sits on the
-   photograph, inset far enough to clear that painted edge. */
-.postcard-plate {
-  padding: 0;
-  background: transparent;
-  border-radius: 4px;
+/* ═══ NIGHT — the home page's first screen ═══════════════════════════
+   Lamplight on a dark table with somebody's postcards spread out on it.
+   Dark because these photographs are all golden hour and they glow against
+   it; warm-dark rather than cool-dark because the page is supposed to feel
+   like an evening spent planning a trip, not like a control room. */
+.night {
+  position: relative;
+  isolation: isolate;
+  background: var(--night);
+  color: var(--lamp);
+  overflow: hidden;
 }
-.postcard-plate::before { content: none; }
-.postcard-plate .postcard-art {
-  border-radius: 3px;
-  box-shadow: none;
-  background: none;
-}
-/* 4.6% is where the painted border ends on every plate in the set. */
-.plate-inner {
+/* The header plate, sunk almost to black and pushed warm. It is atmosphere,
+   not subject — you should read it as a room rather than as a picture. */
+.night-plate {
   position: absolute;
-  inset: 4.6%;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 46% 56%;
+  opacity: 0.17;
+  filter: saturate(0.5) contrast(1.1) brightness(0.4) sepia(0.45);
+}
+/* The lamp. One pool of light in the middle, so the arrangement has a centre
+   before anything is even read. */
+.night-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   pointer-events: none;
+  background:
+    radial-gradient(56% 60% at 50% 48%, rgba(255, 190, 96, 0.22), transparent 66%),
+    radial-gradient(86% 74% at 50% 50%, transparent 26%, rgba(10, 7, 3, 0.86) 100%),
+    linear-gradient(180deg, rgba(10, 7, 3, 0.86), transparent 26%, transparent 80%, rgba(10, 7, 3, 0.7));
 }
-.plate-inner .score-stamp {
-  top: 10px;
-  left: 10px;
+.night a:hover .pc-city { color: var(--sun); }
+
+/* ─── The postcards ──────────────────────────────────────
+   Nothing is drawn on the picture. Every one of them arrived with a torn
+   cream border already painted in, and putting a stamp and a caption on top
+   of that is putting a frame inside a frame. The picture is left alone and
+   everything it needs to say is said underneath it. */
+.pc {
+  display: block;
+  transform: rotate(var(--pc-tilt, 0deg));
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.5s;
+  will-change: transform;
+}
+.pc-shot {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  border-radius: 2px;
+  /* Lifted off the table, and a little of the lamp caught on the top edge. */
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.5),
+    0 14px 26px -12px rgba(0, 0, 0, 0.72),
+    0 40px 70px -40px rgba(0, 0, 0, 0.9);
+}
+.pc:hover,
+.pc:focus-visible {
+  transform: rotate(0deg) translateY(-6px) scale(1.022);
+  outline: none;
+}
+.pc:focus-visible .pc-shot {
+  box-shadow: 0 0 0 2px var(--sun), 0 18px 34px -14px rgba(0, 0, 0, 0.8);
 }
 
-.plate-caption {
-  position: absolute;
-  inset: auto 0 0;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 3rem 0.75rem 0.6rem;
-  border-radius: 0 0 3px 3px;
-  /* Warm rather than neutral: a grey scrim over a sunset turns it to slate.
-     Deep enough at the foot to carry cream type over a white awning or a
-     bleached pavement, which is where the weak version fell apart. */
-  background: linear-gradient(
-    180deg,
-    rgba(26, 16, 9, 0) 0%,
-    rgba(26, 16, 9, 0.32) 34%,
-    rgba(24, 15, 8, 0.72) 66%,
-    rgba(20, 12, 6, 0.93) 100%
-  );
+.pc-cap {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 0 0.55rem;
+  margin-top: 0.6rem;
+  padding: 0 0.1rem;
 }
-.plate-greeting {
+/* The leader. Borrowed from an index page, and it is doing real work: without
+   it the name and the number read as two unrelated facts that happen to share
+   a line. */
+.pc-lead {
+  height: 0.55em;
+  border-bottom: 1px dotted rgba(246, 234, 212, 0.28);
+}
+.pc-city {
   font-family: var(--font-display);
-  font-weight: 500;
-  font-style: italic;
-  font-size: 0.58rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--sun);
+  font-size: 1.22rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--lamp);
+  transition: color 0.3s;
 }
-/* Small, quiet, and always there. Labelling an illustration is what a
-   publication does; hiding the label is what everyone else does. It sits in
-   the corner the postmark used to have, so the caption keeps its two lines. */
-.plate-mark {
-  position: absolute;
-  right: 7px;
-  top: 7px;
-  padding: 1.5px 6px;
-  border-radius: 3px;
-  background: rgba(14, 30, 38, 0.3);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  font: 500 0.53rem/1.4 var(--font-sans);
-  letter-spacing: 0.03em;
-  color: rgba(255, 253, 246, 0.68);
+.pc-score {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--pc-ink, var(--sun));
+}
+.pc-country {
+  grid-column: 1 / -1;
+  margin-top: 0.12rem;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lamp-faint);
 }
 
-/* A seat in the constellation around the home page search.
-   The tilt is handed down to the card through `--tilt`, which `.postcard`
-   already reads, so the two never fight over the same transform. Flat below
-   lg: tilted cards in a single narrow column read as broken, not as scatter. */
-.plate-seat {
-  --tilt: 0deg;
-}
+/* ─── The arrangement ────────────────────────────────────
+   Six cards around the box, at fixed angles. Fixed, not random: a scatter
+   that reshuffles on reload reads as a bug rather than as charm. Flat below
+   lg, where they stack into one column and a tilt just looks broken. */
 @media (min-width: 1024px) {
-  .plate-seat {
-    --tilt: var(--seat-tilt, -1deg);
-    transform: translateY(var(--seat-lift, 0));
+  .pc-seat-1 .pc { --pc-tilt: -3.2deg; }
+  .pc-seat-2 .pc { --pc-tilt: 2.6deg; }
+  .pc-seat-3 .pc { --pc-tilt: -2deg; }
+  .pc-seat-4 .pc { --pc-tilt: 3deg; }
+  .pc-seat-5 .pc { --pc-tilt: 2.2deg; }
+  .pc-seat-6 .pc { --pc-tilt: -2.7deg; }
+  .pc-seat-1 { transform: translateY(-0.5rem); }
+  .pc-seat-2 { transform: translateY(-1.3rem); }
+  .pc-seat-5 { transform: translateY(1rem); }
+  .pc-seat-6 { transform: translateY(0.3rem); }
+}
+
+/* ─── Arrival ────────────────────────────────────────────
+   One orchestrated load and then stillness. The cards are dealt onto the
+   table in seat order, the question fades up through them, and the box
+   lands last — which is also the order you want the eye to travel in. */
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translateY(1.6rem) scale(0.965);
   }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes lamp-up {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.deal {
+  animation: deal 0.85s cubic-bezier(0.2, 0.85, 0.25, 1) backwards;
+}
+.night-glow {
+  animation: lamp-up 2.4s ease-out backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .deal,
+  .night-glow { animation: none; }
+  .pc { transition: none; }
+  .pc:hover, .pc:focus-visible { transform: rotate(var(--pc-tilt, 0deg)); }
+}
+
+/* ─── The box ────────────────────────────────────────────
+   A single lit slot on a dark table. Cream ground so it reads as paper the
+   moment you see it, and the only thing on this screen with a hard edge. */
+.night-box .btn:disabled {
+  background: #e0a88f;
+  color: #5f2510;
+}
+.night-box .card {
+  background: rgba(250, 242, 226, 0.97);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 0 0 1px rgba(255, 200, 87, 0.16),
+    0 2px 6px rgba(0, 0, 0, 0.4),
+    0 26px 50px -22px rgba(0, 0, 0, 0.7),
+    0 0 60px -10px rgba(255, 190, 96, 0.22);
 }
 
 /* Alternating tilts so a grid of cards reads as a scattered stack */
@@ -741,7 +864,7 @@ body::after {
 }
 .score-stamp .n {
   display: block;
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-weight: 600;
   font-size: 1.42rem;
   line-height: 1;

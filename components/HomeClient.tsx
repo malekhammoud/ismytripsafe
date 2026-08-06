@@ -3,8 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { SiteHeader } from "@/components/SiteHeader"
-import { HeroBand } from "@/components/home/HeroBand"
-import { SearchConstellation } from "@/components/home/SearchConstellation"
+import { NightHero, PromiseBand } from "@/components/home/NightHero"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
@@ -12,7 +11,6 @@ import { TrafficReport } from "@/components/report/TrafficReport"
 import { TopNav } from "@/components/report/TopNav"
 import { useReport } from "@/lib/store"
 import { profileFromParams, profileToParams, type TravelerProfile } from "@/lib/profile"
-import type { HomeDemo } from "@/lib/home-demo"
 import type { SafetyQuery } from "@/lib/types"
 
 /**
@@ -28,13 +26,10 @@ import type { SafetyQuery } from "@/lib/types"
  * gives way to the report the moment a search starts.
  */
 export function HomeClient({
-  demo,
   heroCards,
   children,
   footer,
 }: {
-  /** A real destination's live scores, for the phone in the band. */
-  demo: HomeDemo | null
   /** Server-rendered postcards to lay around the search. */
   heroCards?: ReactNode[]
   children?: ReactNode
@@ -127,8 +122,8 @@ export function HomeClient({
       />
 
       {/* Full-bleed, so it sits outside <main>'s measure */}
-      <HeroBand demo={demo} />
-      <SearchConstellation cards={heroCards ?? []} onSearch={search} loading={loading} />
+      <NightHero cards={heroCards ?? []} onSearch={search} loading={loading} />
+      <PromiseBand />
 
       <main className="relative z-10 mx-auto flex max-w-5xl flex-col px-5 pb-4">
         {/* Server-rendered latest-reports directory (crawlable) */}

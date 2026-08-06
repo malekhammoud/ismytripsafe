@@ -7,14 +7,13 @@ import type { ReportMeta } from "@/lib/reports"
 // ─────────────────────────────────────────────────────────────────────
 // A destination as a postcard.
 //
-// Two builds of the same object, depending on what the picture brings:
+// This is the build for a photograph that arrives with no border of its
+// own — from Wikimedia, or the house pool. The CSS draws the card around
+// it: white deckle, art window, caption strip along the bottom.
 //
-//  · **A plate.** The commissioned set arrives with a torn cream border
-//    painted into the pixels. There, the picture *is* the card: no CSS
-//    frame, and the caption sits on the photograph inside that border.
-//  · **A card.** A photograph from Wikimedia or the house pool has no
-//    border of its own, so the CSS draws one — white deckle, art window,
-//    caption strip along the bottom.
+// The commissioned pictures already have a torn border painted into them,
+// so they get a different treatment entirely and nothing is drawn on top.
+// See `components/beach/PlateCard.tsx`.
 //
 // It used to turn over on hover to show the verdict. It doesn't any more:
 // a wall of cards that all move when the mouse crosses them is restless,
@@ -118,47 +117,6 @@ export function Postcard({
     </Link>
   )
 
-  // ── The plate: the picture, border and all ──────────────────────
-  if (supplied) {
-    return link(
-      <div className="postcard postcard-plate">
-        <div className="postcard-art aspect-[3/2]">{art}</div>
-        {/* Inset to clear the painted border, so the stamp and the caption sit
-            on the photograph rather than across the torn edge. */}
-        {/* No postmark here. On white stock it is a faint rubber smudge; over
-            a photograph it turns into an empty ring hovering in the sky. */}
-        <div className="plate-inner">
-          <ScoreStamp score={meta.score} />
-          {/* The picture was drawn rather than taken, and says so. Nobody
-              should have to wonder which of the two they're looking at. */}
-          <span className="plate-mark">Illustration</span>
-          <div className="plate-caption">
-            <div className="min-w-0">
-              <p className="plate-greeting">Greetings from</p>
-              <p
-                className="font-display truncate text-[1.08rem] font-medium leading-tight tracking-tight text-[#fffdf6]"
-                style={{ textShadow: "0 1px 8px rgba(18,10,4,0.55)" }}
-              >
-                {meta.city}
-              </p>
-              <p className="truncate text-[0.64rem] text-[rgba(255,253,246,0.74)]">
-                {meta.flag && <span className="mr-1">{meta.flag}</span>}
-                {meta.country}
-              </p>
-            </div>
-            <p
-              className="shrink-0 pb-1 text-[0.6rem] font-bold uppercase tracking-[0.11em]"
-              style={{ color: stampInk(meta.score), textShadow: "0 1px 6px rgba(18,10,4,0.6)" }}
-            >
-              {level.label}
-            </p>
-          </div>
-        </div>
-      </div>,
-    )
-  }
-
-  // ── The card: a photograph, in a frame the CSS draws ────────────
   return link(
     <div className="postcard">
       <ScoreStamp score={meta.score} />
@@ -182,10 +140,9 @@ export function Postcard({
             {meta.country}
           </p>
         </div>
-        <p
-          className="shrink-0 pb-0.5 text-[0.66rem] font-bold uppercase tracking-[0.11em]"
-          style={{ color: stampInk(meta.score) }}
-        >
+        {/* Mono, like every other verdict on the site: the rule is that a fact
+            never wears the same face as a feeling. */}
+        <p className="meta shrink-0 pb-1 text-[0.58rem]" style={{ color: stampInk(meta.score) }}>
           {level.label}
         </p>
       </div>

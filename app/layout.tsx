@@ -1,38 +1,50 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-import { Bodoni_Moda } from "next/font/google"
+import { Instrument_Serif } from "next/font/google"
+import { Newsreader } from "next/font/google"
+import { Azeret_Mono } from "next/font/google"
 import { SITE_URL } from "@/lib/site"
 import { BetaRibbon, IS_BETA } from "@/components/beach/BetaRibbon"
 import "./globals.css"
 
-// Two faces, and only two.
+// Three faces, and each one has a job it never leaves.
 //
-// Bodoni Moda for anything that carries the brand's voice — the headline, city
-// names, scores. It is the face River's comps were set in, and a Didone reads
-// like a masthead rather than a landing page, which is the register this site
-// needs. Its optical-size axis is the reason it's this Bodoni and not another:
-// hairline serifs are what usually make Didones fall apart below ~20px, and the
-// axis thickens them automatically as the type gets smaller.
+// The product is two things at once — a daydream about going somewhere, and a
+// measurement of whether you should. So the type is split down that seam and
+// never blurred:
 //
-// Inter for everything else. Nothing about it is exciting, which is the point —
-// it has real tabular figures for the score tables and it never draws attention
-// away from the numbers.
+//   · **Instrument Serif** carries the feeling. The headline, the name of a
+//     city on a postcard, the score on a report. High contrast, tight, and it
+//     has the kind of italic you want the word "safe" set in.
+//   · **Newsreader** carries the reading. It is a text serif drawn for
+//     screens, with an optical-size axis, so a page of prose about street
+//     crime in Budapest reads like a briefing rather than like a dashboard.
+//   · **Azeret Mono** carries the measurement. Every number, every category
+//     label, every date and source line. Nothing that is a fact is set in the
+//     same face as something that is a mood, which is the whole rule.
 //
-// The variables are suffixed `-src` because `app/globals.css` composes the final
-// `--font-display` / `--font-sans` from them with a fallback stack. Naming both
-// the same thing made the token reference itself, which silently killed the
+// The variables are suffixed `-src` because `app/globals.css` composes the
+// final tokens from them with fallback stacks. Naming both halves the same
+// thing made the token reference itself, which silently killed the
 // size-adjusted fallback metrics next/font generates to prevent layout shift.
-const inter = Inter({
-  variable: "--font-sans-src",
+const display = Instrument_Serif({
+  variable: "--font-display-src",
   subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
   display: "swap",
 })
 
-const bodoni = Bodoni_Moda({
-  variable: "--font-display-src",
+const text = Newsreader({
+  variable: "--font-text-src",
   subsets: ["latin"],
   style: ["normal", "italic"],
   axes: ["opsz"],
+  display: "swap",
+})
+
+const mono = Azeret_Mono({
+  variable: "--font-mono-src",
+  subsets: ["latin"],
   display: "swap",
 })
 
@@ -63,7 +75,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${bodoni.variable} h-full antialiased`}
+      className={`${display.variable} ${text.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
         <BetaRibbon />

@@ -2,9 +2,9 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { HomeClient } from "@/components/HomeClient"
 import { getCityReport, listCountries, listReports } from "@/lib/reports"
-import { homeDemo } from "@/lib/home-demo"
 import { graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { Postcard } from "@/components/beach/Postcard"
+import { PlateCard } from "@/components/beach/PlateCard"
 import { BigPostcard } from "@/components/home/BigPostcard"
 import { StoplightStrip } from "@/components/home/StoplightStrip"
 import { SiteFooter } from "@/components/SiteFooter"
@@ -58,10 +58,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const [reports, countries, demo, showcase] = await Promise.all([
+  const [reports, countries, showcase] = await Promise.all([
     listReports(),
     listCountries(),
-    homeDemo(),
     getCityReport(SHOWCASE.country, SHOWCASE.city),
   ])
 
@@ -93,8 +92,9 @@ export default async function Home() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <HomeClient
-        demo={demo}
-        heroCards={seated.map((m, i) => <Postcard key={m!.path} meta={m!} index={i} />)}
+        heroCards={seated.map((m, i) => (
+          <PlateCard key={m!.path} meta={m!} priority={i < 2} />
+        ))}
         footer={<SiteFooter />}
       >
         {showcase && (
