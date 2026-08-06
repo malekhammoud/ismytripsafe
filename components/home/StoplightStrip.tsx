@@ -2,12 +2,51 @@ import type { ReactNode } from "react"
 import { LIGHTS } from "@/lib/lights"
 
 /**
- * The three lamps, as one component so the homepage and /how-it-works can't
- * drift apart. `footer` is where the homepage hangs its link through to the
- * longer explanation; /how-it-works has the explanation around it already and
- * passes nothing.
+ * The three lamps, as one component so the home page and /how-it-works can't
+ * drift apart. Two shapes, because the two places are not the same shape:
+ *
+ *  · **Side by side** (default) on the home page, where there is the full
+ *    measure to put three colour blocks across.
+ *  · **Stacked** in a document, where three blocks squeezed into a reading
+ *    column turn into three narrow towers with the sentences wrapping every
+ *    four words. There the colour becomes a rule down the left edge and the
+ *    sentence gets the whole line — the signal survives, the cramping doesn't.
+ *
+ * `footer` is where the home page hangs its link through to the longer
+ * explanation; /how-it-works has the explanation around it and passes nothing.
  */
-export function StoplightStrip({ footer }: { footer?: ReactNode }) {
+export function StoplightStrip({
+  stacked = false,
+  footer,
+}: {
+  stacked?: boolean
+  footer?: ReactNode
+}) {
+  if (stacked) {
+    return (
+      <>
+        <ul className="space-y-2.5">
+          {LIGHTS.map((l) => (
+            <li
+              key={l.label}
+              className="rounded-[4px] py-2.5 pl-4 pr-3"
+              style={{
+                borderLeft: `3px solid ${l.ink}`,
+                background: l.wash,
+              }}
+            >
+              <p className="meta text-[0.62rem]" style={{ color: l.ink }}>
+                {l.label}
+              </p>
+              <p className="mt-1 text-[0.94rem] leading-relaxed text-[var(--ink-soft)]">{l.body}</p>
+            </li>
+          ))}
+        </ul>
+        {footer}
+      </>
+    )
+  }
+
   return (
     <>
       <div className="grid gap-2.5 sm:grid-cols-3">
