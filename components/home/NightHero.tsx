@@ -25,6 +25,14 @@ import type { SafetyQuery } from "@/lib/types"
 // of attention has been taken out, and what is left is arranged around a
 // single pool of light.
 //
+// On a phone the arrangement can't survive: one column of six full-width
+// postcards is six screens of scrolling before anything else on the page
+// exists. So below `lg` they become a strip you swipe, with the next card
+// showing at the edge — one screen, the same six pictures, and a gesture that
+// is closer to actually going through somebody's postcards than a column ever
+// was. `lg:contents` is what lets one set of markup do both: the strip stops
+// being a box at all and its cards become grid cells.
+//
 // What the pictures are, and where the numbers come from, are both said on
 // /credits and /methodology, linked from the footer of every page. They were
 // briefly said here too and it was one line too many under an arrangement
@@ -70,9 +78,9 @@ export function NightHero({
       <div className="night-glow" aria-hidden />
 
       <div className="mx-auto w-full max-w-[78rem] px-5 py-14 sm:px-7 lg:py-20">
-        <div className="grid grid-cols-1 items-center gap-y-10 sm:grid-cols-2 sm:gap-x-7 lg:grid-cols-4 lg:gap-x-8 lg:gap-y-12">
+        <div className="lg:grid lg:grid-cols-4 lg:items-center lg:gap-x-8 lg:gap-y-12">
           {/* ── The question, and the box ───────────────────── */}
-          <div className="night-box order-first sm:col-span-2 lg:order-none lg:col-start-2 lg:col-span-2 lg:row-start-2">
+          <div className="night-box lg:col-start-2 lg:col-span-2 lg:row-start-2">
             <h1
               className="display-lg deal text-balance text-center"
               style={{ color: "var(--lamp)", animationDelay: "0.44s" }}
@@ -103,16 +111,19 @@ export function NightHero({
             </p>
           </div>
 
-          {/* ── The postcards around it ─────────────────────── */}
-          {dealt.map((card, i) => (
-            <div
-              key={i}
-              className={`deal pc-seat-${i + 1} mx-auto w-full max-w-[22rem] lg:max-w-none ${SEATS[i]}`}
-              style={{ animationDelay: `${0.06 * i}s` }}
-            >
-              {card}
-            </div>
-          ))}
+          {/* ── The postcards ───────────────────────────────
+              A swipeable strip on a phone, six seats around the box at lg. */}
+          <div className="pc-strip mt-9">
+            {dealt.map((card, i) => (
+              <div
+                key={i}
+                className={`deal pc-seat-${i + 1} ${SEATS[i]}`}
+                style={{ animationDelay: `${0.06 * i}s` }}
+              >
+                {card}
+              </div>
+            ))}
+          </div>
         </div>
 
       </div>

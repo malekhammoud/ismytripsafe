@@ -773,6 +773,47 @@ body::after {
   color: var(--lamp-faint);
 }
 
+/* ─── The strip, on a phone ──────────────────────────────
+   Bled to both edges so the next card is cut by the screen rather than
+   floating short of it — that cut is the whole affordance, and it does the
+   job an arrow or a row of dots would otherwise have to do. */
+.pc-strip {
+  display: flex;
+  gap: 0.9rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: 1.25rem;
+  padding: 0 1.25rem 0.5rem;
+  /* Only the inline margins: the `margin` shorthand here would reset the top
+     margin the strip is given in the markup, and the row would ride up over
+     the line above it. */
+  margin-inline: -1.25rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.pc-strip::-webkit-scrollbar { display: none; }
+.pc-strip > * {
+  flex: 0 0 auto;
+  width: min(74vw, 20rem);
+  scroll-snap-align: start;
+}
+@media (min-width: 640px) {
+  .pc-strip { gap: 1.1rem; scroll-padding-left: 1.75rem; padding: 0 1.75rem 0.5rem; margin-inline: -1.75rem; }
+  .pc-strip > * { width: min(48vw, 22rem); }
+}
+/* At lg the strip stops existing and its cards become cells of the grid.
+   The `display` switch has to be here rather than an `lg:contents` utility in
+   the markup: this file is declared after Tailwind's layer, so at equal
+   specificity `.pc-strip { display: flex }` wins the media query and the
+   constellation collapses back into a row. */
+@media (min-width: 1024px) {
+  .pc-strip {
+    display: contents;
+  }
+  .pc-strip > * { width: auto; }
+}
+
 /* ─── The arrangement ────────────────────────────────────
    Six cards around the box, at fixed angles. Fixed, not random: a scatter
    that reshuffles on reload reads as a bug rather than as charm. Flat below
@@ -838,6 +879,13 @@ body::after {
     0 0 60px -10px rgba(255, 190, 96, 0.22);
 }
 
+/* Two cards across a phone means each is about 165px wide. Everything drawn on
+   top of the picture scales with it rather than sitting there at desktop size. */
+@media (max-width: 639px) {
+  .postcard-deck .score-stamp { --stamp-size: 0.68; }
+  .postcard-deck .postcard { padding: 6px 6px 0; }
+}
+
 /* Alternating tilts so a grid of cards reads as a scattered stack */
 .postcard-deck > *:nth-child(3n + 1) { --tilt: -1.4deg; }
 .postcard-deck > *:nth-child(3n + 2) { --tilt: 0.9deg; }
@@ -890,11 +938,12 @@ body::after {
    Perforated edge, ink-stamped score. It is the one thing that has to
    read instantly, so it sits in the corner the eye lands on first. */
 .score-stamp {
+  --stamp-size: 1;
   position: absolute;
-  top: 18px;
-  left: 18px;
+  top: calc(18px * var(--stamp-size));
+  left: calc(18px * var(--stamp-size));
   z-index: 3;
-  width: 54px;
+  width: calc(54px * var(--stamp-size));
   padding: 5px 4px 4px;
   text-align: center;
   color: #fff;
@@ -917,7 +966,7 @@ body::after {
   display: block;
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 1.42rem;
+  font-size: calc(1.42rem * var(--stamp-size));
   line-height: 1;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
@@ -925,7 +974,7 @@ body::after {
 .score-stamp .cap {
   display: block;
   margin-top: 1px;
-  font-size: 0.42rem;
+  font-size: calc(0.42rem * var(--stamp-size));
   font-weight: 700;
   letter-spacing: 0.13em;
   text-transform: uppercase;

@@ -30,27 +30,22 @@ export function stampInk(score: number): string {
   return "var(--risky)"
 }
 
-/** The perforated score stamp. Top-left on every card. */
+/**
+ * The perforated score stamp. Top-left on every card.
+ *
+ * Everything about its size comes off one number, handed to CSS rather than
+ * computed here, so a media query can shrink the whole stamp when the card it
+ * sits on gets small — a 54px stamp on a 165px card is a third of the picture.
+ */
 export function ScoreStamp({ score, size = 1 }: { score: number; size?: number }) {
   return (
     <span
       className="score-stamp"
-      style={
-        {
-          "--stamp": stampInk(score),
-          width: 54 * size,
-          top: 18 * size,
-          left: 18 * size,
-        } as React.CSSProperties
-      }
+      style={{ "--stamp": stampInk(score), "--stamp-size": size } as React.CSSProperties}
       aria-label={`Safety score ${score} out of 100`}
     >
-      <span className="n" style={{ fontSize: `${1.42 * size}rem` }}>
-        {score}
-      </span>
-      <span className="cap" style={{ fontSize: `${0.42 * size}rem` }}>
-        Safety
-      </span>
+      <span className="n">{score}</span>
+      <span className="cap">Safety</span>
     </span>
   )
 }
@@ -120,7 +115,11 @@ export function Postcard({
   return link(
     <div className="postcard">
       <ScoreStamp score={meta.score} />
-      <Postmark code={meta.countryCode} iso={meta.updatedAt} />
+      {/* The postmark is 62px across. On a two-up phone grid that is most of
+          the sky, so it stands down and leaves the picture alone. */}
+      <span className="hidden sm:contents">
+        <Postmark code={meta.countryCode} iso={meta.updatedAt} />
+      </span>
       <div className="postcard-art aspect-[3/2]">
         {art}
         {/* When the photograph isn't of this place, say where it is.
@@ -129,20 +128,23 @@ export function Postcard({
             be the one that doesn't tell them. */}
         {!own && stand_in.place && <span className="photo-elsewhere">{stand_in.place}</span>}
       </div>
-      <div className="flex items-end justify-between gap-3 px-1 pb-2.5 pt-2">
-        <div className="min-w-0">
-          <p className="postcard-greeting">Greetings from</p>
-          <p className="font-display truncate text-[1.2rem] font-medium leading-tight tracking-tight text-[var(--navy)]">
+      <div className="flex flex-wrap items-end justify-between gap-x-3 px-1 pb-2 pt-1.5 sm:pb-2.5 sm:pt-2">
+        <div className="min-w-0 flex-1">
+          <p className="postcard-greeting text-[0.56rem] sm:text-[0.68rem]">Greetings from</p>
+          <p className="font-display truncate text-[1rem] font-medium leading-tight tracking-tight text-[var(--navy)] sm:text-[1.2rem]">
             {meta.city}
           </p>
-          <p className="truncate text-[0.7rem] text-[var(--ink-faint)]">
+          <p className="truncate text-[0.64rem] text-[var(--ink-faint)] sm:text-[0.7rem]">
             {meta.flag && <span className="mr-1">{meta.flag}</span>}
             {meta.country}
           </p>
         </div>
         {/* Mono, like every other verdict on the site: the rule is that a fact
             never wears the same face as a feeling. */}
-        <p className="meta shrink-0 pb-1 text-[0.58rem]" style={{ color: stampInk(meta.score) }}>
+        <p
+          className="meta w-full shrink-0 pt-0.5 text-[0.52rem] sm:w-auto sm:pb-1 sm:pt-0 sm:text-[0.58rem]"
+          style={{ color: stampInk(meta.score) }}
+        >
           {level.label}
         </p>
       </div>
