@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { SiteHeader } from "@/components/SiteHeader"
 import { HeroBand } from "@/components/home/HeroBand"
+import { SearchConstellation } from "@/components/home/SearchConstellation"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
@@ -28,11 +29,14 @@ import type { SafetyQuery } from "@/lib/types"
  */
 export function HomeClient({
   demo,
+  heroCards,
   children,
   footer,
 }: {
-  /** A real destination's live scores, for the worked example in the band. */
+  /** A real destination's live scores, for the phone in the band. */
   demo: HomeDemo | null
+  /** Server-rendered postcards to lay around the search. */
+  heroCards?: ReactNode[]
   children?: ReactNode
   footer?: ReactNode
 }) {
@@ -123,27 +127,10 @@ export function HomeClient({
       />
 
       {/* Full-bleed, so it sits outside <main>'s measure */}
-      <HeroBand demo={demo} onSearch={search} loading={loading} />
+      <HeroBand demo={demo} />
+      <SearchConstellation cards={heroCards ?? []} onSearch={search} loading={loading} />
 
       <main className="relative z-10 mx-auto flex max-w-5xl flex-col px-5 pb-4">
-        <div className="pb-2 pt-12 text-center sm:pt-16">
-          <h1 className="display-xl rise-in" style={{ color: "var(--navy)" }}>
-            Is it
-            <span style={{ color: "var(--orange)", fontStyle: "italic" }}> safe</span>
-            <br />
-            to go there?
-          </h1>
-          {/* The one line on the page that names where any of this comes from.
-              River's layout drops it; it stays, because it is the difference
-              between a claim and a citation. */}
-          <p
-            className="mt-5 text-[0.72rem] text-[var(--ink-faint)] rise-in"
-            style={{ animationDelay: "0.08s" }}
-          >
-            World Bank · Governance Indicators · UNODC · GDACS · Open-Meteo · CDC
-          </p>
-        </div>
-
         {/* Server-rendered latest-reports directory (crawlable) */}
         {children}
 

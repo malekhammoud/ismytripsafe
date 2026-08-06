@@ -5,12 +5,12 @@
 //
 //   node scripts/build-supplied-photos.mjs
 //
-// The thing this has to get right is **the deckle**. The postcards arrive with a
-// torn cream border painted into the pixels, and the site's own `.postcard` frame
-// draws that same border in CSS — ship both and every card has two frames. So the
-// deck gets the baked border trimmed off and drops into the CSS frame, while the
-// one big demonstration postcard keeps its baked border and has the CSS frame
-// removed instead. See `.postcard-hero` in app/globals.css.
+// Nothing here is cropped. These arrive with a torn cream border painted into
+// the pixels, and that border is the point — it is what makes them read as
+// postcards someone actually sent rather than as stock photography. So the
+// picture ships exactly as drawn and the card *is* the picture; the CSS deckle
+// that `.postcard` would otherwise draw is switched off for them instead. See
+// `.postcard-plate` in app/globals.css.
 import sharp from "sharp"
 import { mkdir } from "node:fs/promises"
 
@@ -62,34 +62,12 @@ const file = (id) => {
   return `${SRC}/${id}-${stamps[id]}.jpg`
 }
 
-/**
- * Trim the painted deckle off, as a fraction of each edge.
- *
- * This is a measured constant rather than edge detection, deliberately. The
- * border is a torn, mottled, feathered thing that fades into bright skies at
- * the top of half these frames, so every automatic detector either leaves a
- * cream hairline on one file or eats a face on another. Measured across the
- * set, the solid part runs 0.1–1.5% and the feathering carries it to about 4%. Cropping
- * 4.5% off a 1536px frame costs 69px of sky — nothing — and the result is
- * checked by eye before it ships.
- */
-const DECKLE = 0.045
-
-/** Trim the deckle, then cover-crop to 3:2 at `w` wide. */
+/** Resize to the card's 3:2 window. No crop: the deckle is part of the picture. */
 async function card(f, out, w = 1440) {
-  const { width: W, height: H } = await sharp(f).metadata()
-  const frac = DECKLE
-  const dx = Math.round(W * frac)
-  const dy = Math.round(H * frac)
   await sharp(f)
-    .extract({ left: dx, top: dy, width: W - dx * 2, height: H - dy * 2 })
-    // Centre, not "attention": the source is already 3:2 and stays 3:2 after a
-    // uniform trim, so there is nothing to choose between — and a saliency crop
-    // would be free to wander a few pixels and take the top off someone's head.
     .resize(w, Math.round((w * 2) / 3), { fit: "cover", position: "centre" })
     .webp({ quality: 80, effort: 6 })
     .toFile(out)
-  return `trim ${dx}px/${dy}px`
 }
 
 await mkdir(OUT, { recursive: true })
@@ -97,8 +75,7 @@ await mkdir(HERO_OUT, { recursive: true })
 
 for (const c of CARDS) {
   const src = file(c.src)
-  // The big postcard keeps its painted deckle — it *is* the frame there — so it
-  // is only resized, and wider, because it renders about a thousand CSS px across.
+  // The big one is only wider — it renders about a thousand CSS px across.
   if (c.big) {
     await sharp(src)
       .resize(1800, 1200, { fit: "cover", position: "attention" })
@@ -107,8 +84,8 @@ for (const c of CARDS) {
     console.log(`${c.slug.padEnd(28)} 1800×1200  (deckle kept)`)
     continue
   }
-  const d = await card(src, `${OUT}/${c.slug}.webp`)
-  console.log(`${c.slug.padEnd(28)} 1440×960   ${d}`)
+  await card(src, `${OUT}/${c.slug}.webp`)
+  console.log(`${c.slug.padEnd(28)} 1440×960   deckle kept`)
 }
 
 // ── The header plate ───────────────────────────────────────────────────

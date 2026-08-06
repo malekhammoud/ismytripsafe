@@ -5,7 +5,6 @@ import { absUrl, humanDate } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { Breadcrumbs, SectionHeading, SeoFooter, SiteHeader } from "@/components/seo/shared"
 import { GlobeExplorer } from "@/components/globe/GlobeExplorer"
-import { Postcard } from "@/components/beach/Postcard"
 
 export const dynamic = "force-dynamic"
 
@@ -23,7 +22,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function DestinationsPage() {
   const payload = await getGlobePayload()
-  const { totals, updatedAt, highlights } = payload
+  const { totals, updatedAt } = payload
 
   // Country slug → its city reports, best first. Feeds the crawlable index
   // at the foot of the page (the globe holds the same data client-side).
@@ -92,38 +91,10 @@ export default async function DestinationsPage() {
       </div>
 
       <main className="relative z-10 mx-auto max-w-6xl px-4 pb-2 sm:px-6">
-        {/* ── Postcard decks ── */}
-        <section className="mt-10">
-          <SectionHeading note="highest scoring">Postcards from the safe end</SectionHeading>
-          <div className="postcard-deck mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {highlights.safest.map((m, i) => (
-              <Postcard key={m.path} meta={m} index={i} />
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-14">
-          <SectionHeading note="most searched">The big ones</SectionHeading>
-          <div className="postcard-deck mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {highlights.biggest.map((m, i) => (
-              <Postcard key={m.path} meta={m} index={i} />
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-14">
-          <SectionHeading note="lowest scoring">Where we&apos;d think twice</SectionHeading>
-          <p className="mt-2 max-w-[42rem] text-[0.86rem] leading-relaxed text-[var(--ink-soft)]">
-            A low score isn&apos;t a verdict on a place or its people — it&apos;s what the data says
-            about the conditions a visitor would land in this month. Every one of these opens onto the
-            sources behind it.
-          </p>
-          <div className="postcard-deck mt-5 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {highlights.hardest.map((m, i) => (
-              <Postcard key={m.path} meta={m} index={i} />
-            ))}
-          </div>
-        </section>
+        {/* No postcard decks here. This page is the globe and the index — the
+            globe already shows every destination and its score, and eighteen
+            cards under it were a second, worse version of the same answer.
+            The cards live on the home page, where they are the invitation. */}
 
         {/* ── The full index ──
             The globe is WebGL and client-only, so on its own it would strip

@@ -577,6 +577,93 @@ body::after {
   transform: translateY(-5px);
 }
 
+/* The plate — a picture that brought its own border.
+   The commissioned set is drawn with a torn cream deckle painted into the
+   pixels, so the CSS frame comes off and the photograph runs to the card's
+   edge. Everything that would have sat on the white stock now sits on the
+   photograph, inset far enough to clear that painted edge. */
+.postcard-plate {
+  padding: 0;
+  background: transparent;
+  border-radius: 4px;
+}
+.postcard-plate::before { content: none; }
+.postcard-plate .postcard-art {
+  border-radius: 3px;
+  box-shadow: none;
+  background: none;
+}
+/* 4.6% is where the painted border ends on every plate in the set. */
+.plate-inner {
+  position: absolute;
+  inset: 4.6%;
+  pointer-events: none;
+}
+.plate-inner .score-stamp {
+  top: 10px;
+  left: 10px;
+}
+
+.plate-caption {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 3rem 0.75rem 0.6rem;
+  border-radius: 0 0 3px 3px;
+  /* Warm rather than neutral: a grey scrim over a sunset turns it to slate.
+     Deep enough at the foot to carry cream type over a white awning or a
+     bleached pavement, which is where the weak version fell apart. */
+  background: linear-gradient(
+    180deg,
+    rgba(26, 16, 9, 0) 0%,
+    rgba(26, 16, 9, 0.32) 34%,
+    rgba(24, 15, 8, 0.72) 66%,
+    rgba(20, 12, 6, 0.93) 100%
+  );
+}
+.plate-greeting {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-style: italic;
+  font-size: 0.58rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--sun);
+}
+/* Small, quiet, and always there. Labelling an illustration is what a
+   publication does; hiding the label is what everyone else does. It sits in
+   the corner the postmark used to have, so the caption keeps its two lines. */
+.plate-mark {
+  position: absolute;
+  right: 7px;
+  top: 7px;
+  padding: 1.5px 6px;
+  border-radius: 3px;
+  background: rgba(14, 30, 38, 0.3);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  font: 500 0.53rem/1.4 var(--font-sans);
+  letter-spacing: 0.03em;
+  color: rgba(255, 253, 246, 0.68);
+}
+
+/* A seat in the constellation around the home page search.
+   The tilt is handed down to the card through `--tilt`, which `.postcard`
+   already reads, so the two never fight over the same transform. Flat below
+   lg: tilted cards in a single narrow column read as broken, not as scatter. */
+.plate-seat {
+  --tilt: 0deg;
+}
+@media (min-width: 1024px) {
+  .plate-seat {
+    --tilt: var(--seat-tilt, -1deg);
+    transform: translateY(var(--seat-lift, 0));
+  }
+}
+
 /* Alternating tilts so a grid of cards reads as a scattered stack */
 .postcard-deck > *:nth-child(3n + 1) { --tilt: -1.4deg; }
 .postcard-deck > *:nth-child(3n + 2) { --tilt: 0.9deg; }

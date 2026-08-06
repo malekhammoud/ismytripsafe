@@ -15,8 +15,24 @@ export const dynamic = "force-dynamic"
 
 /** The city the big demonstration card shows. */
 const SHOWCASE = { country: "hungary", city: "budapest" } as const
-/** The two cards directly under it, in River's order. */
-const UNDERCARD = ["/czechia/prague", "/italy/venice"]
+
+/**
+ * The six laid around the search, in seat order: two along the top, one out
+ * to each side, two along the bottom.
+ *
+ * Every one of these has a picture drawn for it, so the arrangement never has
+ * a gap in it — and they are picked for spread rather than for score. Prague
+ * and Venice lead because River asked for them; Lima and El Nido are there so
+ * the table isn't six European afternoons.
+ */
+const HERO_SEATS = [
+  "/czechia/prague",
+  "/italy/venice",
+  "/japan/tokyo",
+  "/italy/rome",
+  "/peru/lima",
+  "/philippines/el-nido",
+]
 
 // Reports carry the year they were generated in their titles; the landing page
 // carries the current one, so the result that ranks for "is X safe" never looks
@@ -51,9 +67,9 @@ export default async function Home() {
 
   const cities = reports.filter((m) => m.path.split("/").filter(Boolean).length === 2)
   const byPath = new Map(cities.map((m) => [m.path, m]))
-  // The two cards under the big one, where we have both a report and a picture
-  // of that city. Missing either, the row simply gets shorter.
-  const under = UNDERCARD.map((p) => byPath.get(p)).filter((m) => !!m)
+  // Whatever we still have a report for. Missing one just leaves that seat
+  // empty rather than breaking the arrangement.
+  const seated = HERO_SEATS.map((p) => byPath.get(p)).filter((m) => !!m)
 
   // Then the biggest destinations (population as the proxy for what people
   // search), minus anything already shown above so nothing appears twice.
@@ -61,7 +77,7 @@ export default async function Home() {
   // One city per country, though. Sorting the world by population alone hands
   // back four Chinese megacities in a row, and six near-identical skylines is
   // both duller to look at and a worse answer to "where have you checked?"
-  const shown = new Set([showcase?.meta.path, ...under.map((m) => m!.path)])
+  const shown = new Set([showcase?.meta.path, ...seated.map((m) => m!.path)])
   const seenCountry = new Set<string>()
   const featured: typeof cities = []
   for (const m of [...cities].sort((a, b) => (b.population ?? 0) - (a.population ?? 0))) {
@@ -76,9 +92,13 @@ export default async function Home() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <HomeClient demo={demo} footer={<SiteFooter />}>
+      <HomeClient
+        demo={demo}
+        heroCards={seated.map((m, i) => <Postcard key={m!.path} meta={m!} index={i} />)}
+        footer={<SiteFooter />}
+      >
         {showcase && (
-          <section className="mt-9 rise-in" style={{ animationDelay: "0.16s" }}>
+          <section className="mt-4 rise-in" style={{ animationDelay: "0.16s" }}>
             <div className="text-center">
               <p className="postcard-greeting">What you get</p>
               <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
@@ -89,14 +109,6 @@ export default async function Home() {
               <BigPostcard meta={showcase.meta} report={showcase.report} />
             </div>
           </section>
-        )}
-
-        {under.length > 0 && (
-          <div className="postcard-deck mt-10 grid gap-6 sm:grid-cols-2">
-            {under.map((m, i) => (
-              <Postcard key={m!.path} meta={m!} index={i} />
-            ))}
-          </div>
         )}
 
         {featured.length > 0 && (
