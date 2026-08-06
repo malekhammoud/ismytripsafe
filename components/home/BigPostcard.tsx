@@ -146,7 +146,11 @@ export function BigPostcard({ meta, report }: { meta: ReportMeta; report: Cached
             The same element in both places: on paper beneath the card, and
             floated over the photograph's bottom-right corner at lg. */}
         <div className="px-1 pb-3 pt-3.5 lg:absolute lg:bottom-4 lg:right-4 lg:w-[22rem] lg:rounded-[6px] lg:border lg:border-[rgba(140,225,190,0.34)] lg:bg-[rgba(8,28,38,0.7)] lg:p-4 lg:backdrop-blur-[7px] xl:w-[25rem]">
-          <p className="postcard-greeting lg:[font-family:var(--font-sans)] lg:text-[0.6rem] lg:font-bold lg:not-italic lg:tracking-[0.16em] lg:text-[rgba(140,225,190,0.9)]">
+          {/* Not `.postcard-greeting`: that class is declared after Tailwind's
+              layer in globals.css, so at equal specificity it wins over the
+              `lg:` overrides and the label stays orange serif on the dark
+              panel. Spelled out in utilities instead, both ways. */}
+          <p className="font-display text-[0.68rem] font-medium italic uppercase tracking-[0.16em] text-[var(--orange-deep)] lg:[font-family:var(--font-sans)] lg:text-[0.6rem] lg:font-bold lg:not-italic lg:text-[rgba(140,225,190,0.9)]">
             Written for you
           </p>
           <p className="font-display mt-1 hidden text-[1.05rem] font-medium leading-tight text-[#fffdf6] lg:block">
