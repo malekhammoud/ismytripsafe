@@ -247,22 +247,12 @@ export function suppliedPhotoFor(path: string): PoolPhoto | undefined {
   return SUPPLIED_BY_PATH.get(path)
 }
 
-/**
- * The wide plate behind the homepage header — a couple on the mosaic bench at
- * Park Güell, looking out over Barcelona at the end of the day.
- *
- * It is the first thing anyone sees, and it is doing one job: making the page
- * feel like the start of a trip rather than the start of a form. Landscape,
- * warm, low sun, and the two people are turned away — you are looking at what
- * they're looking at, not at them.
- */
-export const HERO_PLATE = {
-  file: "/photos/hero/barcelona-park-guell.jpg",
-  width: 2599,
-  height: 802,
-  place: "Park Güell, Barcelona, Spain",
-  alt: "Two travellers on the mosaic bench at Park Güell, looking out over Barcelona in the late afternoon",
-} as const
+// The wide Park Güell plate the build script still produces is not on the site
+// at the moment. It was the header photograph, and then the home page's first
+// screen stopped being a header — the postcards became the picture, and a
+// seventh photograph behind six of them was one too many. The file stays in
+// `public/photos/hero` and `scripts/build-supplied-photos.mjs` keeps making it,
+// because putting a band back is a smaller job than sourcing the plate again.
 
 /** Stable 32-bit hash — same value on the server and in the browser. */
 function hashString(s: string): number {

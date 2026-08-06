@@ -1,9 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import Link from "next/link"
 import { SearchBar } from "@/components/SearchBar"
-import { HERO_PLATE } from "@/lib/photos"
 import type { SafetyQuery } from "@/lib/types"
 
 // ─────────────────────────────────────────────────────────────────────
@@ -24,10 +22,10 @@ import type { SafetyQuery } from "@/lib/types"
 // of attention has been taken out, and what is left is arranged around a
 // single pool of light.
 //
-// The one line under the arrangement does two jobs at once that both have to
-// be done somewhere: it says the pictures are illustrations, and it names
-// where the numbers come from. Those are the two things a stranger is
-// entitled to know before they trust anything else on the page.
+// What the pictures are, and where the numbers come from, are both said on
+// /credits and /methodology, linked from the footer of every page. They were
+// briefly said here too and it was one line too many under an arrangement
+// whose whole argument is that it has nothing spare on it.
 // ─────────────────────────────────────────────────────────────────────
 
 /** Grid seat per card, in order. Two along the top, one out to each side,
@@ -55,8 +53,8 @@ export function NightHero({
 
   return (
     <section className="night">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={HERO_PLATE.file} alt="" aria-hidden className="night-plate" />
+      <div className="night-sky" aria-hidden />
+      <div className="night-grain" aria-hidden />
       <div className="night-glow" aria-hidden />
 
       <div className="mx-auto w-full max-w-[78rem] px-5 py-14 sm:px-7 lg:py-20">
@@ -81,6 +79,16 @@ export function NightHero({
             >
               <SearchBar onSubmit={onSearch} loading={loading} />
             </div>
+
+            {/* River's line. Three words for the three things that happen, and
+                the only thing under the box. */}
+            <p
+              className="deal meta mt-5 text-center"
+              style={{ color: "var(--lamp-faint)", animationDelay: "0.72s" }}
+            >
+              One place <span className="mx-1.5 opacity-55">·</span> One click{" "}
+              <span className="mx-1.5 opacity-55">·</span> One report
+            </p>
           </div>
 
           {/* ── The postcards around it ─────────────────────── */}
@@ -95,19 +103,6 @@ export function NightHero({
           ))}
         </div>
 
-        {/* ── The two things a stranger is owed ───────────────── */}
-        <p
-          className="deal meta mx-auto mt-14 max-w-[46rem] text-center leading-[1.9]"
-          style={{ color: "var(--lamp-faint)", animationDelay: "0.78s", letterSpacing: "0.1em" }}
-        >
-          <Link href="/credits" className="underline decoration-dotted underline-offset-4 hover:text-[var(--sun)]">
-            Illustrations, not photographs
-          </Link>
-          <span className="mx-2.5 opacity-50">·</span>
-          <Link href="/methodology" className="underline decoration-dotted underline-offset-4 hover:text-[var(--sun)]">
-            Scores from World Bank, UNODC, GDACS, CDC and 11 more
-          </Link>
-        </p>
       </div>
     </section>
   )

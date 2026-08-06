@@ -617,34 +617,56 @@ body::after {
 .night {
   position: relative;
   isolation: isolate;
-  background: var(--night);
-  color: var(--lamp);
   overflow: hidden;
+  background-color: #120d08;
+  color: var(--lamp);
 }
-/* The header plate, sunk almost to black and pushed warm. It is atmosphere,
-   not subject — you should read it as a room rather than as a picture. */
-.night-plate {
+
+/* The sky behind the table.
+   An earlier version put the header photograph here at 17% opacity with the
+   saturation pulled out of it, and a photograph at 17% opacity is not
+   atmosphere — it is grey. This is built instead: warm and low in the middle
+   where the lamp is, cool at the top corners so the warmth has something to
+   be warm against, and embers away to one side. Dusk, in five gradients. */
+.night-sky {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  background:
+    radial-gradient(66% 58% at 50% 44%, rgba(255, 180, 90, 0.26), transparent 66%),
+    radial-gradient(64% 56% at 0% -4%, rgba(16, 104, 128, 0.5), transparent 66%),
+    radial-gradient(66% 58% at 100% 0%, rgba(30, 78, 108, 0.44), transparent 68%),
+    radial-gradient(74% 50% at 90% 106%, rgba(206, 80, 38, 0.28), transparent 68%),
+    radial-gradient(60% 44% at 4% 104%, rgba(150, 66, 30, 0.18), transparent 70%),
+    linear-gradient(168deg, #120c07 0%, #241809 46%, #17100a 100%);
+}
+
+/* Grain. It is what stops five smooth gradients reading as a screensaver —
+   at this size it is felt rather than seen, the way the tooth of card stock
+   is, and it is the same noise the paper background uses so the two halves of
+   the page are made of the same material. */
+.night-grain {
   position: absolute;
   inset: 0;
   z-index: -2;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 46% 56%;
-  opacity: 0.17;
-  filter: saturate(0.5) contrast(1.1) brightness(0.4) sepia(0.45);
+  pointer-events: none;
+  opacity: 0.55;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.18'/%3E%3C/svg%3E");
 }
-/* The lamp. One pool of light in the middle, so the arrangement has a centre
-   before anything is even read. */
+
+/* The lamp, and the dark that makes it one. Kept as its own layer because it
+   is the thing that fades up on load — the room lights before anything in it
+   is legible. */
 .night-glow {
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(56% 60% at 50% 48%, rgba(255, 190, 96, 0.22), transparent 66%),
-    radial-gradient(86% 74% at 50% 50%, transparent 26%, rgba(10, 7, 3, 0.86) 100%),
-    linear-gradient(180deg, rgba(10, 7, 3, 0.86), transparent 26%, transparent 80%, rgba(10, 7, 3, 0.7));
+    radial-gradient(50% 54% at 50% 47%, rgba(255, 196, 108, 0.16), transparent 68%),
+    radial-gradient(86% 74% at 50% 50%, transparent 30%, rgba(8, 5, 2, 0.7) 100%),
+    linear-gradient(180deg, rgba(8, 5, 2, 0.55), transparent 20%, transparent 84%, rgba(8, 5, 2, 0.55));
 }
 .night a:hover .pc-city { color: var(--sun); }
 
