@@ -97,6 +97,21 @@ for (const c of CARDS) {
   const { width, height } = await sharp(src).metadata()
   await sharp(src).jpeg({ quality: 86, mozjpeg: true }).toFile(`${HERO_OUT}/${HERO.slug}.jpg`)
   console.log(`${HERO.slug.padEnd(28)} ${width}×${height}  hero plate`)
+
+  // ── and the same plate as the home page's background ────────────────
+  // Softened rather than faded. An earlier version dropped this photograph to
+  // 17% opacity with the saturation pulled out of it, and got grey — fading an
+  // image toward black takes its colour with it. Blurring keeps every bit of
+  // the chroma and only removes the detail that would compete with six
+  // postcards, so it still reads as Park Güell at golden hour. The darkening
+  // is done in CSS with a warm overlay, on top, where it can't bleach it.
+  await sharp(src)
+    .resize(1600)
+    .blur(9)
+    .modulate({ saturation: 1.5, brightness: 0.7 })
+    .webp({ quality: 82 })
+    .toFile(`${HERO_OUT}/${HERO.slug}-bg.webp`)
+  console.log(`${(HERO.slug + "-bg").padEnd(28)} 1600w      home background`)
 }
 
 console.log(`\n${CARDS.length} cards → ${OUT}, 1 plate → ${HERO_OUT}`)

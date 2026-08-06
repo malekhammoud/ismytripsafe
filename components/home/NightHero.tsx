@@ -16,6 +16,9 @@ import type { SafetyQuery } from "@/lib/types"
 // something. Warm-dark, not cool-dark: this is an evening spent planning a
 // trip, not a control room.
 //
+// Behind it all, Park Güell at golden hour, out of focus. Twenty-one
+// kilobytes, because there is no detail left in it to encode.
+//
 // The discipline here is subtraction. There is one question, one box, and
 // six pictures. No badges on the art, no step numbers, no phone mock-up, no
 // second call to action — everything that was competing for the same second
@@ -54,6 +57,15 @@ export function NightHero({
   return (
     <section className="night">
       <div className="night-sky" aria-hidden />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/photos/hero/barcelona-park-guell-bg.webp"
+        alt=""
+        aria-hidden
+        className="night-photo"
+        fetchPriority="high"
+      />
+      <div className="night-veil" aria-hidden />
       <div className="night-grain" aria-hidden />
       <div className="night-glow" aria-hidden />
 
