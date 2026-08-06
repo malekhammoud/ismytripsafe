@@ -1,19 +1,39 @@
 import type { Metadata } from "next"
-import { Geist } from "next/font/google"
-import { Fraunces } from "next/font/google"
+import { Inter } from "next/font/google"
+import { Bodoni_Moda } from "next/font/google"
 import { SITE_URL } from "@/lib/site"
 import { BetaRibbon, IS_BETA } from "@/components/beach/BetaRibbon"
 import "./globals.css"
 
-const geistSans = Geist({
-  variable: "--font-sans",
+// Two faces, and only two.
+//
+// Bodoni Moda for anything that carries the brand's voice — the headline, city
+// names, scores. It is the face River's comps were set in, and a Didone reads
+// like a masthead rather than a landing page, which is the register this site
+// needs. Its optical-size axis is the reason it's this Bodoni and not another:
+// hairline serifs are what usually make Didones fall apart below ~20px, and the
+// axis thickens them automatically as the type gets smaller.
+//
+// Inter for everything else. Nothing about it is exciting, which is the point —
+// it has real tabular figures for the score tables and it never draws attention
+// away from the numbers.
+//
+// The variables are suffixed `-src` because `app/globals.css` composes the final
+// `--font-display` / `--font-sans` from them with a fallback stack. Naming both
+// the same thing made the token reference itself, which silently killed the
+// size-adjusted fallback metrics next/font generates to prevent layout shift.
+const inter = Inter({
+  variable: "--font-sans-src",
   subsets: ["latin"],
+  display: "swap",
 })
 
-const fraunces = Fraunces({
-  variable: "--font-display",
+const bodoni = Bodoni_Moda({
+  variable: "--font-display-src",
   subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
+  style: ["normal", "italic"],
+  axes: ["opsz"],
+  display: "swap",
 })
 
 export const metadata: Metadata = {
@@ -43,7 +63,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${inter.variable} ${bodoni.variable} h-full antialiased`}
     >
       <body className="min-h-full">
         <BetaRibbon />

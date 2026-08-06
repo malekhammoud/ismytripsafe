@@ -43,3 +43,7 @@ next-env.d.ts
 # Brand source art + chat export from River (kept out of the repo; the
 # derived web assets in public/brand are committed)
 /WhatsApp Chat - River/
+
+# River's second art drop (chat export). The derived web assets in
+# public/photos/supplied and public/photos/hero are what's committed.
+/WhatsAppChatRiver2/

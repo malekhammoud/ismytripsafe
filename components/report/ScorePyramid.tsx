@@ -1,16 +1,15 @@
 "use client"
 
-import { Globe, Siren, HeartPulse, Landmark, MessagesSquare } from "lucide-react"
 import { PYRAMID, type CategoryScore, type CategoryKey } from "@/lib/safety-display"
+import { CATEGORY_ICON } from "./category-icons"
 import { InfoTip } from "./InfoTip"
 
-const ICONS: Record<CategoryKey, React.ReactNode> = {
-  crime: <Siren size={12} strokeWidth={2.3} />,
-  sentiment: <MessagesSquare size={12} strokeWidth={2.3} />,
-  advisories: <Globe size={12} strokeWidth={2.3} />,
-  stability: <Landmark size={12} strokeWidth={2.3} />,
-  health: <HeartPulse size={12} strokeWidth={2.3} />,
-}
+const ICONS: Record<CategoryKey, React.ReactNode> = Object.fromEntries(
+  (Object.keys(CATEGORY_ICON) as CategoryKey[]).map((k) => {
+    const Icon = CATEGORY_ICON[k]
+    return [k, <Icon key={k} size={12} strokeWidth={2.3} />]
+  }),
+) as Record<CategoryKey, React.ReactNode>
 
 const EXPLAIN: Record<CategoryKey, string> = {
   crime:

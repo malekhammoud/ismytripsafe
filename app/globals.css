@@ -61,8 +61,12 @@
     0 16px 40px -12px rgba(29, 47, 56, 0.24),
     0 40px 80px -32px rgba(29, 47, 56, 0.32);
 
-  --font-display: "Fraunces", Georgia, serif;
-  --font-sans: var(--font-sans), system-ui, sans-serif;
+  /* Composed from the next/font variables set on <html> in app/layout.tsx.
+     They are named `-src` there so these two don't reference themselves — an
+     earlier version did, which made the token invalid and quietly discarded
+     next/font's size-adjusted fallback metrics. */
+  --font-display: var(--font-display-src), "Didot", "Bodoni MT", Georgia, serif;
+  --font-sans: var(--font-sans-src), system-ui, -apple-system, sans-serif;
 }
 
 * {
@@ -124,21 +128,25 @@ body::after {
   font-optical-sizing: auto;
 }
 
+/* Bodoni carries less ink and a smaller x-height than the face this replaced,
+   so the display sizes run a little larger and the tracking a little looser —
+   a Didone set tight loses the space its hairlines need to stay visible. */
 .display-xl {
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: clamp(2.6rem, 7vw, 5.5rem);
-  line-height: 0.95;
-  letter-spacing: -0.02em;
+  font-size: clamp(2.8rem, 7.4vw, 5.9rem);
+  line-height: 0.98;
+  letter-spacing: -0.012em;
   font-optical-sizing: auto;
 }
 
 .display-lg {
   font-family: var(--font-display);
-  font-weight: 470;
-  font-size: clamp(2rem, 5vw, 3.4rem);
-  line-height: 1;
-  letter-spacing: -0.015em;
+  font-weight: 500;
+  font-size: clamp(2.1rem, 5.2vw, 3.6rem);
+  line-height: 1.04;
+  letter-spacing: -0.008em;
+  font-optical-sizing: auto;
 }
 
 .eyebrow {
@@ -280,27 +288,36 @@ body::after {
 }
 
 /* ─── Buttons ────────────────────────────────────────────── */
+/* The one action colour on the site. Warm on purpose: the button sits under
+   an orange strip that says the site is free, and a near-black rectangle
+   between the two read as a form to be got through rather than an invitation.
+   Links stay teal — nothing else should compete with this. */
 .btn {
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--orange-deep);
+  color: #fff8ec;
   border-radius: 14px;
   font-weight: 600;
   font-size: 0.92rem;
   letter-spacing: 0.01em;
-  transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+  transition: transform 0.15s, box-shadow 0.2s, background 0.2s, opacity 0.2s;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 1px 2px rgba(140, 48, 22, 0.24), 0 8px 20px -10px rgba(140, 48, 22, 0.5);
 }
 .btn:hover {
-  background: var(--accent);
+  background: #c03f21;
   transform: translateY(-1px);
-  box-shadow: 0 8px 24px -6px rgba(15, 155, 171, 0.45);
+  box-shadow: 0 2px 4px rgba(140, 48, 22, 0.26), 0 12px 28px -8px rgba(140, 48, 22, 0.55);
 }
 .btn:active {
   transform: translateY(0);
 }
+/* Waiting for input, not broken. A grey rectangle at the top of the page is
+   the first thing a visitor reads as "this site doesn't work". */
 .btn:disabled {
-  opacity: 0.45;
+  background: #eab5a1;
+  color: #7c3418;
+  box-shadow: none;
   cursor: not-allowed;
   transform: none;
 }
@@ -544,6 +561,22 @@ body::after {
     0 48px 90px -40px rgba(29, 47, 56, 0.5);
 }
 
+/* The one big card. Its photograph carries a torn deckle painted into the
+   pixels, so the CSS frame comes off — two borders on one card is one too
+   many — and it sits square rather than tilted, because it is the exhibit
+   rather than part of the scatter. */
+.postcard-hero {
+  padding: 0;
+  background: transparent;
+  border-radius: 5px;
+  transform: none;
+}
+.postcard-hero::before { content: none; }
+.postcard-hero:hover,
+.postcard-hero:focus-within {
+  transform: translateY(-5px);
+}
+
 /* Alternating tilts so a grid of cards reads as a scattered stack */
 .postcard-deck > *:nth-child(3n + 1) { --tilt: -1.4deg; }
 .postcard-deck > *:nth-child(3n + 2) { --tilt: 0.9deg; }
@@ -687,15 +720,6 @@ body::after {
   line-height: 1;
 }
 
-/* ─── Ruled address lines (postcard reverse) ─────────────────── */
-.address-lines {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0 17px,
-    rgba(29, 47, 56, 0.16) 17px 18px
-  );
-}
-
 /* ─── Sea, sand, sun motifs ──────────────────────────────────── */
 
 /* Torn-paper shoreline used to separate page bands */
@@ -821,78 +845,6 @@ body::after {
   .drift, .drift-slow, .kenburns, .pulse { animation: none; }
   .postcard { transition: none; }
   .postcard:hover, .postcard:focus-within { transform: none; }
-}
-
-/* ─── Postcard flip ──────────────────────────────────────────
-   Hover (or keyboard focus) turns the card over to its written side —
-   the message, the ruled address block and the reason for the score. */
-.postcard-flip {
-  perspective: 1400px;
-}
-.postcard-flip .postcard {
-  transform-style: preserve-3d;
-  transition: transform 0.72s cubic-bezier(0.22, 0.72, 0.2, 1), box-shadow 0.4s;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.postcard-flip .postcard::before { content: none; }
-/* The link itself is the hover/focus target — the faces are inside it. */
-.postcard-flip:hover .postcard,
-.postcard-flip:focus-visible .postcard,
-.postcard-flip:focus-within .postcard {
-  transform: rotateY(180deg) translateY(-6px);
-}
-.postcard-face {
-  position: relative;
-  background: #fffdf6;
-  border-radius: 3px;
-  padding: 10px 10px 0;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  box-shadow:
-    0 1px 1px rgba(29, 47, 56, 0.1),
-    0 10px 24px -10px rgba(29, 47, 56, 0.34),
-    0 30px 60px -34px rgba(29, 47, 56, 0.42);
-}
-.postcard-face--back {
-  position: absolute;
-  inset: 0;
-  transform: rotateY(180deg);
-  padding: 14px 14px 12px;
-  display: flex;
-  flex-direction: column;
-}
-/* Vertical rule down the middle of the reverse — message left, address right */
-.postcard-face--back .divider {
-  position: absolute;
-  top: 46px;
-  bottom: 14px;
-  left: 52%;
-  width: 1px;
-  background: rgba(29, 47, 56, 0.18);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .postcard-flip .postcard { transition: none; }
-  .postcard-flip:hover .postcard,
-  .postcard-flip:focus-visible .postcard,
-  .postcard-flip:focus-within .postcard { transform: rotateY(180deg); }
-}
-
-/* Hero panorama: dissolved with a mask rather than an overlay. Painting a
-   paper-coloured fade on top would punch an opaque rectangle through the
-   page's own sun/sea wash — visible as a lighter box. Masking removes the
-   art's own pixels instead, so there is nothing to see an edge of. */
-.hero-band-mask {
-  -webkit-mask-image:
-    linear-gradient(180deg, transparent 0%, #000 42%, #000 74%, transparent 100%),
-    linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
-  mask-image:
-    linear-gradient(180deg, transparent 0%, #000 42%, #000 74%, transparent 100%),
-    linear-gradient(90deg, transparent 0%, #000 20%, #000 80%, transparent 100%);
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
 }
 
 /* ─── City labels on the globe ───────────────────────────────

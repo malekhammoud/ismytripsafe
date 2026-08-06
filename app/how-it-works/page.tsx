@@ -3,6 +3,7 @@ import Link from "next/link"
 import { ShieldCheck, Sparkles } from "lucide-react"
 import { absUrl, monthYear } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
+import { StoplightStrip } from "@/components/home/StoplightStrip"
 import {
   Breadcrumbs,
   DocSection,
@@ -32,24 +33,6 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-/** River's stoplight: the whole report distilled into three colours. */
-const LIGHTS: { label: string; color: string; body: string }[] = [
-  {
-    label: "Green light",
-    color: "linear-gradient(150deg, #34a878, #1f7b55)",
-    body: "Little cause for concern — keep cruising. Normal travel sense is enough.",
-  },
-  {
-    label: "Yellow light",
-    color: "linear-gradient(150deg, #e0ad3d, #c3862a)",
-    body: "Caution and a bit of extra research. Not a showstopper at all — a helpful alert so you arrive better prepared.",
-  },
-  {
-    label: "Red light",
-    color: "linear-gradient(150deg, #e0654a, #bd3c26)",
-    body: "A genuine risk. Something to pause on and evaluate properly before you make a final decision.",
-  },
-]
 
 export default function HowItWorksPage() {
   const trail = [
@@ -99,18 +82,8 @@ export default function HowItWorksPage() {
                 <p className="mt-5 text-[0.92rem] leading-relaxed text-[var(--ink-soft)]">
                   Think of this report as a stoplight for your car on the way to adventure:
                 </p>
-                <div className="mt-3.5 grid gap-2.5 sm:grid-cols-3">
-                  {LIGHTS.map((l) => (
-                    <div key={l.label} className="light-card" style={{ background: l.color }}>
-                      <p className="flex items-center gap-2 text-[0.82rem] font-bold uppercase tracking-[0.08em]">
-                        <span className="lamp" aria-hidden />
-                        {l.label}
-                      </p>
-                      <p className="mt-2 text-[0.8rem] leading-relaxed" style={{ color: "rgba(255,255,255,0.94)" }}>
-                        {l.body}
-                      </p>
-                    </div>
-                  ))}
+                <div className="mt-3.5">
+                  <StoplightStrip />
                 </div>
 
                 <div className="mt-6 space-y-3.5 text-[0.92rem] leading-relaxed text-[var(--ink-soft)]">

@@ -39,7 +39,15 @@ isn't pointing at the beta host.
    destinations list — WebGL, countries tinted by score, clickable city pins.
 2. **The postcard beach theme** — `app/globals.css` keeps production's CSS
    variable *names* and only changes their values, so every page re-skins for
-   free. Artwork is hand-authored SVG in `components/beach/PosterArt.tsx`.
+   free. Type is Bodoni Moda (display) over Inter (text), wired in
+   `app/layout.tsx`; the tokens in `globals.css` compose them from the
+   `-src` variables next/font sets, so don't rename either half.
+3. **River's art direction on the home page** — a photographic header band
+   with the real search on it, one big card that *is* a report, and static
+   postcards. The imagery he supplied is AI-generated and is labelled
+   "Illustration" wherever it appears; see the header comment in
+   `lib/photos.ts` for the rule that governs where it may and may not be
+   used, and `scripts/build-supplied-photos.mjs` for how it is processed.
 
 ## Two traps this page has already hit — don't undo these
 

@@ -2,9 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-import { ShieldCheck } from "lucide-react"
 import { SiteHeader } from "@/components/SiteHeader"
-import { HERO_PHOTO } from "@/lib/photos"
+import { HeroBand } from "@/components/home/HeroBand"
 import { SearchBar } from "@/components/SearchBar"
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
@@ -12,38 +11,31 @@ import { TrafficReport } from "@/components/report/TrafficReport"
 import { TopNav } from "@/components/report/TopNav"
 import { useReport } from "@/lib/store"
 import { profileFromParams, profileToParams, type TravelerProfile } from "@/lib/profile"
+import type { HomeDemo } from "@/lib/home-demo"
 import type { SafetyQuery } from "@/lib/types"
 
 /**
- * The photograph behind the hero: pinned to the bottom of the block, masked
- * into the page so the search stays the loudest thing on screen, and hidden
- * from assistive tech — it says nothing the copy doesn't. Credited on
- * /credits like every other pool photo.
+ * The interactive checker (search → profile → streaming report).
+ *
+ * This is the only component on the home page that knows about search state,
+ * which is why the header band lives inside it. Everything holding real
+ * report data — the postcards, the worked example, the footer — is server-
+ * rendered and passed in through `children` and `footer`, so none of it ends
+ * up in the client bundle.
+ *
+ * `children` renders only on the landing state, which is why the whole page
+ * gives way to the report the moment a search starts.
  */
-function BeachHero() {
-  return (
-    // Dropped below the block's own baseline so the horizon and the figures
-    // clear the source line above them rather than sitting behind the words.
-    <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-2 -z-10 select-none">
-      <div className="relative h-[15rem] w-full overflow-hidden sm:h-[18rem]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={HERO_PHOTO.file}
-          alt=""
-          fetchPriority="high"
-          className="hero-band-mask absolute inset-0 h-full w-full object-cover opacity-[0.62] [object-position:50%_38%]"
-        />
-      </div>
-    </div>
-  )
-}
-
-/**
- * The interactive checker (search → profile → streaming report). Server-
- * rendered content for crawlers — the latest-reports directory — comes in
- * through `children` and is shown on the landing state.
- */
-export function HomeClient({ children }: { children?: ReactNode }) {
+export function HomeClient({
+  demo,
+  children,
+  footer,
+}: {
+  /** A real destination's live scores, for the worked example in the band. */
+  demo: HomeDemo | null
+  children?: ReactNode
+  footer?: ReactNode
+}) {
   const {
     status,
     geo,
@@ -122,47 +114,31 @@ export function HomeClient({ children }: { children?: ReactNode }) {
     return (
       <>
       <SiteHeader />
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col px-5 pb-4">
-        <div
-          className="pointer-events-none fixed inset-0 -z-10"
-          style={{
-            background:
-              "radial-gradient(55% 50% at 80% 8%, rgba(15,155,171,0.12), transparent 70%), radial-gradient(45% 45% at 8% 92%, rgba(255,200,87,0.1), transparent 70%)",
-          }}
-        />
+      <div
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(55% 50% at 80% 8%, rgba(15,155,171,0.12), transparent 70%), radial-gradient(45% 45% at 8% 92%, rgba(255,200,87,0.1), transparent 70%)",
+        }}
+      />
 
-        {/* Hero — the search is the product, so it sits high and alone */}
-        <div className="relative flex flex-col items-center py-14 sm:py-20">
-          <BeachHero />
-          <div className="mb-8 text-center">
-            <div
-              className="mb-5 inline-flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 text-[0.66rem] font-semibold uppercase tracking-[0.1em] rise-in sm:text-xs"
-              style={{
-                background: "rgba(242,112,74,0.1)",
-                border: "1px solid rgba(242,112,74,0.26)",
-                color: "var(--orange-deep)",
-              }}
-            >
-              <ShieldCheck size={13} />
-              One place · One click · One report
-            </div>
-            <h1 className="display-xl rise-in" style={{ animationDelay: "0.08s", color: "var(--navy)" }}>
-              Is it
-              <span style={{ color: "var(--orange)", fontStyle: "italic" }}> safe</span>
-              <br />
-              to go there?
-            </h1>
-          </div>
+      {/* Full-bleed, so it sits outside <main>'s measure */}
+      <HeroBand demo={demo} onSearch={search} loading={loading} />
 
-          {/* z-20: the autocomplete drops over the source line below it, and
-              both are animated (each makes its own stacking context) */}
-          <div className="relative z-20 w-full max-w-2xl rise-in" style={{ animationDelay: "0.16s" }}>
-            <SearchBar onSubmit={search} loading={loading} />
-          </div>
-
+      <main className="relative z-10 mx-auto flex max-w-5xl flex-col px-5 pb-4">
+        <div className="pb-2 pt-12 text-center sm:pt-16">
+          <h1 className="display-xl rise-in" style={{ color: "var(--navy)" }}>
+            Is it
+            <span style={{ color: "var(--orange)", fontStyle: "italic" }}> safe</span>
+            <br />
+            to go there?
+          </h1>
+          {/* The one line on the page that names where any of this comes from.
+              River's layout drops it; it stays, because it is the difference
+              between a claim and a citation. */}
           <p
-            className="relative z-0 mt-6 text-center text-[0.72rem] text-[var(--ink-faint)] rise-in"
-            style={{ animationDelay: "0.24s" }}
+            className="mt-5 text-[0.72rem] text-[var(--ink-faint)] rise-in"
+            style={{ animationDelay: "0.08s" }}
           >
             World Bank · Governance Indicators · UNODC · GDACS · Open-Meteo · CDC
           </p>
@@ -170,6 +146,25 @@ export function HomeClient({ children }: { children?: ReactNode }) {
 
         {/* Server-rendered latest-reports directory (crawlable) */}
         {children}
+
+        {/* One more way in, at the point where someone has finished reading
+            and would otherwise have to scroll all the way back up. */}
+        <section className="mt-12 rise-in" style={{ animationDelay: "0.1s" }}>
+          <div className="mx-auto max-w-2xl text-center">
+            <p className="postcard-greeting">Anywhere you like</p>
+            <h2 className="font-display mt-1 text-[1.6rem] font-medium tracking-tight text-[var(--navy)]">
+              Somewhere else on your mind?
+            </h2>
+            <div className="relative z-10 mt-4 text-left">
+              <SearchBar onSubmit={search} loading={loading} />
+            </div>
+            <p className="mt-3 text-[0.76rem] text-[var(--ink-soft)]">
+              Free, every time. No sign-up, no email.
+            </p>
+          </div>
+        </section>
+
+        {footer}
       </main>
       </>
     )

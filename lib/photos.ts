@@ -1,30 +1,39 @@
 // ─────────────────────────────────────────────────────────────────────
 // Photography.
 //
-// Every image on this site is a real photograph. There is no illustration
-// and nothing generated.
+// Three sources, in order of preference on a destination card:
 //
-// Two sources, in order of preference:
-//
-//  1. **The destination's own photo.** Reports already carry a lead image
-//     picked from Wikipedia / Wikivoyage / Wikimedia Commons by
+//  1. **The destination's own photo.** Reports carry a lead image picked
+//     from Wikipedia / Wikivoyage / Wikimedia Commons by
 //     `lib/data/images.ts`. A picture of the actual place always beats a
 //     picture of a beach, so it wins wherever we have one (about 3 in 4).
+//     These are real photographs, and each one is credited on its report.
 //
-//  2. **The house pool below.** Freely-licensed coastal photography, used
-//     where a destination has no photo of its own, and for decorative
-//     furniture like the homepage band.
+//  2. **The house pool.** Freely-licensed coastal photography, used where a
+//     destination has no photo of its own. Also real photographs.
 //
-// Pool licensing: CC0, public domain and CC BY only. ShareAlike is
-// deliberately excluded — resizing is an adaptation, and none of this is
-// worth relicensing the site over. Attribution for every CC BY photo is on
-// /credits, linked from the footer, which is the condition those licences
-// actually impose.
+//     Licensing: CC0, public domain and CC BY only. ShareAlike is
+//     deliberately excluded — resizing is an adaptation, and none of this is
+//     worth relicensing the site over. Attribution for every CC BY photo is
+//     on /credits, linked from the footer, which is the condition those
+//     licences actually impose.
 //
-// Every pool photo was reviewed by eye before being added. Candid beach
-// photography of identifiable strangers, and anything with children in
-// swimwear, is not usable here whatever its licence says — one otherwise
-// well-licensed candidate was rejected on exactly those grounds.
+//     Every pool photo was reviewed by eye before being added. Candid beach
+//     photography of identifiable strangers, and anything with children in
+//     swimwear, is not usable here whatever its licence says — one otherwise
+//     well-licensed candidate was rejected on exactly those grounds.
+//
+//  3. **The commissioned set** (`SUPPLIED_POOL`). Travel scenes made for
+//     this site, AI-generated, used as page furniture and on a handful of
+//     cards where the scene is unmistakably the city it names.
+//
+//     These are illustrations, and the site says so rather than finding a
+//     softer word for it: they carry an "Illustration" mark on the card, and
+//     /credits has a section of its own explaining what they are. The rule
+//     that decides the hard cases is simple — **an illustration is never
+//     evidence**. It can set a mood at the top of a page; it can never
+//     appear as if it were a photograph documenting a place, and no claim
+//     about a destination ever rests on one.
 // ─────────────────────────────────────────────────────────────────────
 
 export interface PoolPhoto {
@@ -43,6 +52,21 @@ export interface PoolPhoto {
   license: string
   licenseUrl: string
   source: string
+  /**
+   * Absent → a real photograph, freely licensed.
+   * "illustration" → made for this site and not a photograph of anywhere.
+   * Anything carrying this is labelled as such wherever it is shown.
+   */
+  provenance?: "illustration"
+  /**
+   * The report this image may be shown under — "/hungary/budapest".
+   *
+   * Setting this is a claim that the scene really is that city, checked by
+   * eye. It is what lets an image outrank the destination's own Wikimedia
+   * photo, so it is also the only place where getting it wrong would put the
+   * wrong city under a city's name. Leave it null when in doubt.
+   */
+  reportPath?: string
 }
 
 export const PHOTO_POOL: PoolPhoto[] = [
@@ -75,16 +99,6 @@ export const PHOTO_POOL: PoolPhoto[] = [
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     source: "https://commons.wikimedia.org/wiki/File%3ATropical%20Sunset%2C%20Philippines%20(53014260401).jpg",
-  },
-  {
-    slug: "relax",
-    place: null,
-    file: "/photos/relax.jpg",
-    title: "Relax (262571903).jpeg",
-    author: "Denis Lintner",
-    license: "CC BY 3.0",
-    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
-    source: "https://commons.wikimedia.org/wiki/File%3ARelax%20(262571903).jpeg",
   },
   {
     slug: "surfer-walk",
@@ -169,15 +183,86 @@ export const PHOTO_POOL: PoolPhoto[] = [
  */
 export const CARD_POOL: PoolPhoto[] = PHOTO_POOL.filter((p) => p.place)
 
+// ─── The commissioned set ────────────────────────────────────────────
+//
+// Built from River's art drop by `scripts/build-supplied-photos.mjs`. Three
+// of the fourteen he sent are not here on purpose: two had generation
+// artefacts legible at card size (an invented London Underground map, a
+// Bangkok market with repeating stalls), and one had a "85 / 100" score
+// painted into it, which is a number this site does not get to invent.
+
 /**
- * The wide photograph behind the homepage hero.
+ * Travel scenes made for this site. Illustrations, labelled as such
+ * everywhere they appear — see the header note above.
  *
- * Deliberately a high-key one. The band is masked into a cream page, and a
- * dark photograph doesn't dissolve into cream — it sits there as a grey slab
- * with the page showing through the edges. Bright sand and open water fade
- * out properly.
+ * `place` is what the scene depicts, and doubles as the caption on /credits.
+ * `reportPath` is set only where the scene is unmistakably that city, and is
+ * what allows it onto that city's card.
  */
-export const HERO_PHOTO = PHOTO_POOL.find((p) => p.slug === "relax") ?? PHOTO_POOL[0]
+export const SUPPLIED_POOL: PoolPhoto[] = [
+  ill("budapest-liberty-bridge", "Budapest, Hungary", "/hungary/budapest"),
+  ill("prague-hostel-table", "Prague, Czechia", "/czechia/prague"),
+  ill("venice-san-marco-pigeons", "Venice, Italy", "/italy/venice"),
+  ill("tokyo-izakaya-alley", "Tokyo, Japan", "/japan/tokyo"),
+  ill("milan-duomo-tram", "Milan, Italy", "/italy/milan"),
+  ill("gdansk-mariacka", "Gdańsk, Poland", "/poland/gdansk"),
+  ill("london-regent-street", "London, United Kingdom", "/united-kingdom/london"),
+  ill("lima-miraflores", "Lima, Peru", "/peru/lima"),
+  ill("rome-da-enzo", "Rome, Italy", "/italy/rome"),
+  ill("san-francisco-golden-gate", "San Francisco, United States", "/united-states/san-francisco"),
+  ill("el-nido-paddleboards", "El Nido, Philippines", "/philippines/el-nido"),
+]
+
+function ill(slug: string, place: string, reportPath: string | null): PoolPhoto {
+  return {
+    slug,
+    place,
+    file: `/photos/supplied/${slug}.webp`,
+    title: place,
+    author: "Made for IsMyTripSafe",
+    license: "Illustration",
+    licenseUrl: "",
+    source: "",
+    provenance: "illustration",
+    ...(reportPath ? { reportPath } : {}),
+  }
+}
+
+/** Everything that needs crediting, in one list. Used only by /credits. */
+export const ALL_PHOTOS: PoolPhoto[] = [...PHOTO_POOL, ...SUPPLIED_POOL]
+
+const SUPPLIED_BY_PATH = new Map(
+  SUPPLIED_POOL.filter((p) => p.reportPath).map((p) => [p.reportPath as string, p]),
+)
+
+/**
+ * The commissioned image for this exact destination, if there is one.
+ *
+ * Note this reads `SUPPLIED_POOL` and never `CARD_POOL`: an illustration is
+ * only ever shown under the one place it depicts, never handed out as a
+ * stand-in for somewhere that has no picture. That is the difference between
+ * setting a mood and making a claim.
+ */
+export function suppliedPhotoFor(path: string): PoolPhoto | undefined {
+  return SUPPLIED_BY_PATH.get(path)
+}
+
+/**
+ * The wide plate behind the homepage header — a couple on the mosaic bench at
+ * Park Güell, looking out over Barcelona at the end of the day.
+ *
+ * It is the first thing anyone sees, and it is doing one job: making the page
+ * feel like the start of a trip rather than the start of a form. Landscape,
+ * warm, low sun, and the two people are turned away — you are looking at what
+ * they're looking at, not at them.
+ */
+export const HERO_PLATE = {
+  file: "/photos/hero/barcelona-park-guell.jpg",
+  width: 2599,
+  height: 802,
+  place: "Park Güell, Barcelona, Spain",
+  alt: "Two travellers on the mosaic bench at Park Güell, looking out over Barcelona in the late afternoon",
+} as const
 
 /** Stable 32-bit hash — same value on the server and in the browser. */
 function hashString(s: string): number {
@@ -203,19 +288,34 @@ export function poolPhotoFor(seed: string, offset = 0): PoolPhoto {
  * Ask Wikimedia for a sensibly-sized rendition of a lead image.
  *
  * Lead images arrive at up to 3840px and several megabytes, which is absurd
- * behind a 400px postcard. But upload.wikimedia.org no longer renders
- * arbitrary widths on demand: it serves a fixed set of pre-rendered buckets
- * and answers everything else with a 400. Measured across a sample of the
- * report cache, only **960px and 1280px** come back — 640, 800, 1600 and
- * 2560 all fail. So this picks from that set rather than asking for what it
- * would like.
+ * behind a 400px postcard — one Istanbul skyline in the cache is 3.7 MB. But
+ * upload.wikimedia.org no longer renders arbitrary widths on demand: it
+ * serves a fixed set of pre-rendered buckets and answers everything else
+ * with a 400. Measured across a sample of the report cache, only **960px and
+ * 1280px** come back — 640, 800, 1600 and 2560 all fail. So this picks from
+ * that set rather than asking for what it would like.
  *
- * A full-size original (no /thumb/ in the path) is left alone. Constructing
- * a thumb path for one 400s just the same, and the original at least loads.
- * Callers pair this with an onError fallback to the untouched URL.
+ * Two shapes of URL turn up in the cache:
+ *
+ *  · Already a thumb — rewrite the width in place.
+ *  · A full-size original with no /thumb/ segment. The thumb path for one is
+ *    constructible: /commons/4/4c/NAME.jpg → /commons/thumb/4/4c/NAME.jpg/
+ *    960px-NAME.jpg. Checked against the cache, that comes back 200 and
+ *    turns megabytes into ~170 KB.
+ *
+ * Either can still miss — Wikimedia refuses to upscale, so a file narrower
+ * than 960px has no such thumb. Callers pair this with an onError fallback
+ * to the untouched URL, which is what `components/beach/Photo.tsx` does.
  */
 export function sized(url: string, prefer: 960 | 1280 = 960): string {
   if (!/^https?:\/\/upload\.wikimedia\.org\//.test(url)) return url
-  if (!/\/thumb\//.test(url)) return url
-  return url.replace(/\/\d{2,4}px-([^/]+)$/, `/${prefer}px-$1`)
+  if (/\/thumb\//.test(url)) return url.replace(/\/\d{2,4}px-([^/]+)$/, `/${prefer}px-$1`)
+
+  // Only the raster formats whose thumb keeps the same extension. SVG and TIFF
+  // get a second one appended (NAME.svg/960px-NAME.svg.png) and are rare
+  // enough here that guessing wrong isn't worth the request.
+  const m = url.match(/^(https?:\/\/upload\.wikimedia\.org\/wikipedia\/[^/]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/]+\.(?:jpe?g|png|webp))$/i)
+  if (!m) return url
+  const [, base, a, b, file] = m
+  return `${base}/thumb/${a}/${b}/${file}/${prefer}px-${file}`
 }
