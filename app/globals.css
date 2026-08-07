@@ -1246,22 +1246,6 @@ body::after {
     0 0 60px -10px rgba(255, 190, 96, 0.22);
 }
 
-/* Two cards across a phone means each is about 165px wide. Everything drawn on
-   top of the picture scales with it rather than sitting there at desktop size. */
-@media (max-width: 639px) {
-  .postcard-deck .score-stamp { --stamp-size: 0.68; }
-  .postcard-deck .postcard { padding: 6px 6px 0; }
-}
-
-/* Alternating tilts so a grid of cards reads as a scattered stack. Five, not
-   three: the deck is four across, and a three-step cycle over four columns
-   lines the same angle up down the grid. */
-.postcard-deck > *:nth-child(5n + 1) { --tilt: -1.4deg; }
-.postcard-deck > *:nth-child(5n + 2) { --tilt: 0.9deg; }
-.postcard-deck > *:nth-child(5n + 3) { --tilt: -0.5deg; }
-.postcard-deck > *:nth-child(5n + 4) { --tilt: 1.2deg; }
-.postcard-deck > *:nth-child(5n + 5) { --tilt: -1deg; }
-
 /* The art window inside the deckle */
 .postcard-art {
   position: relative;
@@ -1350,55 +1334,6 @@ body::after {
   letter-spacing: 0.13em;
   text-transform: uppercase;
   opacity: 0.92;
-}
-
-/* ─── Rubber postmark ────────────────────────────────────────
-   Smudged circular date stamp, rotated, sitting over the top-right. */
-.postmark {
-  position: absolute;
-  top: 14px;
-  right: 16px;
-  z-index: 3;
-  width: 62px;
-  height: 62px;
-  border: 1.5px solid var(--navy);
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  color: var(--navy);
-  opacity: 0.42;
-  transform: rotate(-13deg);
-  pointer-events: none;
-  mix-blend-mode: multiply;
-}
-.postmark::before {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border: 1px dashed currentColor;
-  border-radius: 50%;
-  opacity: 0.55;
-}
-.postmark .top,
-.postmark .bot {
-  font-size: 0.36rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  line-height: 1;
-}
-.postmark .mid {
-  font-size: 0.5rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  font-variant-numeric: tabular-nums;
-  border-top: 1px solid currentColor;
-  border-bottom: 1px solid currentColor;
-  padding: 1.5px 3px;
-  line-height: 1;
 }
 
 /* ─── Sea, sand, sun motifs ──────────────────────────────────── */

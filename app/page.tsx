@@ -3,7 +3,6 @@ import Link from "next/link"
 import { HomeClient } from "@/components/HomeClient"
 import { getCityReport, listCountries, listReports } from "@/lib/reports"
 import { graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
-import { Postcard } from "@/components/beach/Postcard"
 import { PlateCard } from "@/components/beach/PlateCard"
 import { homeDemo } from "@/lib/home-demo"
 import { BigPostcard } from "@/components/home/BigPostcard"
@@ -18,19 +17,24 @@ export const dynamic = "force-dynamic"
 const SHOWCASE = { country: "hungary", city: "budapest" } as const
 
 /**
- * The six illustrated postcards, now a strip under the header rather than an
- * arrangement around the search — the header took over that job.
+ * The one set of postcards on the page, as a strip under the header.
  *
- * Picked for spread rather than for score. Prague and Venice lead because
- * River asked for them; Lima and El Nido are there so it isn't six European
- * afternoons.
+ * Six, not ten. Ten fitted — the strip scrolls — but on a desktop six is
+ * exactly the row that fits the measure, so the other four sat off the edge
+ * with nothing to suggest they were there. A complete row beats a partial one
+ * with a secret in it; the flag links under it and the globe are how you get
+ * to the rest.
+ *
+ * Ordered for spread rather than for score. Prague and Venice lead because
+ * River asked for them, and Tokyo and Lima come early so the row isn't all
+ * European afternoons.
  */
 const HERO_SEATS = [
   "/czechia/prague",
   "/italy/venice",
   "/japan/tokyo",
-  "/italy/rome",
   "/peru/lima",
+  "/italy/rome",
   "/philippines/el-nido",
 ]
 
@@ -71,24 +75,6 @@ export default async function Home() {
   // empty rather than breaking the arrangement.
   const seated = HERO_SEATS.map((p) => byPath.get(p)).filter((m) => !!m)
 
-  // Then the biggest destinations (population as the proxy for what people
-  // search), minus anything already shown above so nothing appears twice.
-  //
-  // One city per country, though. Sorting the world by population alone hands
-  // back four Chinese megacities in a row, and a wall of near-identical
-  // skylines is both duller to look at and a worse answer to "where have you
-  // checked?" Eight of them, four across: smaller cards, more destinations,
-  // and two even rows instead of a pair of oversized ones.
-  const shown = new Set([showcase?.meta.path, ...seated.map((m) => m!.path)])
-  const seenCountry = new Set<string>()
-  const featured: typeof cities = []
-  for (const m of [...cities].sort((a, b) => (b.population ?? 0) - (a.population ?? 0))) {
-    if (featured.length === 8) break
-    if (shown.has(m.path) || seenCountry.has(m.countrySlug)) continue
-    seenCountry.add(m.countrySlug)
-    featured.push(m)
-  }
-
   const jsonLd = graph(organizationNode(), websiteNode())
 
   return (
@@ -110,42 +96,8 @@ export default async function Home() {
                 </div>
               ))}
             </div>
-          </section>
-        )}
-
-        {showcase && (
-          <section className="mt-4 rise-in" style={{ animationDelay: "0.16s" }}>
-            <div className="text-center">
-              <p className="postcard-greeting">What you get</p>
-              <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
-                One card, one answer, and the reasons behind it
-              </h2>
-            </div>
-            <div className="mt-6">
-              <BigPostcard meta={showcase.meta} report={showcase.report} />
-            </div>
-          </section>
-        )}
-
-        {featured.length > 0 && (
-          <section className="mt-14 w-full rise-in" style={{ animationDelay: "0.24s" }}>
-            <div className="text-center">
-              <p className="postcard-greeting">Postcards from the road</p>
-              <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
-                Somewhere we&apos;ve already checked
-              </h2>
-              <p className="mx-auto mt-2 max-w-[30rem] text-[0.83rem] leading-relaxed text-[var(--ink-soft)]">
-                Every score is the same 0–100 scale, built from the same sources. Pick a card to
-                read what we found.
-              </p>
-            </div>
-            <div className="postcard-deck mt-6 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
-              {featured.map((m, i) => (
-                <Postcard key={m.path} meta={m} index={i} />
-              ))}
-            </div>
             {countries.length > 0 && (
-              <p className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.78rem] text-[var(--ink-soft)]">
+              <p className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.78rem] text-[var(--ink-soft)]">
                 {countries.slice(0, 8).map((c) => (
                   <Link key={c.countrySlug} href={`/${c.countrySlug}`} className="font-medium hover:text-[var(--accent)]">
                     {c.flag} {c.country}
@@ -156,6 +108,20 @@ export default async function Home() {
                 </Link>
               </p>
             )}
+          </section>
+        )}
+
+        {showcase && (
+          <section className="mt-14 rise-in" style={{ animationDelay: "0.16s" }}>
+            <div className="text-center">
+              <p className="postcard-greeting">What you get</p>
+              <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
+                One card, one answer, and the reasons behind it
+              </h2>
+            </div>
+            <div className="mt-6">
+              <BigPostcard meta={showcase.meta} report={showcase.report} />
+            </div>
           </section>
         )}
 

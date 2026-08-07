@@ -1,7 +1,14 @@
 import Link from "next/link"
-import { stampInk } from "@/components/beach/Postcard"
 import { suppliedPhotoFor } from "@/lib/photos"
 import type { ReportMeta } from "@/lib/reports"
+
+/** Score → ink. Matches the safety spectrum in globals.css. */
+export function stampInk(score: number): string {
+  if (score >= 70) return "var(--safe)"
+  if (score >= 55) return "var(--moderate)"
+  if (score >= 40) return "var(--caution)"
+  return "var(--risky)"
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // A postcard, used as it was drawn.
