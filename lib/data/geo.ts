@@ -1,3 +1,4 @@
+import worldCountries from "world-countries"
 import type { GeoPoint } from "../types"
 import { englishCountryName } from "./country"
 import { withBudget } from "../timing"
@@ -45,6 +46,56 @@ const norm = (s: string) =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
 
+/**
+ * Territories that ISO 3166-1 gives their own code but that a sovereign state
+ * administers — French Polynesia, New Caledonia, Réunion, Puerto Rico, Guam,
+ * Hong Kong and fifty more.
+ *
+ * They matter here because the two databases disagree about them. GeoNames
+ * (through Open-Meteo) uses the territory's own code; OpenStreetMap tags them
+ * by sovereign, so asking Nominatim about Bora Bora gets `country_code: "fr"`
+ * — French Polynesia is, legally, France. Believed literally, that files two
+ * Tahitian islands under France and draws them on the globe 15,900 km from
+ * Paris, which is what it did.
+ */
+const DEPENDENCY = new Set(
+  (worldCountries as { cca2: string; independent?: boolean | null }[])
+    .filter((c) => c.independent === false)
+    .map((c) => c.cca2)
+)
+
+/** Great-circle kilometres. */
+function km(aLat: number, aLon: number, bLat: number, bLon: number): number {
+  const t = Math.PI / 180
+  const dLat = (bLat - aLat) * t
+  const dLon = (bLon - aLon) * t
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(aLat * t) * Math.cos(bLat * t) * Math.sin(dLon / 2) ** 2
+  return 2 * 6371 * Math.asin(Math.sqrt(h))
+}
+
+/**
+ * Give a dependency back its own country code.
+ *
+ * Only fires when the resolved country is a sovereign state *and* GeoNames has
+ * a dependency-coded record for what is plainly the same spot — within 60 km,
+ * which no mainland city has. A place that really is in France stays in France
+ * because there is no French dependency sitting on top of it.
+ */
+function ownTerritory(p: GeoPoint, geonames: OpenMeteoHit[]): GeoPoint {
+  if (!p.countryCode || DEPENDENCY.has(p.countryCode.toUpperCase())) return p
+  const hit = geonames.find(
+    (h) =>
+      h.country_code &&
+      DEPENDENCY.has(h.country_code.toUpperCase()) &&
+      km(p.lat, p.lon, h.latitude, h.longitude) <= 60
+  )
+  if (!hit) return p
+  const iso2 = hit.country_code.toUpperCase()
+  return { ...p, countryCode: iso2, country: englishCountryName(iso2) ?? p.country }
+}
+
 /** Rank bonus by GeoNames feature code — a capital outranks a hamlet. */
 function featureRank(code: string | undefined): number {
   if (!code) return 0
@@ -66,7 +117,10 @@ function featureRank(code: string | undefined): number {
  * Authority Heliport" is a real Open-Meteo hit), and a strong preference for
  * candidates matching the country/region hinted after a comma in the query.
  */
-async function openMeteoSearch(name: string, hint: string): Promise<OpenMeteoHit[]> {
+async function openMeteoSearch(
+  name: string,
+  hint: string
+): Promise<{ ranked: OpenMeteoHit[]; all: OpenMeteoHit[] }> {
   try {
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
       name
@@ -76,7 +130,7 @@ async function openMeteoSearch(name: string, hint: string): Promise<OpenMeteoHit
     const wanted = norm(name)
     const h = norm(hint)
 
-    return results
+    const ranked = results
       .map((r) => {
         let rank = (r.population ?? 0) + featureRank(r.feature_code)
         if (norm(r.name) === wanted) rank += 250_000 // exact name, not a prefix match
@@ -91,8 +145,13 @@ async function openMeteoSearch(name: string, hint: string): Promise<OpenMeteoHit
       .filter((x) => featureRank(x.r.feature_code) >= 0)
       .sort((a, b) => b.rank - a.rank)
       .map((x) => x.r)
+
+    // `all` keeps what the ranking discards. Bora Bora is an ISL and its only
+    // other record is an AIRP, so the filter empties the list for exactly the
+    // places whose country code most needs checking.
+    return { ranked, all: results }
   } catch {
-    return []
+    return { ranked: [], all: [] }
   }
 }
 
@@ -188,17 +247,19 @@ export async function geocode(name: string): Promise<GeoPoint | null> {
 
   // 1. Open-Meteo, ranked. Taken only when the winner is clearly the place a
   //    traveller means — a populated town, a capital or an admin division.
-  const hits = await openMeteoSearch(cityPart, hint)
-  if (hits.length && isConfident(hits[0])) return toPoint(hits[0])
+  const { ranked, all } = await openMeteoSearch(cityPart, hint)
+  if (ranked.length && isConfident(ranked[0])) return toPoint(ranked[0])
 
   // 2. Nominatim with the full string — country-aware, so "Sé, Benin" resolves
   //    to Benin rather than a same-named city elsewhere, and "new jersey"
-  //    resolves to the state rather than a village in Trinidad.
+  //    resolves to the state rather than a village in Trinidad. It is also the
+  //    rung that hands back a sovereign where ISO wants a territory, so its
+  //    answer is reconciled against GeoNames before it is believed.
   const osm = await nominatimGeocode(query)
-  if (osm) return osm
+  if (osm) return ownTerritory(osm, all)
 
   // 3. Fall back to Open-Meteo's best guess rather than failing outright.
-  if (hits.length) return toPoint(hits[0])
+  if (ranked.length) return toPoint(ranked[0])
 
   return null
 }

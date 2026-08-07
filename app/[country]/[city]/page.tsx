@@ -1,8 +1,8 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, permanentRedirect } from "next/navigation"
 import { cache } from "react"
-import { getCityReport, getRelated } from "@/lib/reports"
+import { findCityElsewhere, getCityReport, getRelated } from "@/lib/reports"
 import { computeCategories, computeFinalScore, LEVELS } from "@/lib/safety-display"
 import { personalizeScore, type TravelerProfile } from "@/lib/profile"
 import { absUrl, humanDate, monthYear } from "@/lib/site"
@@ -129,7 +129,12 @@ export default async function CityReportPage({
 }) {
   const { country, city } = await params
   const hit = await load(country, city)
-  if (!hit) notFound()
+  if (!hit) {
+    // The report may simply have moved country — see `findCityElsewhere`.
+    const moved = await findCityElsewhere(city.toLowerCase())
+    if (moved) permanentRedirect(moved.path)
+    notFound()
+  }
   const { report, meta } = hit
 
   const final = finalScoreOf(report)

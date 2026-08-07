@@ -183,6 +183,27 @@ export async function getCityReport(
   return { report, meta }
 }
 
+/**
+ * The one report with this city slug, wherever it now lives.
+ *
+ * Reports move between countries: two Tahitian islands sat under `/france/`
+ * until the geocoder stopped believing OpenStreetMap's claim that French
+ * Polynesia is France, and moved to `/french-polynesia/`. The old addresses
+ * were live and in the sitemap, so a 404 is the wrong answer — the page still
+ * exists, it is just somewhere else.
+ *
+ * Only answers when exactly one country has the slug. Plenty of cities share a
+ * name (Santiago is in Chile, Spain, Cuba and the Dominican Republic), and
+ * guessing which one a stale link meant is worse than admitting the miss.
+ */
+export async function findCityElsewhere(citySlug: string): Promise<ReportMeta | null> {
+  const all = await listReports()
+  const hits = all.filter(
+    (m) => m.citySlug === citySlug && m.path.split("/").filter(Boolean).length === 2
+  )
+  return hits.length === 1 ? hits[0] : null
+}
+
 export interface CountryHub {
   countrySlug: string
   country: string

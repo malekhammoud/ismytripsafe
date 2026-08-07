@@ -32,15 +32,55 @@ const SEA = "#0d5f74"
 const SAND_IDLE = "rgba(233, 214, 178, 0.42)"
 const SAND_IDLE_HOVER = "rgba(243, 226, 189, 0.62)"
 
-/** Score → globe tint. Brighter than the page palette to survive the dark sea. */
+/**
+ * Score → globe tint, as a ramp rather than four buckets.
+ *
+ * The buckets were a real misreading of the world. Everything from 55 to 69
+ * came out the same amber, which is most of South America — Chile at 68 was
+ * drawn exactly as risky as Bolivia at 56, and the continent read as one flat
+ * mass next to an Africa full of distinctions. On a choropleth that is not a
+ * styling choice, it is the map saying something untrue.
+ *
+ * So the colour moves continuously between anchors taken from the safety
+ * spectrum, and a thirteen-point difference now looks like one.
+ */
+const RAMP: [number, [number, number, number]][] = [
+  [0, [214, 62, 56]],
+  [25, [232, 92, 78]],
+  [42, [246, 140, 76]],
+  [56, [235, 176, 66]],
+  [68, [201, 195, 78]],
+  [78, [116, 197, 118]],
+  [88, [38, 190, 148]],
+  [100, [22, 209, 165]],
+]
+
+function ramp(score: number): [number, number, number] {
+  const s = Math.max(0, Math.min(100, score))
+  for (let i = 1; i < RAMP.length; i++) {
+    const [hi, cHi] = RAMP[i]
+    if (s <= hi) {
+      const [lo, cLo] = RAMP[i - 1]
+      const t = hi === lo ? 0 : (s - lo) / (hi - lo)
+      return [0, 1, 2].map((k) => Math.round(cLo[k] + (cHi[k] - cLo[k]) * t)) as [
+        number,
+        number,
+        number,
+      ]
+    }
+  }
+  return RAMP[RAMP.length - 1][1]
+}
+
+/** Brighter than the page palette, to survive the dark sea. */
 function tint(score: number, alpha = 0.9): string {
-  const [r, g, b] =
-    score >= 70 ? [26, 186, 140] : score >= 55 ? [235, 176, 66] : score >= 40 ? [246, 140, 76] : [232, 92, 78]
+  const [r, g, b] = ramp(score)
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
 function tintSolid(score: number): string {
-  return score >= 70 ? "#1aba8c" : score >= 55 ? "#ebb042" : score >= 40 ? "#f68c4c" : "#e85c4e"
+  const [r, g, b] = ramp(score)
+  return `rgb(${r}, ${g}, ${b})`
 }
 
 interface Feat {
@@ -77,12 +117,8 @@ const ALT_COUNTRY = 0.01
 const ALT_COUNTRY_ACTIVE = 0.028
 const ALT_LABEL = 0.034
 
-const LEGEND = [
-  { label: "70+ · safe", color: "#1aba8c" },
-  { label: "55–69 · moderate", color: "#ebb042" },
-  { label: "40–54 · caution", color: "#f68c4c" },
-  { label: "under 40 · high risk", color: "#e85c4e" },
-]
+/** The ramp, as something you can read a number off. */
+const LEGEND = [20, 40, 55, 70, 85].map((score) => ({ score, color: tintSolid(score) }))
 
 export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
   const stageRef = useRef<HTMLDivElement>(null)
@@ -708,12 +744,20 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
               Safety score
             </p>
             <div className="mt-1.5 flex flex-wrap gap-x-3.5 gap-y-1">
-              {LEGEND.map((l) => (
-                <span key={l.label} className="flex items-center gap-1.5 text-[0.72rem] text-[#dcf0f3]">
-                  <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: l.color }} />
-                  {l.label}
+              <span className="flex items-center gap-2 text-[0.7rem] text-[#dcf0f3]">
+                <span aria-hidden>higher risk</span>
+                <span className="flex overflow-hidden rounded-[2px]">
+                  {LEGEND.map((l) => (
+                    <span
+                      key={l.score}
+                      className="h-2.5 w-5"
+                      style={{ background: l.color }}
+                      title={`around ${l.score} / 100`}
+                    />
+                  ))}
                 </span>
-              ))}
+                <span aria-hidden>safer</span>
+              </span>
               <span className="flex items-center gap-1.5 text-[0.72rem] text-[#93b4bd]">
                 <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: "rgba(233,214,178,0.5)" }} />
                 not yet checked
