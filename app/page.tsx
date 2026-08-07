@@ -75,13 +75,15 @@ export default async function Home() {
   // search), minus anything already shown above so nothing appears twice.
   //
   // One city per country, though. Sorting the world by population alone hands
-  // back four Chinese megacities in a row, and six near-identical skylines is
-  // both duller to look at and a worse answer to "where have you checked?"
+  // back four Chinese megacities in a row, and a wall of near-identical
+  // skylines is both duller to look at and a worse answer to "where have you
+  // checked?" Eight of them, four across: smaller cards, more destinations,
+  // and two even rows instead of a pair of oversized ones.
   const shown = new Set([showcase?.meta.path, ...seated.map((m) => m!.path)])
   const seenCountry = new Set<string>()
   const featured: typeof cities = []
   for (const m of [...cities].sort((a, b) => (b.population ?? 0) - (a.population ?? 0))) {
-    if (featured.length === 6) break
+    if (featured.length === 8) break
     if (shown.has(m.path) || seenCountry.has(m.countrySlug)) continue
     seenCountry.add(m.countrySlug)
     featured.push(m)
@@ -137,7 +139,7 @@ export default async function Home() {
                 read what we found.
               </p>
             </div>
-            <div className="postcard-deck mt-6 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-3">
+            <div className="postcard-deck mt-6 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
               {featured.map((m, i) => (
                 <Postcard key={m.path} meta={m} index={i} />
               ))}

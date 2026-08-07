@@ -948,15 +948,37 @@ body::after {
    five scores over a sunset on a 360px screen is unreadable however warm
    the veil is. */
 @media (max-width: 767px) {
-  .ith-photo { height: clamp(9rem, 34vw, 13rem); }
-  .ith-stage { display: block; min-height: 0; padding-top: clamp(9rem, 34vw, 13rem); }
-  .ith-panel { margin-top: 0; padding-inline: 0; }
-  .ith-panel::before {
-    inset: -0.6rem -1.5rem;
-    border-radius: 0;
-    background: linear-gradient(180deg, rgba(28, 16, 8, 0.92), rgba(22, 12, 6, 0.96));
+  /* The plate gets more room — at 9rem the couple were a smudge — and the
+     panel below it stops being a flat black slab: the same espresso the rest
+     of the site uses, warm enough that the strip beneath it doesn't look like
+     it belongs to a different page. */
+  .ith-photo { height: clamp(11.5rem, 42vw, 16rem); }
+  .ith-stage {
+    display: block;
+    min-height: 0;
+    padding-top: clamp(11.5rem, 42vw, 16rem);
   }
-  .ith-cats { gap: 0.2rem; }
+  .ith-panel {
+    margin-top: 0;
+    padding: 1.15rem 0 1.25rem;
+    gap: 1.05rem;
+  }
+  .ith-panel::before {
+    inset: 0 -1.5rem;
+    border-radius: 0;
+    background:
+      radial-gradient(80% 60% at 50% 0%, rgba(226, 115, 46, 0.16), transparent 70%),
+      linear-gradient(180deg, #241608, #1a1006);
+  }
+  .ith-step { gap: 0.38rem; }
+  .ith-search { margin-top: 0.7rem; }
+  .ith-ring { margin-top: 0.45rem; }
+  .ith-cats { gap: 0.2rem; margin-top: 0.55rem; }
+  /* Nothing is over a photograph down here, so the shadows that carried the
+     type on the plate are just mud. */
+  .ith-step-label,
+  .ith-cats > li { text-shadow: none; }
+  .ith-cats svg { filter: none; }
 }
 
 /* ═══ NIGHT — the home page's first screen ═══════════════════════════
@@ -1098,7 +1120,7 @@ body::after {
 }
 .pc-city {
   font-family: var(--font-display);
-  font-size: 1.22rem;
+  font-size: 1.02rem;
   line-height: 1.1;
   letter-spacing: -0.01em;
   color: var(--lamp);
@@ -1106,7 +1128,7 @@ body::after {
 }
 .pc-score {
   font-family: var(--font-mono);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
@@ -1114,9 +1136,9 @@ body::after {
 }
 .pc-country {
   grid-column: 1 / -1;
-  margin-top: 0.12rem;
+  margin-top: 0.1rem;
   font-family: var(--font-mono);
-  font-size: 0.58rem;
+  font-size: 0.52rem;
   font-weight: 400;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1143,36 +1165,21 @@ body::after {
   overscroll-behavior-x: contain;
 }
 .pc-strip::-webkit-scrollbar { display: none; }
+/* 9.5rem is not arbitrary: six of them plus their gaps come to just under the
+   1024px measure the page is set to, so on a desktop the row sits complete
+   rather than running off the edge, and on a phone it still scrolls. */
 .pc-strip > * {
   flex: 0 0 auto;
-  width: min(74vw, 20rem);
+  width: min(46vw, 9.5rem);
   scroll-snap-align: start;
 }
 @media (min-width: 640px) {
   .pc-strip { gap: 1.1rem; scroll-padding-left: 1.75rem; padding: 0 1.75rem 0.5rem; margin-inline: -1.75rem; }
-  .pc-strip > * { width: min(48vw, 22rem); }
 }
-/* On the cream page the strip keeps its scroll behaviour but not the
-   constellation's grid escape — there is no grid to become part of. */
+/* Captions on cream rather than on a dark table. */
 .pc-strip--light .pc-city { color: var(--navy); }
 .pc-strip--light .pc-country { color: var(--ink-faint); }
 .pc-strip--light .pc-lead { border-bottom-color: rgba(29, 47, 56, 0.22); }
-@media (min-width: 1024px) {
-  .pc-strip--light { display: flex; }
-  .pc-strip--light > * { width: min(30vw, 20rem); }
-}
-
-/* At lg the strip stops existing and its cards become cells of the grid.
-   The `display` switch has to be here rather than an `lg:contents` utility in
-   the markup: this file is declared after Tailwind's layer, so at equal
-   specificity `.pc-strip { display: flex }` wins the media query and the
-   constellation collapses back into a row. */
-@media (min-width: 1024px) {
-  .pc-strip {
-    display: contents;
-  }
-  .pc-strip > * { width: auto; }
-}
 
 /* ─── The arrangement ────────────────────────────────────
    Six cards around the box, at fixed angles. Fixed, not random: a scatter
@@ -1246,10 +1253,14 @@ body::after {
   .postcard-deck .postcard { padding: 6px 6px 0; }
 }
 
-/* Alternating tilts so a grid of cards reads as a scattered stack */
-.postcard-deck > *:nth-child(3n + 1) { --tilt: -1.4deg; }
-.postcard-deck > *:nth-child(3n + 2) { --tilt: 0.9deg; }
-.postcard-deck > *:nth-child(3n + 3) { --tilt: -0.5deg; }
+/* Alternating tilts so a grid of cards reads as a scattered stack. Five, not
+   three: the deck is four across, and a three-step cycle over four columns
+   lines the same angle up down the grid. */
+.postcard-deck > *:nth-child(5n + 1) { --tilt: -1.4deg; }
+.postcard-deck > *:nth-child(5n + 2) { --tilt: 0.9deg; }
+.postcard-deck > *:nth-child(5n + 3) { --tilt: -0.5deg; }
+.postcard-deck > *:nth-child(5n + 4) { --tilt: 1.2deg; }
+.postcard-deck > *:nth-child(5n + 5) { --tilt: -1deg; }
 
 /* The art window inside the deckle */
 .postcard-art {
