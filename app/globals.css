@@ -728,7 +728,9 @@ body::after {
 /* ─── the field ─────────────────────────────────────── */
 .ith-search { margin-top: clamp(0.7rem, 1.2vw, 1.05rem); position: relative; z-index: 5; }
 /* The site's own search, wearing the comp's white pill. */
-.ith-search input { font-size: clamp(0.7rem, 0.9vw, 0.84rem); padding-left: 0.15rem; }
+/* Font only. The left padding is clearing the pin icon, which is
+   absolutely positioned — trimming it ran the placeholder under it. */
+.ith-search input { font-size: clamp(0.7rem, 0.9vw, 0.84rem); }
 .ith-search .card {
   border-radius: 10px;
   background: #fff;
