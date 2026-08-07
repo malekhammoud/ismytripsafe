@@ -609,6 +609,354 @@ body::after {
   transform: translateY(-5px);
 }
 
+/* ═══ THE HEADER ═════════════════════════════════════════════════════
+   Built from River's comp (WhatsAppChatRiver2/00000105), measured off the
+   2048×808 original rather than eyeballed:
+
+     translucent panel   30.1% → 85.5% across,  8.0% → 41.7% down
+     orange strip        83.0% → 100% down
+     step circles        #f04a7a
+     scores              #17ba6b
+     strip               #e2732e   with #7d2c00 for the second line
+
+   The proportions are kept as percentages of the band so the composition
+   holds as it scales, and the contents reflow rather than shrink. */
+:root {
+  --ith-pink: #f04a7a;
+  --ith-green: #17ba6b;
+  --ith-strip: #e2732e;
+  --ith-strip-ink: #7d2c00;
+}
+
+/* No `overflow: hidden` here, deliberately. The photograph is absolutely
+   positioned at inset 0 with object-fit, so it has nothing to spill; the
+   search suggestions, on the other hand, drop out of the panel and would be
+   guillotined by it. */
+.ith {
+  position: relative;
+  isolation: isolate;
+  background: #2a1a10;
+}
+/* The field and whatever it drops has to sit above the phone and the strip. */
+.ith-search { position: relative; z-index: 5; }
+.ith-photo {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 46%;
+}
+/* The comp's veil is a pale warm wash. Kept warm and kept translucent, with
+   a dark gradient beneath it so the white type on top has a ground — the
+   comp sets white on pale sky, which reads beautifully in Figma and not at
+   all outdoors. */
+.ith-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 2px;
+  background:
+    linear-gradient(180deg, rgba(46, 24, 8, 0.3), rgba(46, 24, 8, 0.17)),
+    linear-gradient(0deg, rgba(255, 226, 186, 0.34), rgba(255, 226, 186, 0.34));
+}
+
+.ith-stage {
+  position: relative;
+  margin: 0 auto;
+  max-width: 96rem;
+  min-height: clamp(20rem, 34vw, 32rem);
+  padding: 0 clamp(1rem, 3vw, 2.5rem);
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: clamp(0.75rem, 1.8vw, 2rem);
+}
+
+/* Pushed right, and no wider than the comp's: the left third of the plate is
+   where the couple are, and covering them with a control panel would be
+   throwing away the only part of this header that makes anyone want to go
+   anywhere. */
+.ith-panel {
+  position: relative;
+  flex: 0 1 clamp(24rem, 66vw, 46rem);
+  min-width: 0;
+  margin-top: clamp(1.25rem, 3.4vw, 2.6rem);
+  padding: clamp(0.9rem, 1.6vw, 1.5rem) clamp(0.85rem, 1.6vw, 1.5rem) clamp(1rem, 1.7vw, 1.6rem);
+  display: grid;
+  gap: clamp(0.8rem, 1.6vw, 1.6rem);
+  grid-template-columns: 1fr;
+}
+
+.ith-col { min-width: 0; text-align: center; }
+
+/* ─── ①②③ ───────────────────────────────────────────── */
+.ith-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.ith-num {
+  display: grid;
+  place-items: center;
+  width: clamp(1.9rem, 2.6vw, 2.5rem);
+  height: clamp(1.9rem, 2.6vw, 2.5rem);
+  border-radius: 50%;
+  background: var(--ith-pink);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: clamp(0.9rem, 1.2vw, 1.15rem);
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+.ith-step-label {
+  display: block;
+  max-width: 18rem;
+  font-family: var(--font-mono);
+  font-size: clamp(0.54rem, 0.72vw, 0.7rem);
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(18, 9, 3, 0.85), 0 2px 10px rgba(18, 9, 3, 0.5);
+}
+
+/* ─── the field ─────────────────────────────────────── */
+.ith-search { margin-top: clamp(0.7rem, 1.2vw, 1.05rem); position: relative; z-index: 5; }
+/* The site's own search, wearing the comp's white pill. */
+.ith-search input { font-size: clamp(0.7rem, 0.9vw, 0.84rem); padding-left: 0.15rem; }
+.ith-search .card {
+  border-radius: 10px;
+  background: #fff;
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 3px 14px rgba(16, 8, 2, 0.32);
+  padding: 0.3rem;
+}
+
+/* ─── the ring ──────────────────────────────────────── */
+.ith-ring {
+  margin-top: clamp(0.5rem, 0.9vw, 0.8rem);
+  display: flex;
+  justify-content: center;
+}
+.ith-blurb {
+  max-width: 15rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.86);
+  text-shadow: 0 1px 6px rgba(20, 10, 4, 0.6);
+}
+
+/* ─── the five ──────────────────────────────────────── */
+.ith-cats {
+  margin-top: clamp(0.6rem, 1.1vw, 1rem);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: clamp(0.15rem, 0.5vw, 0.55rem);
+  color: #fff;
+}
+.ith-cats > li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  text-shadow: 0 1px 3px rgba(18, 9, 3, 0.85), 0 2px 10px rgba(18, 9, 3, 0.5);
+}
+.ith-cats svg { filter: drop-shadow(0 1px 3px rgba(18, 9, 3, 0.7)); }
+.ith-cats svg { width: clamp(1.1rem, 1.6vw, 1.55rem); height: auto; }
+/* Never broken mid-word: "Advisorie/s" is worse than a smaller label. */
+.ith-cat-label {
+  white-space: nowrap;
+  font-size: clamp(0.46rem, 0.63vw, 0.62rem);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.ith-cat-score {
+  font-family: var(--font-mono);
+  font-size: clamp(0.55rem, 0.78vw, 0.72rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.ith-cat-score b { color: var(--ith-green); font-weight: 700; font-size: 1.3em; }
+
+/* ─── the phone ─────────────────────────────────────── */
+.ith-phone {
+  display: none;
+  flex: 0 0 auto;
+  width: clamp(12rem, 15.5vw, 14.5rem);
+  margin-top: clamp(1rem, 2.4vw, 2rem);
+  padding: 9px;
+  border-radius: 30px;
+  background: linear-gradient(160deg, #303a44, #171d24 40%, #2b333c);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.4),
+    0 22px 44px -14px rgba(0, 0, 0, 0.55),
+    0 50px 90px -50px rgba(0, 0, 0, 0.7);
+}
+.ith-phone-screen {
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fff, #f6fbf8);
+  padding: 0.95rem 0.85rem 0.8rem;
+  text-align: center;
+}
+.ith-phone-city {
+  font-size: 1.02rem;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #12303f;
+}
+.ith-phone-flag { font-size: 0.9em; }
+.ith-phone-country {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  margin-top: 0.1rem;
+  font-size: 0.62rem;
+  color: #7c8b93;
+}
+.ith-phone-ring {
+  position: relative;
+  width: 6.1rem;
+  height: 6.1rem;
+  margin: 0.55rem auto 0;
+}
+.ith-phone-ring svg { width: 100%; height: 100%; }
+.ith-phone-score {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-bottom: 0.85rem;
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: var(--ith-green);
+  font-variant-numeric: tabular-nums;
+}
+.ith-phone-of {
+  position: absolute;
+  inset: auto 0 0.9rem;
+  font-size: 0.6rem;
+  color: #8b979d;
+  font-variant-numeric: tabular-nums;
+}
+.ith-phone-verdict {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--ith-green);
+}
+.ith-phone-rows {
+  margin-top: 0.6rem;
+  border-top: 1px solid rgba(18, 48, 63, 0.09);
+  padding-top: 0.5rem;
+  display: grid;
+  gap: 0.28rem;
+  text-align: left;
+}
+.ith-phone-rows > li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #46606d;
+}
+.ith-phone-label { flex: 1 1 auto; min-width: 0; font-size: 0.64rem; }
+.ith-phone-num {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--ith-green);
+  font-variant-numeric: tabular-nums;
+}
+.ith-phone-den { font-size: 0.56rem; color: #93a0a6; font-variant-numeric: tabular-nums; }
+.ith-phone-cta {
+  display: block;
+  margin-top: 0.7rem;
+  border-radius: 9px;
+  background: var(--ith-pink);
+  padding: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #fff;
+  transition: background 0.2s;
+}
+.ith-phone-cta:hover { background: #d93b69; }
+
+/* ─── the strip ─────────────────────────────────────── */
+.ith-band {
+  position: relative;
+  background: var(--ith-strip);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.2rem clamp(1.5rem, 6vw, 6rem);
+  padding: clamp(0.55rem, 1.4vw, 1.1rem) clamp(1rem, 3vw, 2.5rem);
+  text-align: center;
+}
+.ith-band-lead {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3.6vw, 3.1rem);
+  line-height: 1.05;
+  color: #fffaf0;
+}
+.ith-band-sub {
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 1.9vw, 1.7rem);
+  line-height: 1.15;
+  color: var(--ith-strip-ink);
+}
+
+/* ─── how it reflows ──────────────────────────────────
+   Not by scaling. Three columns need about 640px between them before the
+   search field stops being a search field, so below that the panel takes two
+   rows instead — the field across the top, the ring and the five scores under
+   it. The phone only appears when there is room for it beside all of that. */
+@media (min-width: 768px) {
+  .ith-panel {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    column-gap: clamp(1rem, 2.4vw, 2rem);
+  }
+  /* The field spans; the ring and the tiles share the row beneath. */
+  .ith-col:first-child { grid-column: 1 / -1; }
+  .ith-band { justify-content: space-between; text-align: left; }
+}
+@media (min-width: 1024px) {
+  .ith-panel { grid-template-columns: 1.15fr 0.86fr 1.5fr; }
+  .ith-col:first-child { grid-column: auto; }
+  /* One of the three labels runs to two lines. Reserving both keeps the
+     search, the ring and the tiles on one baseline. */
+  .ith-step-label { min-height: 2.4em; }
+}
+@media (min-width: 1280px) {
+  .ith-phone { display: block; }
+  .ith-panel { flex-basis: clamp(38rem, 56vw, 64rem); }
+}
+/* Below md the panel comes off the photograph: the picture becomes a band
+   across the top and the controls sit under it, because a field, a ring and
+   five scores over a sunset on a 360px screen is unreadable however warm
+   the veil is. */
+@media (max-width: 767px) {
+  .ith-photo { height: clamp(9rem, 34vw, 13rem); }
+  .ith-stage { display: block; min-height: 0; padding-top: clamp(9rem, 34vw, 13rem); }
+  .ith-panel { margin-top: 0; padding-inline: 0; }
+  .ith-panel::before {
+    inset: -0.6rem -1.5rem;
+    border-radius: 0;
+    background: linear-gradient(180deg, rgba(28, 16, 8, 0.92), rgba(22, 12, 6, 0.96));
+  }
+  .ith-cats { gap: 0.2rem; }
+}
+
 /* ═══ NIGHT — the home page's first screen ═══════════════════════════
    Lamplight on a dark table with somebody's postcards spread out on it.
    Dark because these photographs are all golden hour and they glow against
@@ -802,6 +1150,16 @@ body::after {
   .pc-strip { gap: 1.1rem; scroll-padding-left: 1.75rem; padding: 0 1.75rem 0.5rem; margin-inline: -1.75rem; }
   .pc-strip > * { width: min(48vw, 22rem); }
 }
+/* On the cream page the strip keeps its scroll behaviour but not the
+   constellation's grid escape — there is no grid to become part of. */
+.pc-strip--light .pc-city { color: var(--navy); }
+.pc-strip--light .pc-country { color: var(--ink-faint); }
+.pc-strip--light .pc-lead { border-bottom-color: rgba(29, 47, 56, 0.22); }
+@media (min-width: 1024px) {
+  .pc-strip--light { display: flex; }
+  .pc-strip--light > * { width: min(30vw, 20rem); }
+}
+
 /* At lg the strip stops existing and its cards become cells of the grid.
    The `display` switch has to be here rather than an `lg:contents` utility in
    the markup: this file is declared after Tailwind's layer, so at equal

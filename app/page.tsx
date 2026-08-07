@@ -5,6 +5,7 @@ import { getCityReport, listCountries, listReports } from "@/lib/reports"
 import { graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { Postcard } from "@/components/beach/Postcard"
 import { PlateCard } from "@/components/beach/PlateCard"
+import { homeDemo } from "@/lib/home-demo"
 import { BigPostcard } from "@/components/home/BigPostcard"
 import { StoplightStrip } from "@/components/home/StoplightStrip"
 import { SiteFooter } from "@/components/SiteFooter"
@@ -17,13 +18,12 @@ export const dynamic = "force-dynamic"
 const SHOWCASE = { country: "hungary", city: "budapest" } as const
 
 /**
- * The six laid around the search, in seat order: two along the top, one out
- * to each side, two along the bottom.
+ * The six illustrated postcards, now a strip under the header rather than an
+ * arrangement around the search — the header took over that job.
  *
- * Every one of these has a picture drawn for it, so the arrangement never has
- * a gap in it — and they are picked for spread rather than for score. Prague
- * and Venice lead because River asked for them; Lima and El Nido are there so
- * the table isn't six European afternoons.
+ * Picked for spread rather than for score. Prague and Venice lead because
+ * River asked for them; Lima and El Nido are there so it isn't six European
+ * afternoons.
  */
 const HERO_SEATS = [
   "/czechia/prague",
@@ -58,10 +58,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const [reports, countries, showcase] = await Promise.all([
+  const [reports, countries, showcase, demo] = await Promise.all([
     listReports(),
     listCountries(),
     getCityReport(SHOWCASE.country, SHOWCASE.city),
+    homeDemo(),
   ])
 
   const cities = reports.filter((m) => m.path.split("/").filter(Boolean).length === 2)
@@ -91,12 +92,25 @@ export default async function Home() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <HomeClient
-        heroCards={seated.map((m, i) => (
-          <PlateCard key={m!.path} meta={m!} priority={i < 2} />
-        ))}
-        footer={<SiteFooter />}
-      >
+      <HomeClient demo={demo} footer={<SiteFooter />}>
+        {seated.length > 0 && (
+          <section className="mt-9 rise-in">
+            <div className="text-center">
+              <p className="postcard-greeting">Wish you were here</p>
+              <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
+                Somewhere worth checking first
+              </h2>
+            </div>
+            <div className="pc-strip pc-strip--light mt-6">
+              {seated.map((m, i) => (
+                <div key={m!.path}>
+                  <PlateCard meta={m!} priority={i < 2} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {showcase && (
           <section className="mt-4 rise-in" style={{ animationDelay: "0.16s" }}>
             <div className="text-center">
