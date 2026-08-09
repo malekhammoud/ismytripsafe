@@ -943,42 +943,78 @@ body::after {
   .ith-phone { display: block; }
   .ith-panel { flex-basis: clamp(38rem, 56vw, 64rem); }
 }
-/* Below md the panel comes off the photograph: the picture becomes a band
-   across the top and the controls sit under it, because a field, a ring and
-   five scores over a sunset on a 360px screen is unreadable however warm
-   the veil is. */
+/* Below md: Mobile version recreated to romanticize travel and communicate the product clearly */
 @media (max-width: 767px) {
-  /* The plate gets more room — at 9rem the couple were a smudge — and the
-     panel below it stops being a flat black slab: the same espresso the rest
-     of the site uses, warm enough that the strip beneath it doesn't look like
-     it belongs to a different page. */
-  .ith-photo { height: clamp(11.5rem, 42vw, 16rem); }
+  .ith {
+    padding-top: 0.5rem;
+    padding-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .ith-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 55% 25%;
+    z-index: -2;
+    filter: brightness(0.88);
+  }
   .ith-stage {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     min-height: 0;
-    padding-top: clamp(11.5rem, 42vw, 16rem);
+    padding: 1rem 1rem 1.5rem;
+  }
+  .ith-hero-title {
+    text-align: center;
+    margin-bottom: 0.75rem;
+    width: 100%;
   }
   .ith-panel {
-    margin-top: 0;
-    padding: 1.15rem 0 1.25rem;
-    gap: 1.05rem;
+    margin-top: 0.5rem;
+    padding: 1.25rem 1rem;
+    gap: 1.25rem;
+    width: 100%;
+    border-radius: 18px;
+    background: rgba(22, 14, 8, 0.78);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 226, 186, 0.22);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.15);
   }
   .ith-panel::before {
-    inset: 0 -1.5rem;
-    border-radius: 0;
-    background:
-      radial-gradient(80% 60% at 50% 0%, rgba(226, 115, 46, 0.16), transparent 70%),
-      linear-gradient(180deg, #241608, #1a1006);
+    display: none;
   }
   .ith-step { gap: 0.38rem; }
-  .ith-search { margin-top: 0.7rem; }
+  .ith-step-label {
+    color: #fff;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+  }
+  .ith-search { margin-top: 0.5rem; }
   .ith-ring { margin-top: 0.45rem; }
-  .ith-cats { gap: 0.2rem; margin-top: 0.55rem; }
-  /* Nothing is over a photograph down here, so the shadows that carried the
-     type on the plate are just mud. */
-  .ith-step-label,
-  .ith-cats > li { text-shadow: none; }
-  .ith-cats svg { filter: none; }
+  .ith-cats {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.25rem;
+    margin-top: 0.55rem;
+  }
+  .ith-cats > li {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  }
+  .ith-cats svg {
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+  }
+  /* Mobile phone interactive scorecard preview */
+  .ith-phone {
+    display: block;
+    width: 100%;
+    max-width: 21rem;
+    margin-top: 1.25rem;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  }
 }
 
 /* ═══ NIGHT — the home page's first screen ═══════════════════════════

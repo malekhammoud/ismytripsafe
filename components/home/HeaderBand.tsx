@@ -50,8 +50,6 @@ export function HeaderBand({
   onSearch: (q: SafetyQuery) => void
   loading: boolean
 }) {
-  // The ring is sized in CSS terms so it tracks the band; ScoreRing wants a
-  // number, and this is the one measurement that has to cross that line.
   const ringSize = 112
 
   return (
@@ -66,6 +64,14 @@ export function HeaderBand({
       />
 
       <div className="ith-stage">
+        {/* Mobile & Desktop Hero Headline */}
+        <div className="ith-hero-title">
+          <p className="postcard-greeting text-[var(--orange)] sm:text-white">Know Before You Go</p>
+          <h1 className="font-display mt-0.5 text-[1.6rem] font-medium leading-tight text-white drop-shadow-md sm:text-[2.2rem]">
+            Romanticize Travel with Instant Safety Confidence
+          </h1>
+        </div>
+
         <div className="ith-panel">
           {/* ── ① a location ─────────────────────────────── */}
           <section className="ith-col">
@@ -93,9 +99,6 @@ export function HeaderBand({
                   stroke={9}
                   track="#3c4a5c"
                   label="/100"
-                  // Roll the ring so the unfilled arc opens at twelve o'clock
-                  // and runs clockwise, the way the comp draws it, whatever
-                  // the score happens to be today.
                   spin={(100 - demo.score) * 3.6}
                   onDark
                 />
