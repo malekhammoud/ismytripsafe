@@ -6,7 +6,7 @@ import type { ReportMeta } from "@/lib/reports"
 import { stampInk } from "@/components/beach/PlateCard"
 
 /**
- * The 10 WhatsApp postcard photos sent by River (after removing the 5 requested ones).
+ * The 10 WhatsApp postcard photos sent by River.
  * Every photo has the authentic torn-paper deckled border baked into the image.
  */
 const WHATSAPP_POSTCARDS = [
@@ -38,8 +38,8 @@ export function PostcardScroller({ cards }: { cards: ReportMeta[] }) {
 
   return (
     <div className="pc-scroller-root">
-      {/* ── Desktop infinite marquee (md+) ─────────────────────────── */}
-      <div className="pc-scroller-outer hidden md:block">
+      {/* ── Continuous Infinite Marquee across ALL viewports (Mobile & Desktop) ── */}
+      <div className="pc-scroller-outer">
         {/* Edge fade overlays */}
         <div className="pc-scroller-fade-left" />
         <div className="pc-scroller-fade-right" />
@@ -51,6 +51,8 @@ export function PostcardScroller({ cards }: { cards: ReportMeta[] }) {
             style={{ animationPlayState: paused ? "paused" : "running" }}
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
+            onTouchStart={() => setPaused(true)}
+            onTouchEnd={() => setPaused(false)}
           >
             {looped.map(({ card, photo }, idx) => (
               <div key={`${card.path}-${idx}`} className="pc-scroller-card pc-strip--light">
@@ -82,38 +84,6 @@ export function PostcardScroller({ cards }: { cards: ReportMeta[] }) {
             ))}
           </div>
         </div>
-      </div>
-
-      {/* ── Mobile touch-scroll strip (below md) ───────────────────── */}
-      <div className="pc-strip pc-strip--light mt-2 md:hidden">
-        {items.slice(0, 12).map(({ card, photo }, i) => (
-          <div key={card.path} className="w-[190px] shrink-0">
-            <Link
-              href={card.path}
-              className="pc block text-left"
-              aria-label={`${card.city}, ${card.country} — safety score ${card.score} out of 100`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={photo}
-                alt={`${card.city}, ${card.country}`}
-                className="pc-shot"
-                width={1440}
-                height={960}
-                loading={i < 2 ? "eager" : "lazy"}
-                decoding="async"
-              />
-              <span className="pc-cap">
-                <span className="pc-city">{card.city}</span>
-                <span className="pc-lead" aria-hidden />
-                <span className="pc-score" style={{ "--pc-ink": stampInk(card.score) } as React.CSSProperties}>
-                  {card.score}
-                </span>
-                <span className="pc-country">{card.country}</span>
-              </span>
-            </Link>
-          </div>
-        ))}
       </div>
     </div>
   )

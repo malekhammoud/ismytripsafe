@@ -1713,15 +1713,15 @@ body::after {
    at the start of the second copy, giving a perfectly seamless loop. */
 .pc-scroller-track {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.25rem;
   width: max-content;
-  animation: pc-marquee 60s linear infinite;
+  animation: pc-marquee 38s linear infinite;
   will-change: transform;
 }
 
 /* Each card slot */
 .pc-scroller-card {
-  width: 220px;
+  width: min(56vw, 210px);
   flex-shrink: 0;
 }
 @media (min-width: 1280px) {
