@@ -1715,7 +1715,7 @@ body::after {
   display: flex;
   gap: 1.25rem;
   width: max-content;
-  animation: pc-marquee 38s linear infinite;
+  animation: pc-marquee 75s linear infinite;
   will-change: transform;
 }
 
