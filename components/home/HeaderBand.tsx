@@ -64,14 +64,6 @@ export function HeaderBand({
       />
 
       <div className="ith-stage">
-        {/* Mobile & Desktop Hero Headline */}
-        <div className="ith-hero-title">
-          <p className="postcard-greeting text-[var(--orange)] sm:text-white">Know Before You Go</p>
-          <h1 className="font-display mt-0.5 text-[1.6rem] font-medium leading-tight text-white drop-shadow-md sm:text-[2.2rem]">
-            Romanticize Travel with Instant Safety Confidence
-          </h1>
-        </div>
-
         <div className="ith-panel">
           {/* ── ① a location ─────────────────────────────── */}
           <section className="ith-col">
