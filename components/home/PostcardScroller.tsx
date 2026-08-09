@@ -2,36 +2,42 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { suppliedPhotoFor, poolPhotoFor } from "@/lib/photos"
 import type { ReportMeta } from "@/lib/reports"
 import { stampInk } from "@/components/beach/PlateCard"
 
 /**
- * The 10 WhatsApp postcard photos sent by River.
- * Every photo has the authentic torn-paper deckled border baked into the image.
+ * Exact mapping for River's WhatsApp deckled postcard photos.
+ * Each photo is mapped to the exact city it depicts.
  */
-const WHATSAPP_POSTCARDS = [
-  "/photos/postcards/00000110-PHOTO-2026-08-04-23-38-18.jpg",
-  "/photos/postcards/00000111-PHOTO-2026-08-04-23-38-18.jpg",
-  "/photos/postcards/00000113-PHOTO-2026-08-04-23-38-18.jpg",
-  "/photos/postcards/00000114-PHOTO-2026-08-04-23-38-18.jpg",
-  "/photos/postcards/00000115-PHOTO-2026-08-04-23-38-18.jpg",
-  "/photos/postcards/00000116-PHOTO-2026-08-04-23-38-18.jpg",
-  "/photos/postcards/00000117-PHOTO-2026-08-04-23-38-19.jpg",
-  "/photos/postcards/00000119-PHOTO-2026-08-04-23-38-19.jpg",
-  "/photos/postcards/00000121-PHOTO-2026-08-04-23-38-19.jpg",
-  "/photos/postcards/00000122-PHOTO-2026-08-04-23-38-19.jpg",
-]
+const CITY_POSTCARD_PHOTOS: Record<string, string> = {
+  "/italy/venice": "/photos/postcards/00000110-PHOTO-2026-08-04-23-38-18.jpg",
+  "/japan/tokyo": "/photos/postcards/00000111-PHOTO-2026-08-04-23-38-18.jpg",
+  "/united-states/san-francisco": "/photos/postcards/00000113-PHOTO-2026-08-04-23-38-18.jpg",
+  "/czechia/prague": "/photos/postcards/00000114-PHOTO-2026-08-04-23-38-18.jpg",
+  "/italy/rome": "/photos/postcards/00000115-PHOTO-2026-08-04-23-38-18.jpg",
+  "/italy/milan": "/photos/postcards/00000116-PHOTO-2026-08-04-23-38-18.jpg",
+  "/poland/gdansk": "/photos/postcards/00000117-PHOTO-2026-08-04-23-38-19.jpg",
+  "/united-kingdom/london": "/photos/postcards/00000119-PHOTO-2026-08-04-23-38-19.jpg",
+  "/philippines/el-nido": "/photos/postcards/00000121-PHOTO-2026-08-04-23-38-19.jpg",
+  "/hungary/budapest": "/photos/postcards/00000122-PHOTO-2026-08-04-23-38-19.jpg",
+}
 
 export function PostcardScroller({ cards }: { cards: ReportMeta[] }) {
   const [paused, setPaused] = useState(false)
 
   if (!cards || cards.length === 0) return null
 
-  // Pair each destination report with one of the 10 WhatsApp deckled photos
-  const items = cards.map((card, i) => ({
-    card,
-    photo: WHATSAPP_POSTCARDS[i % WHATSAPP_POSTCARDS.length],
-  }))
+  // Resolve matching photo for each place so picture and city ALWAYS match 100%
+  const items = cards.map((card) => {
+    const photo =
+      CITY_POSTCARD_PHOTOS[card.path] ||
+      suppliedPhotoFor(card.path)?.file ||
+      card.image ||
+      poolPhotoFor(card.path).file
+
+    return { card, photo }
+  })
 
   // Duplicate items array for continuous, seamless 100% infinite marquee loop
   const looped = [...items, ...items]

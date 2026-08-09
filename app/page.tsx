@@ -20,17 +20,16 @@ const SHOWCASE = { country: "hungary", city: "budapest" } as const
  * Featured seat list for the home page postcard scroller.
  */
 const HERO_SEATS = [
-  "/czechia/prague",
   "/italy/venice",
   "/japan/tokyo",
-  "/peru/lima",
+  "/united-states/san-francisco",
+  "/czechia/prague",
   "/italy/rome",
+  "/italy/milan",
+  "/poland/gdansk",
+  "/united-kingdom/london",
   "/philippines/el-nido",
   "/hungary/budapest",
-  "/italy/milan",
-  "/united-kingdom/london",
-  "/poland/gdansk",
-  "/united-states/san-francisco",
   "/spain/barcelona",
   "/france/paris",
   "/japan/kyoto",
