@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { suppliedPhotoFor } from "@/lib/photos"
+import { suppliedPhotoFor, poolPhotoFor } from "@/lib/photos"
 import type { ReportMeta } from "@/lib/reports"
 
 /** Score → ink. Matches the safety spectrum in globals.css. */
@@ -10,23 +10,9 @@ export function stampInk(score: number): string {
   return "var(--risky)"
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// A postcard, used as it was drawn.
-//
-// These pictures arrive with a torn cream border painted into the pixels.
-// That border is the whole charm of them, and it is also already a frame —
-// so nothing at all goes on top: no stamp, no rubber postmark, no caption
-// bar, no chip in the corner. The picture is the picture.
-//
-// Everything the card has to say is said underneath it instead, the way a
-// caption sits under a photograph in an album: the place in the display
-// serif, the score in mono beside it, the country small and quiet below.
-// Two lines, three facts, and no furniture.
-// ─────────────────────────────────────────────────────────────────────
-
 export function PlateCard({ meta, priority = false }: { meta: ReportMeta; priority?: boolean }) {
-  const photo = suppliedPhotoFor(meta.path)
-  if (!photo) return null
+  const supplied = suppliedPhotoFor(meta.path)
+  const photoFile = supplied?.file || meta.image || poolPhotoFor(meta.path).file
 
   return (
     <Link
@@ -36,7 +22,7 @@ export function PlateCard({ meta, priority = false }: { meta: ReportMeta; priori
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={photo.file}
+        src={photoFile}
         alt={`${meta.city}, ${meta.country}`}
         className="pc-shot"
         width={1440}

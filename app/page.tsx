@@ -3,7 +3,7 @@ import Link from "next/link"
 import { HomeClient } from "@/components/HomeClient"
 import { getCityReport, listCountries, listReports } from "@/lib/reports"
 import { graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
-import { PlateCard } from "@/components/beach/PlateCard"
+import { PostcardScroller } from "@/components/home/PostcardScroller"
 import { homeDemo } from "@/lib/home-demo"
 import { BigPostcard } from "@/components/home/BigPostcard"
 import { StoplightStrip } from "@/components/home/StoplightStrip"
@@ -17,17 +17,7 @@ export const dynamic = "force-dynamic"
 const SHOWCASE = { country: "hungary", city: "budapest" } as const
 
 /**
- * The one set of postcards on the page, as a strip under the header.
- *
- * Six, not ten. Ten fitted — the strip scrolls — but on a desktop six is
- * exactly the row that fits the measure, so the other four sat off the edge
- * with nothing to suggest they were there. A complete row beats a partial one
- * with a secret in it; the flag links under it and the globe are how you get
- * to the rest.
- *
- * Ordered for spread rather than for score. Prague and Venice lead because
- * River asked for them, and Tokyo and Lima come early so the row isn't all
- * European afternoons.
+ * Featured seat list for the home page postcard scroller.
  */
 const HERO_SEATS = [
   "/czechia/prague",
@@ -36,6 +26,24 @@ const HERO_SEATS = [
   "/peru/lima",
   "/italy/rome",
   "/philippines/el-nido",
+  "/hungary/budapest",
+  "/italy/milan",
+  "/united-kingdom/london",
+  "/poland/gdansk",
+  "/united-states/san-francisco",
+  "/spain/barcelona",
+  "/france/paris",
+  "/japan/kyoto",
+  "/australia/sydney",
+  "/netherlands/amsterdam",
+  "/portugal/lisbon",
+  "/austria/vienna",
+  "/united-arab-emirates/dubai",
+  "/singapore/singapore",
+  "/iceland/reykjavik",
+  "/south-africa/cape-town",
+  "/thailand/bangkok",
+  "/greece/athens",
 ]
 
 // Reports carry the year they were generated in their titles; the landing page
@@ -71,9 +79,23 @@ export default async function Home() {
 
   const cities = reports.filter((m) => m.path.split("/").filter(Boolean).length === 2)
   const byPath = new Map(cities.map((m) => [m.path, m]))
-  // Whatever we still have a report for. Missing one just leaves that seat
-  // empty rather than breaking the arrangement.
-  const seated = HERO_SEATS.map((p) => byPath.get(p)).filter((m) => !!m)
+  const seen = new Set<string>()
+  const seatedCards: typeof cities = []
+
+  for (const p of HERO_SEATS) {
+    const m = byPath.get(p)
+    if (m && !seen.has(m.path)) {
+      seatedCards.push(m)
+      seen.add(m.path)
+    }
+  }
+  for (const c of cities) {
+    if (seatedCards.length >= 30) break
+    if (!seen.has(c.path)) {
+      seatedCards.push(c)
+      seen.add(c.path)
+    }
+  }
 
   const jsonLd = graph(organizationNode(), websiteNode())
 
@@ -81,7 +103,7 @@ export default async function Home() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <HomeClient demo={demo} footer={<SiteFooter />}>
-        {seated.length > 0 && (
+        {seatedCards.length > 0 && (
           <section className="mt-9 rise-in">
             <div className="text-center">
               <p className="postcard-greeting">Wish you were here</p>
@@ -89,12 +111,8 @@ export default async function Home() {
                 Somewhere worth checking first
               </h2>
             </div>
-            <div className="pc-strip pc-strip--light mt-6">
-              {seated.map((m, i) => (
-                <div key={m!.path}>
-                  <PlateCard meta={m!} priority={i < 2} />
-                </div>
-              ))}
+            <div className="mt-4">
+              <PostcardScroller cards={seatedCards} />
             </div>
             {countries.length > 0 && (
               <p className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.78rem] text-[var(--ink-soft)]">
