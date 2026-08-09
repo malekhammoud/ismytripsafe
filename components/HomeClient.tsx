@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { SiteHeader } from "@/components/SiteHeader"
 import { HeaderBand } from "@/components/home/HeaderBand"
-import { SearchBar } from "@/components/SearchBar"
+
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
 import { TrafficReport } from "@/components/report/TrafficReport"
@@ -129,22 +129,8 @@ export function HomeClient({
         {/* Server-rendered latest-reports directory (crawlable) */}
         {children}
 
-        {/* One more way in, at the point where someone has finished reading
-            and would otherwise have to scroll all the way back up. */}
-        <section className="mt-12 rise-in" style={{ animationDelay: "0.1s" }}>
-          <div className="mx-auto max-w-2xl text-center">
-            <p className="postcard-greeting">Anywhere you like</p>
-            <h2 className="font-display mt-1 text-[1.6rem] font-medium tracking-tight text-[var(--navy)]">
-              Somewhere else on your mind?
-            </h2>
-            <div className="relative z-10 mt-4 text-left">
-              <SearchBar onSubmit={search} loading={loading} />
-            </div>
-            <p className="mt-3 text-[0.76rem] text-[var(--ink-soft)]">
-              Free, every time. No sign-up, no email.
-            </p>
-          </div>
-        </section>
+
+
 
         {footer}
       </main>
