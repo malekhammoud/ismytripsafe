@@ -19,7 +19,7 @@ export function PostcardScroller({ cards }: { cards: ReportMeta[] }) {
     if (!el) return
 
     let animId: number
-    const speed = 1.5 // Speed of auto-scroll (pixels per frame)
+    const speed = 0.4 // Speed of auto-scroll (pixels per frame) — gentle, smooth drift
 
     const scrollStep = () => {
       if (el && !isHovered) {
