@@ -133,6 +133,24 @@ export function HeaderBand({
         <p className="ith-band-lead">Fast. Reliable. Free.</p>
         <p className="ith-band-sub">Made for travellers, by travellers.</p>
       </div>
+
+      {/* ── Large Desktop Search Bar (Underneath Orange Banner) ── */}
+      <div className="hidden md:block ith-desktop-search-banner">
+        <div className="mx-auto max-w-3xl px-6 py-7 text-center">
+          <p className="postcard-greeting text-[0.78rem] tracking-widest text-[var(--accent-deep)] mb-1">
+            Search Destinations
+          </p>
+          <h2 className="font-display text-2xl font-medium tracking-tight text-[var(--navy)] lg:text-3xl">
+            Where are you travelling to next?
+          </h2>
+          <p className="mt-1.5 text-[0.72rem] uppercase tracking-wider text-[var(--ink-soft)] font-mono">
+            Instant safety scores &amp; district breakdowns for 1,000+ cities
+          </p>
+          <div className="mt-4 text-left shadow-xl rounded-2xl">
+            <SearchBar onSubmit={onSearch} loading={loading} />
+          </div>
+        </div>
+      </div>
     </header>
   )
 }

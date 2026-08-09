@@ -1007,13 +1007,9 @@ body::after {
   .ith-cats svg {
     filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
   }
-  /* Mobile phone interactive scorecard preview */
+  /* Mobile phone interactive scorecard preview - hidden as requested */
   .ith-phone {
-    display: block;
-    width: 100%;
-    max-width: 21rem;
-    margin-top: 1.25rem;
-    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+    display: none !important;
   }
 }
 
@@ -1204,10 +1200,18 @@ body::after {
 /* 9.5rem is not arbitrary: six of them plus their gaps come to just under the
    1024px measure the page is set to, so on a desktop the row sits complete
    rather than running off the edge, and on a phone it still scrolls. */
-.pc-strip > * {
-  flex: 0 0 auto;
-  width: min(46vw, 9.5rem);
-  scroll-snap-align: start;
+@media (max-width: 639px) {
+  .pc-strip {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
+    overflow-x: visible;
+    padding: 0;
+    margin-inline: 0;
+  }
+  .pc-strip > * {
+    width: 100%;
+  }
 }
 @media (min-width: 640px) {
   .pc-strip { gap: 1.1rem; scroll-padding-left: 1.75rem; padding: 0 1.75rem 0.5rem; margin-inline: -1.75rem; }
@@ -1651,3 +1655,59 @@ body::after {
   color: rgba(255, 253, 246, 0.92);
   pointer-events: none;
 }
+
+/* ═══ DESKTOP SEARCH BAR UNDER ORANGE BANNER ═════════════════════════ */
+.ith-desktop-search-banner {
+  background: radial-gradient(85% 120% at 50% -20%, #fef8ee 0%, var(--paper-deep) 100%);
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.ith-desktop-search-banner .card {
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 155, 171, 0.22);
+  box-shadow: 0 10px 32px -8px rgba(13, 59, 77, 0.16);
+  padding: 0.5rem;
+}
+
+.ith-desktop-search-banner input {
+  font-size: 1.02rem;
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+}
+
+.ith-desktop-search-banner .btn {
+  font-size: 0.96rem;
+  padding-left: 1.6rem;
+  padding-right: 1.6rem;
+  border-radius: 12px;
+}
+
+/* ═══ INFINITE POSTCARD SCROLLER (DESKTOP) ═══════════════════════════ */
+@keyframes pc-infinite-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.pc-infinite-track {
+  width: max-content;
+  display: flex;
+  animation: pc-infinite-scroll 50s linear infinite;
+  will-change: transform;
+}
+
+.pc-infinite-track:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-infinite-track {
+    animation: none;
+  }
+}
+

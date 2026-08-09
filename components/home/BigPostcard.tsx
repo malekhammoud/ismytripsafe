@@ -100,23 +100,16 @@ export function BigPostcard({ meta, report }: { meta: ReportMeta; report: Cached
               {meta.city} <span className="align-middle text-[0.7em]">{meta.flag}</span>
             </p>
             <p className="meta mt-1.5 text-[0.62rem] text-[rgba(255,253,246,0.6)]">{meta.country}</p>
-            <div className="mt-4 sm:mt-5">
+            <div className="mt-3 sm:mt-4">
               <ScoreRing
                 score={final.index}
                 color={level.color}
-                size={116}
-                stroke={7}
+                size={80}
+                stroke={6}
                 track="rgba(255,253,246,0.22)"
                 onDark
               />
             </div>
-            <p
-              className="meta mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.6rem]"
-              style={{ background: "rgba(255,253,246,0.92)", color: level.color }}
-            >
-              <ShieldCheck size={13} strokeWidth={2.4} />
-              {level.answer}
-            </p>
           </div>
         </div>
 
