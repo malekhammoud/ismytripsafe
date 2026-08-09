@@ -53,90 +53,92 @@ export function HeaderBand({
   const ringSize = 112
 
   return (
-    <header className="ith">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/photos/hero/barcelona-park-guell.jpg"
-        alt="Two travellers on the mosaic bench at Park Güell, looking out over Barcelona in the late afternoon"
-        className="ith-photo"
-        fetchPriority="high"
-        decoding="async"
-      />
+    <>
+      <header className="ith">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/photos/hero/barcelona-park-guell.jpg"
+          alt="Two travellers on the mosaic bench at Park Güell, looking out over Barcelona in the late afternoon"
+          className="ith-photo"
+          fetchPriority="high"
+          decoding="async"
+        />
 
-      <div className="ith-stage">
-        <div className="ith-panel">
-          {/* ── ① a location ─────────────────────────────── */}
-          <section className="ith-col">
-            <p className="ith-step">
-              <span className="ith-num">1</span>
-              <span className="ith-step-label">{STEPS[0]}</span>
-            </p>
-            <div className="ith-search">
-              <SearchBar onSubmit={onSearch} loading={loading} compact />
-            </div>
-          </section>
+        <div className="ith-stage">
+          <div className="ith-panel">
+            {/* ── ① a location ─────────────────────────────── */}
+            <section className="ith-col">
+              <p className="ith-step">
+                <span className="ith-num">1</span>
+                <span className="ith-step-label">{STEPS[0]}</span>
+              </p>
+              <div className="ith-search">
+                <SearchBar onSubmit={onSearch} loading={loading} compact />
+              </div>
+            </section>
 
-          {/* ── ② a score ────────────────────────────────── */}
-          <section className="ith-col">
-            <p className="ith-step">
-              <span className="ith-num">2</span>
-              <span className="ith-step-label">{STEPS[1]}</span>
-            </p>
-            <div className="ith-ring">
-              {demo ? (
-                <ScoreRing
-                  score={demo.score}
-                  color="var(--ith-green)"
-                  size={ringSize}
-                  stroke={9}
-                  track="#3c4a5c"
-                  label="/100"
-                  spin={(100 - demo.score) * 3.6}
-                  onDark
-                />
-              ) : (
-                <p className="ith-blurb">One rating out of 100, in a few seconds.</p>
+            {/* ── ② a score ────────────────────────────────── */}
+            <section className="ith-col">
+              <p className="ith-step">
+                <span className="ith-num">2</span>
+                <span className="ith-step-label">{STEPS[1]}</span>
+              </p>
+              <div className="ith-ring">
+                {demo ? (
+                  <ScoreRing
+                    score={demo.score}
+                    color="var(--ith-green)"
+                    size={ringSize}
+                    stroke={9}
+                    track="#3c4a5c"
+                    label="/100"
+                    spin={(100 - demo.score) * 3.6}
+                    onDark
+                  />
+                ) : (
+                  <p className="ith-blurb">One rating out of 100, in a few seconds.</p>
+                )}
+              </div>
+            </section>
+
+            {/* ── ③ the five behind it ─────────────────────── */}
+            <section className="ith-col ith-col--wide">
+              <p className="ith-step">
+                <span className="ith-num">3</span>
+                <span className="ith-step-label">{STEPS[2]}</span>
+              </p>
+              {demo && (
+                <ul className="ith-cats">
+                  {demo.cats.map((c) => {
+                    const Icon = CATEGORY_ICON[c.key]
+                    return (
+                      <li key={c.key}>
+                        <Icon size={30} strokeWidth={1.6} aria-hidden />
+                        <span className="ith-cat-label">{c.short}</span>
+                        <span className="ith-cat-score">
+                          <b>{c.score}</b>/100
+                        </span>
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
-            </div>
-          </section>
+            </section>
+          </div>
 
-          {/* ── ③ the five behind it ─────────────────────── */}
-          <section className="ith-col ith-col--wide">
-            <p className="ith-step">
-              <span className="ith-num">3</span>
-              <span className="ith-step-label">{STEPS[2]}</span>
-            </p>
-            {demo && (
-              <ul className="ith-cats">
-                {demo.cats.map((c) => {
-                  const Icon = CATEGORY_ICON[c.key]
-                  return (
-                    <li key={c.key}>
-                      <Icon size={30} strokeWidth={1.6} aria-hidden />
-                      <span className="ith-cat-label">{c.short}</span>
-                      <span className="ith-cat-score">
-                        <b>{c.score}</b>/100
-                      </span>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </section>
+          {demo && <HeaderPhone demo={demo} />}
         </div>
 
-        {demo && <HeaderPhone demo={demo} />}
-      </div>
+        {/* ── The strip ─────────────────────────────────────── */}
+        <div className="ith-band">
+          <p className="ith-band-lead">Fast. Reliable. Free.</p>
+          <p className="ith-band-sub">Made for travellers, by travellers.</p>
+        </div>
+      </header>
 
-      {/* ── The strip ─────────────────────────────────────── */}
-      <div className="ith-band">
-        <p className="ith-band-lead">Fast. Reliable. Free.</p>
-        <p className="ith-band-sub">Made for travellers, by travellers.</p>
-      </div>
-
-      {/* ── Large Desktop Search Bar (Underneath Orange Banner) ── */}
+      {/* ── Large Desktop Search Bar (Underneath Orange Banner, outside header image) ── */}
       <div className="hidden md:block ith-desktop-search-banner">
-        <div className="mx-auto max-w-3xl px-6 py-7 text-center">
+        <div className="mx-auto max-w-3xl px-6 py-6 text-center">
           <p className="postcard-greeting text-[0.78rem] tracking-widest text-[var(--accent-deep)] mb-1">
             Search Destinations
           </p>
@@ -151,6 +153,6 @@ export function HeaderBand({
           </div>
         </div>
       </div>
-    </header>
+    </>
   )
 }
