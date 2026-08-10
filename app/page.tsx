@@ -103,14 +103,8 @@ export default async function Home() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <HomeClient demo={demo} footer={<SiteFooter />}>
         {seatedCards.length > 0 && (
-          <section className="mt-9 rise-in">
-            <div className="text-center">
-              <p className="postcard-greeting">Wish you were here</p>
-              <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
-                Somewhere worth checking first
-              </h2>
-            </div>
-            <div className="mt-4">
+          <section className="mt-4 rise-in">
+            <div>
               <PostcardScroller cards={seatedCards} />
             </div>
             {countries.length > 0 && (

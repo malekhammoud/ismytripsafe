@@ -3,8 +3,7 @@ import Link from "next/link"
 import { notFound, permanentRedirect } from "next/navigation"
 import { cache } from "react"
 import { findCityElsewhere, getCityReport, getRelated } from "@/lib/reports"
-import { computeCategories, computeFinalScore, LEVELS } from "@/lib/safety-display"
-import { personalizeScore, type TravelerProfile } from "@/lib/profile"
+import { computeFinalScore, LEVELS } from "@/lib/safety-display"
 import { absUrl, humanDate, monthYear } from "@/lib/site"
 import {
   breadcrumbNode,
@@ -20,7 +19,6 @@ import {
   FaqList,
   ReportDoc,
   ReportLinkGrid,
-  ScoreBadge,
   SeoFooter,
   SiteHeader,
   sectionNumberer,
@@ -138,7 +136,6 @@ export default async function CityReportPage({
   const { report, meta } = hit
 
   const final = finalScoreOf(report)
-  const categories = computeCategories(report.bundle.safety.signals, report.enrichment)
   const capsule = buildCapsule(report)
   const related = await getRelated(meta)
   const e = report.enrichment
@@ -149,17 +146,6 @@ export default async function CityReportPage({
     { name: "Destinations", href: "/destinations" },
     { name: meta.country, href: `/${meta.countrySlug}` },
     { name: meta.city, href: meta.path },
-  ]
-
-  // Deterministic traveller-type scores (same arithmetic as the interactive
-  // personalisation — unique numbers per city, no AI involved).
-  const travellerRows: { label: string; profile: TravelerProfile }[] = [
-    { label: "Solo female traveller", profile: { party: "solo", gender: "female", age: "under30", style: "sightseeing" } },
-    { label: "Solo traveller", profile: { party: "solo", gender: "unspecified", age: "under30", style: "sightseeing" } },
-    { label: "Family with kids", profile: { party: "family", gender: "mixed", age: "30to49", style: "sightseeing" } },
-    { label: "Nightlife-focused trip", profile: { party: "group", gender: "mixed", age: "under30", style: "nightlife" } },
-    { label: "Travellers 65+", profile: { party: "couple", gender: "mixed", age: "65plus", style: "sightseeing" } },
-    { label: "Business trip", profile: { party: "solo", gender: "unspecified", age: "30to49", style: "business" } },
   ]
 
   const walkDark = report.bundle.safety.signals.find((s) => s.key === "safe_walking_dark")
@@ -298,47 +284,6 @@ export default async function CityReportPage({
                       night-time rules apply: stay in lit, populated areas and keep your phone out of sight.
                     </p>
                   )}
-                </div>
-              </DocSection>
-
-              {/* Traveller-type scores — deterministic re-weighting, unique per city */}
-              <DocSection num={num()} kicker="Trip Profiles" title="Score by traveller type">
-                <p className="text-[0.88rem] leading-relaxed text-[var(--ink-soft)]">
-                  Who&apos;s travelling changes which risks matter. These re-weight {meta.city}&apos;s
-                  category data for common trip types — same data, different emphasis. Run your own
-                  profile from the{" "}
-                  {/* rel=nofollow: /?place=… renders the landing page, which
-                      canonicalises to "/" — a crawlable link to it from every
-                      report just spends crawl budget re-discovering the home
-                      page. People can still click it. */}
-                  <Link
-                    href={`/?place=${encodeURIComponent(`${meta.city}, ${meta.country}`)}`}
-                    rel="nofollow"
-                    className="font-medium text-[var(--accent-deep)] hover:underline"
-                  >
-                    interactive checker
-                  </Link>
-                  .
-                </p>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {travellerRows.map((row) => {
-                    const p = personalizeScore(final, categories, row.profile)
-                    return (
-                      <div
-                        key={row.label}
-                        className="flex items-center justify-between gap-3 rounded-[3px] px-4 py-3"
-                        style={{ border: "1px solid rgba(20,25,34,0.1)" }}
-                      >
-                        <span className="min-w-0">
-                          <span className="block text-[0.88rem] font-semibold text-[var(--ink)]">{row.label}</span>
-                          <span className="block truncate text-[0.7rem] text-[var(--ink-faint)]">
-                            {p.drivers.length ? p.drivers.join(" · ") : "Baseline weighting"}
-                          </span>
-                        </span>
-                        <ScoreBadge score={p.index} size={34} />
-                      </div>
-                    )
-                  })}
                 </div>
               </DocSection>
 

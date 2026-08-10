@@ -27,12 +27,12 @@ export function SearchBar({ onSubmit, loading, compact = false }: SearchBarProps
   }
 
   return (
-    <form onSubmit={submit} className={compact ? "card p-1.5" : "card p-3 sm:p-3.5"}>
+    <form onSubmit={submit} className={compact ? "card p-2" : "card p-3 sm:p-4"}>
       <div
         className={
           compact
-            ? "flex items-stretch gap-1.5"
-            : "flex flex-col gap-2.5 sm:flex-row sm:items-stretch"
+            ? "flex items-stretch gap-2"
+            : "flex flex-col gap-3 sm:flex-row sm:items-stretch"
         }
       >
         <div className="min-w-0 flex-1">
@@ -41,8 +41,9 @@ export function SearchBar({ onSubmit, loading, compact = false }: SearchBarProps
             onChange={setPlace}
             onSelectPlace={setPlaceGeo}
             placeholder={compact ? "e.g. Barcelona, Spain" : "Any city or country — “Is it safe?”"}
-            icon={<MapPin size={16} style={{ color: "var(--accent)" }} />}
+            icon={<MapPin size={compact ? 20 : 22} style={{ color: "var(--accent)" }} />}
             required
+            compact={compact}
           />
         </div>
         <button
@@ -51,18 +52,18 @@ export function SearchBar({ onSubmit, loading, compact = false }: SearchBarProps
           aria-label="Check safety"
           className={
             compact
-              ? "btn flex shrink-0 items-center justify-center px-3.5"
-              : "btn flex items-center justify-center gap-2 px-6 py-3 sm:py-0"
+              ? "btn flex shrink-0 items-center justify-center px-4 py-2.5 text-base font-semibold"
+              : "btn flex items-center justify-center gap-2.5 px-8 py-3.5 text-lg font-semibold sm:py-0"
           }
         >
           {loading ? (
             <>
-              <span className="spin inline-block h-4 w-4 rounded-full border-2 border-[var(--paper)]/30 border-t-[var(--paper)]" />
+              <span className="spin inline-block h-5 w-5 rounded-full border-2 border-[var(--paper)]/30 border-t-[var(--paper)]" />
               {!compact && "Checking…"}
             </>
           ) : (
             <>
-              <ShieldQuestion size={17} />
+              <ShieldQuestion size={compact ? 20 : 22} />
               {!compact && " Check safety"}
             </>
           )}

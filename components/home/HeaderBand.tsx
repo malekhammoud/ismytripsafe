@@ -72,8 +72,8 @@ export function HeaderBand({
                 <span className="ith-num">1</span>
                 <span className="ith-step-label">{STEPS[0]}</span>
               </p>
-              <div className="mt-3">
-                <p className="ith-blurb">Search any destination score below.</p>
+              <div className="ith-search">
+                <SearchBar onSubmit={onSearch} loading={loading} compact />
               </div>
             </section>
 

@@ -78,28 +78,14 @@ export function BigPostcard({ meta, report }: { meta: ReportMeta; report: Cached
             sizes="(max-width: 1024px) 100vw, 62rem"
             className="object-cover object-[36%_50%] transition-transform duration-[900ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] group-hover:scale-[1.03] sm:object-[50%_44%]"
           />
-          {/* Two scrims, not one: the type on the left needs a dark ground, and
-              the panel on the right needs a darker one still. A single flat
-              overlay across the whole frame would take the sunset with it. */}
-          <div
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(101deg, rgba(9,32,44,0.78) 0%, rgba(9,32,44,0.5) 34%, rgba(9,32,44,0.12) 56%, rgba(9,32,44,0.06) 100%)",
-            }}
-          />
-          <div
-            className="absolute inset-x-0 bottom-0 h-2/3"
-            style={{ background: "linear-gradient(180deg, transparent, rgba(9,32,44,0.7))" }}
-          />
           <span className="photo-elsewhere">Illustration</span>
 
           {/* ── The answer ─────────────────────────────────── */}
-          <div className="absolute left-0 top-0 p-5 sm:p-7 lg:p-9">
+          <div className="absolute left-0 top-0 p-5 sm:p-7 lg:p-9" style={{ filter: "drop-shadow(0 2px 5px rgba(0,0,0,0.65))" }}>
             <p className="font-display text-[clamp(1.5rem,3.4vw,2.5rem)] font-medium leading-none tracking-tight text-[#fffdf6]">
               {meta.city} <span className="align-middle text-[0.7em]">{meta.flag}</span>
             </p>
-            <p className="meta mt-1.5 text-[0.62rem] text-[rgba(255,253,246,0.6)]">{meta.country}</p>
+            <p className="meta mt-1.5 text-[0.62rem] text-[rgba(255,253,246,0.9)]">{meta.country}</p>
             <div className="mt-3 sm:mt-4">
               <ScoreRing
                 score={final.index}
@@ -110,6 +96,14 @@ export function BigPostcard({ meta, report }: { meta: ReportMeta; report: Cached
                 onDark
               />
             </div>
+            {/* Desktop version ONLY: "Yes — generally safe" text badge */}
+            <p
+              className="mt-3 hidden sm:inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[0.74rem] font-semibold shadow-md"
+              style={{ background: "rgba(255,253,246,0.95)", color: level.color }}
+            >
+              <ShieldCheck size={13} strokeWidth={2.4} />
+              {level.answer}
+            </p>
           </div>
         </div>
 

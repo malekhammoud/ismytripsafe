@@ -730,13 +730,13 @@ body::after {
 /* The site's own search, wearing the comp's white pill. */
 /* Font only. The left padding is clearing the pin icon, which is
    absolutely positioned — trimming it ran the placeholder under it. */
-.ith-search input { font-size: clamp(0.7rem, 0.9vw, 0.84rem); }
+.ith-search input { font-size: clamp(0.92rem, 1.1vw, 1.1rem); }
 .ith-search .card {
-  border-radius: 10px;
+  border-radius: 12px;
   background: #fff;
-  border-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 3px 14px rgba(16, 8, 2, 0.32);
-  padding: 0.3rem;
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 20px rgba(16, 8, 2, 0.4);
+  padding: 0.45rem;
 }
 
 /* ─── the ring ──────────────────────────────────────── */
@@ -1664,24 +1664,24 @@ body::after {
 }
 
 .ith-desktop-search-banner .card {
-  border-radius: 16px;
+  border-radius: 18px;
   background: #ffffff;
-  border: 1px solid rgba(15, 155, 171, 0.22);
-  box-shadow: 0 10px 32px -8px rgba(13, 59, 77, 0.16);
-  padding: 0.5rem;
+  border: 1px solid rgba(15, 155, 171, 0.28);
+  box-shadow: 0 14px 40px -6px rgba(13, 59, 77, 0.22);
+  padding: 0.65rem;
 }
 
 .ith-desktop-search-banner input {
-  font-size: 1.02rem;
-  padding-top: 0.8rem;
-  padding-bottom: 0.8rem;
+  font-size: 1.25rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
 }
 
 .ith-desktop-search-banner .btn {
-  font-size: 0.96rem;
-  padding-left: 1.6rem;
-  padding-right: 1.6rem;
-  border-radius: 12px;
+  font-size: 1.1rem;
+  padding-left: 2.2rem;
+  padding-right: 2.2rem;
+  border-radius: 14px;
 }
 
 /* ═══ POSTCARD SCROLLER — CSS MARQUEE (DESKTOP) ═══════════════════════ */
@@ -1719,13 +1719,29 @@ body::after {
   will-change: transform;
 }
 
-/* Each card slot */
+/* Each card slot — enlarged to fill space prominently */
 .pc-scroller-card {
-  width: min(56vw, 210px);
+  width: min(85vw, 320px);
   flex-shrink: 0;
 }
+@media (min-width: 640px) {
+  .pc-scroller-card { width: 380px; }
+}
+@media (min-width: 1024px) {
+  .pc-scroller-card { width: 440px; }
+}
 @media (min-width: 1280px) {
-  .pc-scroller-card { width: 240px; }
+  .pc-scroller-card { width: 480px; }
+}
+
+.pc-scroller-card .pc-city {
+  font-size: 1.25rem;
+}
+.pc-scroller-card .pc-score {
+  font-size: 1rem;
+}
+.pc-scroller-card .pc-country {
+  font-size: 0.65rem;
 }
 
 /* Edge fades */

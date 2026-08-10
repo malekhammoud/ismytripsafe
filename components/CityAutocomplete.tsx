@@ -22,6 +22,7 @@ interface CityAutocompleteProps {
   placeholder?: string
   icon: React.ReactNode
   required?: boolean
+  compact?: boolean
 }
 
 // ISO2 country code → flag emoji
@@ -39,6 +40,7 @@ export function CityAutocomplete({
   placeholder,
   icon,
   required,
+  compact = false,
 }: CityAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const [open, setOpen] = useState(false)
@@ -167,11 +169,15 @@ export function CityAutocomplete({
 
   return (
     <div ref={boxRef} className="relative">
-      <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2">
+      <span className={`pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 ${compact ? "left-3" : "left-4"}`}>
         {icon}
       </span>
       <input
-        className="field w-full bg-transparent px-9 py-3 text-sm"
+        className={`field w-full bg-transparent font-medium ${
+          compact
+            ? "pl-10 pr-3 py-2.5 text-base sm:text-lg"
+            : "pl-12 pr-4 py-3.5 text-lg sm:text-xl"
+        }`}
         placeholder={placeholder}
         value={value}
         onChange={(e) => handleType(e.target.value)}
