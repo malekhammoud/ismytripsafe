@@ -31,6 +31,7 @@ import {
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
 import type { SafetySignal } from "@/lib/types"
+import { SlidersHorizontal } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
@@ -227,7 +228,16 @@ export default async function CountryHubPage({
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
         <div className="mx-auto max-w-[640px]">
-          <Breadcrumbs trail={trail} />
+          <div className="flex items-start justify-between gap-4">
+            <Breadcrumbs trail={trail} />
+            <Link
+              href={`/?place=${encodeURIComponent(hub.country)}`}
+              className="btn inline-flex shrink-0 items-center gap-1.5 px-4 py-1.5 text-[0.8rem]"
+            >
+              <SlidersHorizontal size={14} />
+              Personalize
+            </Link>
+          </div>
 
           <h1 className="font-display text-[clamp(1.7rem,5vw,2.3rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
             Is {hub.country} safe? {hub.flag}

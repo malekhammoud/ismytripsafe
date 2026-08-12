@@ -67,8 +67,13 @@ export function HomeClient({
     const params = new URLSearchParams(window.location.search)
     const place = params.get("place")
     if (place) {
-      setProfile(profileFromParams(params))
-      run({ place })
+      const p = profileFromParams(params)
+      if (p) {
+        setProfile(p)
+        run({ place })
+      } else {
+        setPending({ place })
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
