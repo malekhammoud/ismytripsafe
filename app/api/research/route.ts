@@ -124,8 +124,8 @@ export async function POST(request: Request) {
             bundle,
             enrichment: prior.enrichment,
             prose: prior.prose,
-            // Keep the original publish date; the research did not change.
-            cachedAt: prior.cachedAt,
+            // No cachedAt: the databases were re-gathered now, so the assessed
+            // date advances to today even though the research text is reused.
           })
           send({ type: "done", cached: false, path: pathForGeo(geo) })
           return

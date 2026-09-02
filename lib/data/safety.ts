@@ -12,8 +12,11 @@ import type { GeoPoint } from "../types"
 
 /**
  * Build the "Official guidance" index signal from every graded advisory.
- * The US and Canadian levels share a 1–4 scale and are averaged; the UK's
- * structured alert rank only stands in when neither is available.
+ * The US and Canadian levels share a 1–4 scale and are AVERAGED; the UK's
+ * structured alert rank only stands in when neither is available. The average
+ * is what the scoring engine maps to a 0–100 score (see advisoryScore), and
+ * the same number drives the "Do Not Travel" cap — so a Level 4 + Level 3
+ * pair reads honestly as a serious average (3.5), not as a green "Level 2".
  */
 function advisorySignal(advisories: OfficialAdvisory[]): SafetySignal {
   const graded = advisories.filter(
@@ -23,12 +26,11 @@ function advisorySignal(advisories: OfficialAdvisory[]): SafetySignal {
     ? graded
     : advisories.filter((a) => a.level != null)
 
+  // Lead for the display: the US advisory when present (cleanest "Level N —
+  // label" phrasing), otherwise the first graded government.
   const us = advisories.find((a) => a.sourceShort === "US" && a.level != null)
   const lead = us ?? pool[0]
 
-  // Average the advisory *level* across issuing governments, then let the
-  // scoring engine map that to a 0–100 score — the level is also what drives
-  // the "Do Not Travel" cap, so the two must read the same number.
   const level = pool.length
     ? pool.reduce((sum, a) => sum + (a.level as number), 0) / pool.length
     : null
@@ -38,15 +40,18 @@ function advisorySignal(advisories: OfficialAdvisory[]): SafetySignal {
       (pool.length > 1 ? ` · ${pool.length} govts` : "")
     : "No advisory"
 
+  const source =
+    pool.length > 1
+      ? Array.from(new Set(pool.map((a) => a.sourceShort)))
+          .sort()
+          .join(" / ")
+      : (lead?.source ?? "U.S. Department of State")
+
   return {
     key: "advisory",
     label: "Government travel advisory",
     group: "Official guidance",
-    source: us
-      ? pool.length > 1
-        ? "US State Dept · Canada"
-        : "U.S. Department of State"
-      : (lead?.source ?? "U.S. Department of State"),
+    source,
     value: level,
     display,
     year: null,

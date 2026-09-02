@@ -75,8 +75,9 @@ export default function MethodologyPage() {
             is simply wrong — clean air does not offset an armed conflict. So families are
             combined on the risk scale through a generalised mean that weights severity, which
             means high risk in any one family dominates the result instead of being diluted by
-            the calmer ones. Family weights: crime 30%, conflict 20%, official guidance 20%,
-            institutions 14%, everyday hazards 10%, health 6%.
+            the calmer ones. Family weights: crime 45%, conflict 15%, official guidance 15%,
+            institutions 15%, everyday hazards 6%, health 4% — renormalised over whichever
+            families actually have data, and never raised above the hard caps below.
           </p>
           <p>
             Raw values are normalised onto a 0–100 safety scale with piecewise bands calibrated
@@ -93,11 +94,12 @@ export default function MethodologyPage() {
             Some facts are categorical, not quantitative. &quot;Do not travel&quot; is not a
             data point to be weighed against air quality — it is a statement that bounds the
             answer. So a handful of conditions set a <strong>ceiling</strong> on the score
-            rather than contributing a term to it: a Level 4 advisory caps the score at 18, a
-            Level 3 advisory at 44, a homicide rate above 40/100k at 30, and bottom-5%
-            political stability (active conflict) at 22. When a cap binds, the report says so
-            and names the reason. No other indicator — and no traveller-type re-weighting —
-            can lift a score above its cap.
+            rather than contributing a term to it: a pair of Level 4 (&quot;Do Not Travel&quot;)
+            advisories caps the score at 20, a Level 3 advisory average at 44, extreme
+            homicide (50+/100k) at 28, sustained terrorism (25+ deaths per million) at 32,
+            and bottom-5% political stability (active conflict) at 22. When a cap binds, the
+            report says so and names the reason. No other indicator — and no traveller-type
+            re-weighting — can lift a score above its cap.
           </p>
 
           <h3 className="font-display !mt-6 text-[1.1rem] font-medium tracking-tight text-[var(--ink)]">Reporting reliability</h3>

@@ -141,13 +141,12 @@ export const useReport = create<ReportState>((set, get) => ({
                 status: s.status === "error" ? "error" : "done",
                 cached: ev.cached ?? false,
                 reportPath: ev.path ?? s.reportPath,
-                generatedAt: ev.cachedAt
-                  ? new Date(ev.cachedAt).toLocaleDateString("en-US", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })
-                  : s.generatedAt,
+                // The assessment date is the moment THIS check was made —
+                // searching or personalising a place re-assesses it, even when
+                // the databases replay from cache. (The honest "last updated"
+                // date for the underlying data stays on the report page, from
+                // the report's own cachedAt.)
+                generatedAt: s.generatedAt,
               }))
               break
           }

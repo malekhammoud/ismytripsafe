@@ -157,16 +157,28 @@ function fcdoSlug(iso2: string, name: string): string {
     .replace(/^-|-$/g, "")
 }
 
-/** Map FCDO structured alert codes to a human label + ordinal severity. */
+/**
+ * Map FCDO structured alert codes to a human label + ordinal severity.
+ *
+ * The FCDO distinguishes warnings that cover the whole country from warnings
+ * that cover parts of it ("to parts" statuses), and that difference matters
+ * enormously to a traveller: "advise against all travel to the country" and
+ * "advise against all travel to parts of the country" are not the same
+ * rating. Here a parts-scoped "all travel" warning is graded 3 — the same
+ * severity as "all but essential travel" — because both are severe
+ * but scoped, while a country-wide one is a genuine 4.
+ */
 function fcdoAlert(status: string[]): { label: string; rank: number } {
   const s = status.join(" ")
-  if (/advise_against_all_travel|avoid_all_travel/.test(s))
-    return { label: "Advises against all travel to parts of the country", rank: 4 }
-  if (/all_but_essential/.test(s))
-    return {
-      label: "Advises against all-but-essential travel to parts",
-      rank: 3,
-    }
+  const all = /advise_against_all_travel|avoid_all_travel/.test(s)
+  const essential = /all_but_essential/.test(s)
+  const parts = /to_parts|in_parts|localis|localiz/.test(s)
+  if (all && !parts)
+    return { label: "Advises against all travel", rank: 4 }
+  if (parts && (all || essential))
+    return { label: "Advises against all travel to parts of the country", rank: 3 }
+  if (essential)
+    return { label: "Advises against all-but-essential travel", rank: 3 }
   if (status.length > 0)
     return { label: "Active warnings in place", rank: 2 }
   return { label: "No advisory against travel", rank: 1 }
@@ -279,23 +291,4 @@ export async function getOfficialAdvisories(
   return results
     .map((r) => (r.status === "fulfilled" ? r.value : null))
     .filter((a): a is OfficialAdvisory => a != null)
-}
-
-/**
- * Normalize a US State Dept level (1–4) into the app's 0–100 safety score.
- * Used to feed official guidance into the composite index.
- */
-export function stateDeptLevelScore(level: number): number {
-  switch (level) {
-    case 1:
-      return 95
-    case 2:
-      return 70
-    case 3:
-      return 38
-    case 4:
-      return 8
-    default:
-      return 60
-  }
 }

@@ -224,14 +224,16 @@ export const SIGNAL_BANDS: Record<string, (v: number) => number> = {
       [65, 0],
     ]),
 
-  // NOTE: urban scale (population) is deliberately NOT scored. It was tried as
-  // a universal city-level input — Numbeo covers only ~7% of the places we
-  // publish, so the long tail has nothing city-specific — and it made the
-  // score worse. Population says "2 million people" identically for a safe
-  // metro and a dangerous one, so it pulled everything toward the middle:
-  // Brazzaville rose 13 points and Algiers 12, on no evidence about either.
-  // Buying separation for a few cities by adding noise to the rest is a bad
-  // trade. It is still gathered and shown as context, just not scored.
+  // NOTE: urban scale (population) is deliberately kept on a SHORT leash. A
+  // full-weight run pulled every city toward the middle — population says
+  // "2 million people" identically for a safe metro and a dangerous one, so
+  // it dragged Brazzaville up 13 points and Algiers up 12 on no evidence
+  // about either. It still earns a small weight (0.05) in the crime pillar,
+  // because it is the only city-level input that exists for nearly every
+  // place we publish (Numbeo covers ~7%, and the long tail would otherwise
+  // inherit its country's score outright) — enough to separate a big metro
+  // from a hill town without deciding a big metro is dangerous.
+  // It is still gathered and shown as context in the signal list.
 
   // ── City-level survey signals ──────────────────────────────────────
   // Everything else scored here is a national statistic, so these are the only
@@ -305,27 +307,36 @@ export const SIGNAL_BANDS: Record<string, (v: number) => number> = {
       [12000000, 50],
     ]),
 
-  // Qualitative robbery / mugging risk assessed from city research (1=Severe, 2=High, 3=Moderate, 4=Low)
-  research_robbery_risk: (v) =>
-    band(v, [
-      [1, 20],
-      [2, 45],
-      [3, 70],
-      [4, 92],
-    ]),
-
-  // Qualitative pickpocketing risk assessed from city research (1=Severe, 2=High, 3=Moderate, 4=Low)
-  research_pickpocket_risk: (v) =>
-    band(v, [
-      [1, 20],
-      [2, 45],
-      [3, 70],
-      [4, 92],
-    ]),
+  // Qualitative street-crime ratings (1=Severe, 2=High, 3=Moderate, 4=Low).
+  // Robbery and pickpocketing are NOT the same kind of risk: armed robbery
+  // threatens a person, pickpocketing threatens a wallet. Scoring them on one
+  // shared scale made "High pickpocket risk" worth the same as "High robbery
+  // risk" and pushed Barcelona and Rome — cities with very little violent
+  // crime — below Yerevan. So the two keep their own curves, and these are
+  // the single source of truth for both the crime pillar (here) and the
+  // traveller-sentiment section (lib/safety-display.ts imports them).
+  research_robbery_risk: (v) => band(v, RESEARCH_ROBBERY),
+  research_pickpocket_risk: (v) => band(v, RESEARCH_PICKPOCKET),
 
   // Visitor sentiment score (0–100, higher = safer)
   research_sentiment_score: (v) => clamp(v),
 }
+
+/** Robbery / mugging — a threat to the traveller's person. */
+export const RESEARCH_ROBBERY: [number, number][] = [
+  [1, 12],
+  [2, 34],
+  [3, 62],
+  [4, 92],
+]
+
+/** Pickpocketing / bag-snatching — costly and common, rarely dangerous. */
+export const RESEARCH_PICKPOCKET: [number, number][] = [
+  [1, 40],
+  [2, 58],
+  [3, 78],
+  [4, 96],
+]
 
 // WGI percentile ranks are already 0–100 with higher = better, so they map
 // straight through. All six behave identically.
@@ -340,13 +351,29 @@ const WGI_KEYS = [
 for (const k of WGI_KEYS) SIGNAL_BANDS[k] = (v) => clamp(v)
 
 /**
- * Official government advisory level → score. Level 4 now bottoms out at 0
- * rather than 8, and an ungraded advisory returns NaN (no data) instead of
+ * Official government advisory level → score. The level fed in here is the
+ * AVERAGE across issuing governments (see advisorySignal in lib/data/safety),
+ * so it can be fractional — the curve reads averages directly:
+ *
+ *   all at level 1          → 100
+ *   average under 2         → 75
+ *   average under 3         → 50
+ *   average under 4         → 25
+ *   both at level 4         → 0
+ *
+ * The average also drives the hard cap (see hardCaps), so score and ceiling
+ * read the same number. An ungraded advisory returns NaN (no data) instead of
  * the old 60, which quietly voted "average" for every place we could not
- * grade. The level also drives a hard cap; see ADVISORY_CAPS.
+ * grade.
  */
-export const advisoryScore = (level: number): number =>
-  level <= 1 ? 97 : level === 2 ? 72 : level === 3 ? 30 : level >= 4 ? 0 : NaN
+export const advisoryScore = (level: number): number => {
+  if (!Number.isFinite(level) || level <= 0) return NaN
+  if (level <= 1) return 100
+  if (level < 2) return 75
+  if (level < 3) return 50
+  if (level < 4) return 25
+  return 0
+}
 
 SIGNAL_BANDS.advisory = advisoryScore
 
@@ -422,7 +449,9 @@ export const PILLARS: PillarDef[] = [
       homicide: 0.12,
       safe_walking_dark: 0.05,
       violence_victimization: 0.03,
+      sexual_violence: 0.02,
       bribery_contact_rate: 0.02,
+      human_trafficking_victims: 0.01,
     },
   },
   {
@@ -501,7 +530,12 @@ function hardCaps(byKey: Map<string, SafetySignal>): Cap[] {
 
   const adv = val("advisory")
   if (adv != null) {
-    if (adv >= 4) caps.push({ max: 18, reason: 'Level 4 advisory — "Do Not Travel"' })
+    // The cap and the advisory's own score must read the same number (see
+    // advisoryScore). A pair of "Do Not Travel" ratings caps at 20 — the
+    // pillar scores 0, but ambient hazards like a bad health system or poor
+    // roads are still allowed to tell on the verdict a little. An average at
+    // level 3 ("reconsider travel") caps at 44.
+    if (adv >= 4) caps.push({ max: 20, reason: 'Level 4 advisory — "Do Not Travel"' })
     else if (adv >= 3) caps.push({ max: 44, reason: "Level 3 advisory — reconsider travel" })
   }
 
@@ -792,7 +826,7 @@ export function attachResearchSignals(
         value: v,
         display: `${intel.robbery.level} risk`,
         year: null,
-        score: Math.round(band(v, [[1, 20], [2, 45], [3, 70], [4, 92]])),
+        score: Math.round(band(v, RESEARCH_ROBBERY)),
         lowerIsBetter: true,
         note: intel.robbery.note || "Mugging and armed robbery risk to visitors based on city news and web research.",
       })
@@ -810,7 +844,7 @@ export function attachResearchSignals(
         value: v,
         display: `${intel.pickpocket.level} risk`,
         year: null,
-        score: Math.round(band(v, [[1, 20], [2, 45], [3, 70], [4, 92]])),
+        score: Math.round(band(v, RESEARCH_PICKPOCKET)),
         lowerIsBetter: true,
         note: intel.pickpocket.note || "Pickpocketing and bag-snatching risk to visitors based on city news and web research.",
       })

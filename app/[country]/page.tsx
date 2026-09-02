@@ -31,7 +31,7 @@ import {
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
 import type { SafetySignal } from "@/lib/types"
-import { SlidersHorizontal } from "lucide-react"
+import { ArrowRight, SlidersHorizontal } from "lucide-react"
 
 export const dynamic = "force-dynamic"
 
@@ -228,16 +228,36 @@ export default async function CountryHubPage({
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
         <div className="mx-auto max-w-[640px]">
-          <div className="flex items-start justify-between gap-4">
-            <Breadcrumbs trail={trail} />
-            <Link
-              href={`/?place=${encodeURIComponent(hub.country)}`}
-              className="btn inline-flex shrink-0 items-center gap-1.5 px-4 py-1.5 text-[0.8rem]"
+          <Breadcrumbs trail={trail} />
+
+          {/* The one action on the page — big on purpose: personalisation is
+              the whole point of the checker, and it starts the interactive
+              flow with this country pre-filled. */}
+          <Link
+            href={`/?place=${encodeURIComponent(hub.country)}`}
+            className="group mt-4 flex items-center gap-3.5 rounded-[14px] border border-[var(--hairline)] bg-white/55 px-5 py-4 transition-colors hover:border-[var(--accent)] hover:bg-white/80"
+          >
+            <span
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+              style={{ background: "rgba(15,155,171,0.12)" }}
             >
-              <SlidersHorizontal size={14} />
-              Personalize
-            </Link>
-          </div>
+              <SlidersHorizontal size={20} style={{ color: "var(--accent-deep)" }} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[1rem] font-semibold text-[var(--ink)]">
+                Make this report personal
+              </span>
+              <span className="mt-0.5 block text-[0.8rem] leading-snug text-[var(--ink-soft)]">
+                Who&apos;s travelling? A family, a woman alone, a business trip — the score
+                and the key findings are re-weighted for your group, not the average traveller.
+              </span>
+            </span>
+            <ArrowRight
+              size={17}
+              className="ml-auto shrink-0 transition-transform group-hover:translate-x-0.5"
+              style={{ color: "var(--ink-faint)" }}
+            />
+          </Link>
 
           <h1 className="font-display text-[clamp(1.7rem,5vw,2.3rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
             Is {hub.country} safe? {hub.flag}

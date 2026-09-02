@@ -10,6 +10,8 @@ import {
   computeSafetyIndex,
   levelFromIndex,
   saferThanPct,
+  RESEARCH_ROBBERY,
+  RESEARCH_PICKPOCKET,
   type PillarKey,
 } from "./scoring"
 
@@ -58,28 +60,35 @@ export const LEVELS: Record<SafetyLevel, LevelConfig> = {
 // ─── Final published score (databases + field research) ──────────────
 
 // 0–100 equivalents for the analyst's qualitative street-crime ratings.
-//
-// Robbery and pickpocketing get separate scales because they are not the same
-// kind of risk. Armed robbery is a threat to life; pickpocketing is a threat
-// to a wallet. On a single shared scale, "High pickpocket risk" scored 38 —
-// which is what pushed Barcelona and Rome, two cities with very little
-// violent crime, below Yerevan and Skagway.
+// These ARE the same curves the scoring engine uses for the crime pillar
+// (RESEARCH_ROBBERY / RESEARCH_PICKPOCKET in scoring.ts) — one table, one
+// truth. Robbery and pickpocketing keep separate scales because they are not
+// the same kind of risk. Armed robbery is a threat to life; pickpocketing is
+// a threat to a wallet. On a single shared scale, "High pickpocket risk"
+// scored 38 — which is what pushed Barcelona and Rome, two cities with very
+// little violent crime, below Yerevan and Skagway.
+
+/** Value 1=Severe … 4=Low → risk level name. */
+const LEVEL_VALUE: Record<RiskLevel, number> = {
+  Low: 4,
+  Moderate: 3,
+  High: 2,
+  Severe: 1,
+}
+
+const fromBands = (bands: [number, number][]) =>
+  Object.fromEntries(
+    (Object.keys(LEVEL_VALUE) as RiskLevel[]).map((l) => [
+      l,
+      bands.find(([v]) => v === LEVEL_VALUE[l])![1],
+    ])
+  ) as Record<RiskLevel, number>
 
 /** Mugging / armed robbery — a risk to the traveller's person. */
-const ROBBERY_SCORE: Record<RiskLevel, number> = {
-  Low: 92,
-  Moderate: 62,
-  High: 34,
-  Severe: 12,
-}
+const ROBBERY_SCORE: Record<RiskLevel, number> = fromBands(RESEARCH_ROBBERY)
 
 /** Pickpocketing / bag-snatching — costly and common, but rarely dangerous. */
-const PICKPOCKET_SCORE: Record<RiskLevel, number> = {
-  Low: 96,
-  Moderate: 78,
-  High: 58,
-  Severe: 40,
-}
+const PICKPOCKET_SCORE: Record<RiskLevel, number> = fromBands(RESEARCH_PICKPOCKET)
 
 export interface FinalScore {
   index: number
@@ -338,7 +347,11 @@ export function computeCategories(
       short: "Advisories",
       // An advisory with no grade is not a bad advisory — an ungraded or
       // absent one reads as "no government is warning about this place".
-      score: pillar("advisory")?.score ?? 90,
+      // But if a government DID grade this place and the pillar still did not
+      // resolve, that is a machinery failure, not a good sign: grey 0.
+      score:
+        pillar("advisory")?.score ??
+        (byKey.get("advisory")?.value != null ? 0 : 90),
       note: advNote,
       signalKeys: ["advisory"],
       levelName: "",
