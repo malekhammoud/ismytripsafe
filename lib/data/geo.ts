@@ -2,6 +2,8 @@ import worldCountries from "world-countries"
 import type { GeoPoint } from "../types"
 import { englishCountryName } from "./country"
 import { withBudget } from "../timing"
+import { normQuery, matchCountryQuery } from "../search"
+import { CITY_ALIASES } from "./aliases"
 
 // The geocode ladder is serial by necessity (Nominatim's usage policy rules out
 // firing it speculatively alongside Open-Meteo just to save a round-trip), so
@@ -117,7 +119,7 @@ function featureRank(code: string | undefined): number {
  * Authority Heliport" is a real Open-Meteo hit), and a strong preference for
  * candidates matching the country/region hinted after a comma in the query.
  */
-async function openMeteoSearch(
+export async function openMeteoSearch(
   name: string,
   hint: string
 ): Promise<{ ranked: OpenMeteoHit[]; all: OpenMeteoHit[] }> {
@@ -244,6 +246,25 @@ export async function geocode(name: string): Promise<GeoPoint | null> {
   const [head, ...rest] = query.split(",")
   const cityPart = head.trim() || query
   const hint = rest.join(",").trim()
+
+  // 0. Curated, zero-network rung. A colloquial alias ("bkk" → Bangkok)
+  //    redirects; a query that unambiguously names a country ("spain",
+  //    "usa", "czech republic", "mexi") is the country itself, instantly —
+  //    and its report page key matches the existing country hubs.
+  const aliasTarget = !hint ? CITY_ALIASES[normQuery(cityPart)] : undefined
+  if (aliasTarget) return geocode(aliasTarget)
+  const countryHit = matchCountryQuery(cityPart)
+  if (countryHit) {
+    return {
+      city: countryHit.name,
+      lat: countryHit.lat,
+      lon: countryHit.lon,
+      countryCode: countryHit.countryCode,
+      country: countryHit.name,
+      timezone: "",
+      population: null,
+    }
+  }
 
   // 1. Open-Meteo, ranked. Taken only when the winner is clearly the place a
   //    traveller means — a populated town, a capital or an admin division.

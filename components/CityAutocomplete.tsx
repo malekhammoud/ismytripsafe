@@ -3,16 +3,27 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import type { GeoPoint } from "@/lib/types"
 
+/**
+ * A suggestion from the server engine (/api/search → lib/search.ts): a
+ * country or a city we already have a report for, or a geocoder long-tail
+ * hit. Mirrors SearchHit in lib/search.ts.
+ */
 interface Suggestion {
-  id: number
+  type: "country" | "city"
   name: string
-  admin1?: string
   country: string
   countryCode: string
+  region?: string
   lat: number
   lon: number
-  timezone: string
   population: number | null
+  flag: string
+  tier: number
+  hasReport: boolean
+  path?: string
+  quality: number
+  inCountry?: boolean
+  resolvedFrom?: string
 }
 
 interface CityAutocompleteProps {
@@ -33,6 +44,12 @@ function flagOf(cc: string): string {
   )
 }
 
+const DEBOUNCE_MS = 220
+// The AI long tail only fires when the local engine found nothing — and then
+// only after the traveller has stopped typing for a beat.
+const RESOLVE_IDLE_MS = 550
+const RESOLVE_MIN_LEN = 4
+
 export function CityAutocomplete({
   value,
   onChange,
@@ -46,9 +63,12 @@ export function CityAutocomplete({
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const [loading, setLoading] = useState(false)
+  const [bestGuess, setBestGuess] = useState<Suggestion | null>(null)
+  const [guessVisible, setGuessVisible] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
   const justSelected = useRef(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resolveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reqId = useRef(0)
 
   const fetchSuggestions = useCallback(async (q: string) => {
@@ -56,48 +76,97 @@ export function CityAutocomplete({
     if (term.length < 2) {
       setSuggestions([])
       setOpen(false)
+      setBestGuess(null)
+      setGuessVisible(false)
       return
     }
     const myReq = ++reqId.current
     setLoading(true)
+    let raw: Response
     try {
-      const res = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
-          term
-        )}&count=6&language=en&format=json`
-      )
-      const data = await res.json()
+      raw = await fetch(`/api/search?q=${encodeURIComponent(term)}&limit=8`)
+    } catch {
+      // Engine unreachable — fall back to the direct geocoder so the box is
+      // never dead. Best-effort; the server engine is the real path.
+      try {
+        raw = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+            term
+          )}&count=6&language=en&format=json`
+        )
+      } catch {
+        if (myReq === reqId.current) {
+          setSuggestions([])
+          setLoading(false)
+        }
+        return
+      }
+    }
+    try {
+      const data = await raw.json()
       if (myReq !== reqId.current) return // stale response
-      const results: Suggestion[] = (data.results ?? []).map(
-        (r: {
-          id: number
-          name: string
-          admin1?: string
-          country: string
-          country_code: string
-          latitude: number
-          longitude: number
-          timezone: string
-          population?: number
-        }) => ({
-          id: r.id,
-          name: r.name,
-          admin1: r.admin1,
-          country: r.country,
-          countryCode: r.country_code,
-          lat: r.latitude,
-          lon: r.longitude,
-          timezone: r.timezone,
-          population: r.population ?? null,
-        })
-      )
+      const direct = !/^\/api\/search/.test(raw.url ?? "")
+      const results: Suggestion[] = (
+        direct ? (data.results ?? []) : (data.hits ?? [])
+      ).map((r: Record<string, unknown>) => {
+        if (direct) {
+          return {
+            type: "city",
+            name: String(r.name ?? ""),
+            country: String(r.country ?? ""),
+            countryCode: String(r.country_code ?? ""),
+            region: r.admin1 ? String(r.admin1) : undefined,
+            lat: Number(r.latitude),
+            lon: Number(r.longitude),
+            population: r.population == null ? null : Number(r.population),
+            flag: "",
+            tier: 0,
+            hasReport: false,
+            quality: 40,
+          }
+        }
+        return r as unknown as Suggestion
+      })
       setSuggestions(results)
       setOpen(results.length > 0)
       setActive(-1)
-    } catch {
-      setSuggestions([])
-    } finally {
       if (myReq === reqId.current) setLoading(false)
+
+      // AI long tail: the engine drew a blank. Ask the resolver (bounded,
+      // cached server-side) only after the traveller pauses.
+      if (!direct && results.length === 0 && term.length >= RESOLVE_MIN_LEN) {
+        if (resolveRef.current) clearTimeout(resolveRef.current)
+        resolveRef.current = setTimeout(async () => {
+          if (reqId.current !== myReq) return
+          try {
+            const res = await fetch("/api/resolve", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ q: term }),
+            })
+            const data = await res.json()
+            if (reqId.current !== myReq) return
+            if (data?.hit) {
+              setBestGuess(data.hit as Suggestion)
+              setGuessVisible(true)
+              setOpen(true)
+              setActive(-1)
+            } else {
+              setGuessVisible(false)
+            }
+          } catch {
+            // silent — the box simply shows nothing
+          }
+        }, RESOLVE_IDLE_MS)
+      } else if (resolveRef.current) {
+        clearTimeout(resolveRef.current)
+        setGuessVisible(false)
+      }
+    } catch {
+      if (myReq === reqId.current) {
+        setSuggestions([])
+        setLoading(false)
+      }
     }
   }, [])
 
@@ -108,9 +177,10 @@ export function CityAutocomplete({
       return
     }
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => fetchSuggestions(value), 220)
+    debounceRef.current = setTimeout(() => fetchSuggestions(value), DEBOUNCE_MS)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
+      if (resolveRef.current) clearTimeout(resolveRef.current)
     }
   }, [value, fetchSuggestions])
 
@@ -126,7 +196,8 @@ export function CityAutocomplete({
   }, [])
 
   const select = (s: Suggestion) => {
-    const label = `${s.name}, ${s.country}`
+    const isCountry = s.type === "country"
+    const label = isCountry ? s.name : `${s.name}, ${s.country}`
     justSelected.current = true
     onChange(label)
     onSelectPlace?.({
@@ -135,11 +206,13 @@ export function CityAutocomplete({
       lon: s.lon,
       countryCode: s.countryCode,
       country: s.country,
-      timezone: s.timezone,
+      timezone: "",
       population: s.population,
     })
     setOpen(false)
     setSuggestions([])
+    setBestGuess(null)
+    setGuessVisible(false)
     setActive(-1)
   }
 
@@ -149,18 +222,20 @@ export function CityAutocomplete({
     onSelectPlace?.(null)
   }
 
+  const list = [...(guessVisible && bestGuess ? [bestGuess] : []), ...suggestions]
+
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (!open || suggestions.length === 0) return
+    if (!open || list.length === 0) return
     if (e.key === "ArrowDown") {
       e.preventDefault()
-      setActive((a) => (a + 1) % suggestions.length)
+      setActive((a) => (a + 1) % list.length)
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      setActive((a) => (a <= 0 ? suggestions.length - 1 : a - 1))
+      setActive((a) => (a <= 0 ? list.length - 1 : a - 1))
     } else if (e.key === "Enter") {
       if (active >= 0) {
         e.preventDefault()
-        select(suggestions[active])
+        select(list[active])
       }
     } else if (e.key === "Escape") {
       setOpen(false)
@@ -181,7 +256,7 @@ export function CityAutocomplete({
         placeholder={placeholder}
         value={value}
         onChange={(e) => handleType(e.target.value)}
-        onFocus={() => suggestions.length > 0 && setOpen(true)}
+        onFocus={() => list.length > 0 && setOpen(true)}
         onKeyDown={onKeyDown}
         required={required}
         autoComplete="off"
@@ -190,38 +265,60 @@ export function CityAutocomplete({
         aria-autocomplete="list"
       />
 
-      {open && (
+      {open && list.length > 0 && (
         <ul
           className="glass-float absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-64 overflow-auto rounded-2xl p-1.5"
           role="listbox"
         >
-          {suggestions.map((s, i) => (
-            <li key={s.id} role="option" aria-selected={i === active}>
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  select(s)
-                }}
-                onMouseEnter={() => setActive(i)}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
-                style={{
-                  background: i === active ? "rgba(15,155,171,0.1)" : "transparent",
-                }}
-              >
-                <span className="text-lg leading-none">{flagOf(s.countryCode)}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-[var(--ink)]">
-                    {s.name}
-                  </span>
-                  <span className="block truncate text-[0.72rem] text-[var(--ink-faint)]">
-                    {[s.admin1, s.country].filter(Boolean).join(" · ")}
-                  </span>
-                </span>
-              </button>
+          {guessVisible && bestGuess && (
+            <li className="px-3 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--ink-faint)]">
+              Best guess · {bestGuess.resolvedFrom ?? value.trim()}
             </li>
-          ))}
-          {loading && suggestions.length === 0 && (
+          )}
+          {list.map((s, i) => {
+            const isGuess = guessVisible && bestGuess && i === 0 && suggestions.length > 0
+            const isCountry = s.type === "country"
+            return (
+              <li key={s.type + ":" + s.name + ":" + s.countryCode + ":" + s.lat} role="option" aria-selected={i === active}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    select(s)
+                  }}
+                  onMouseEnter={() => setActive(i)}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors"
+                  style={{
+                    background: i === active ? "rgba(15,155,171,0.1)" : "transparent",
+                  }}
+                >
+                  <span className="text-lg leading-none">{s.flag || flagOf(s.countryCode)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-[var(--ink)]">
+                      {s.name}
+                    </span>
+                    <span className="block truncate text-[0.72rem] text-[var(--ink-faint)]">
+                      {isCountry
+                        ? [s.region, "Country"].filter(Boolean).join(" · ")
+                        : s.country}
+                    </span>
+                  </span>
+                  {(isGuess || s.tier === 1) && (
+                    <span
+                      className="shrink-0 rounded-full px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wider"
+                      style={{
+                        background: "rgba(15,155,171,0.12)",
+                        color: "var(--accent-deep)",
+                      }}
+                    >
+                      {isGuess ? "Best guess" : "Popular"}
+                    </span>
+                  )}
+                </button>
+              </li>
+            )
+          })}
+          {loading && list.length === 0 && (
             <li className="px-3 py-2.5 text-sm text-[var(--ink-faint)]">Searching…</li>
           )}
         </ul>
