@@ -12,7 +12,7 @@ Next.js 16.2.9 / React 19 / TypeScript strict / Tailwind v4 (App Router). No tes
 
 - `git push origin main` auto-deploys: a webhook on this host runs `git reset --hard origin/main`, `npm install`, `npm run build`, `systemctl restart` (see `/usr/local/bin/ismytripsafe-deploy.sh`, `/etc/webhook.conf`). **Uncommitted work is destroyed by the next push.** Commit (and expect an auto-deploy) before ending a session.
 - Never run `next dev` or `next start` in this checkout. Ports 3000–3004 are taken; use 3005 from a copy (`/root/ismytripsafe-preview`) instead.
-- Checkout roles have drifted from CLAUDE.md: as of Aug 2026 the production service (`ismytripsafe.service`, port 3000) runs from `/root/ismytripsafe-beta`, not here. Before assuming this directory serves a live site, verify with `systemctl cat ismytripsafe.service` and `ls -l /proc/<next-server-pid>/cwd`.
+- The deploy pipeline (build here → `systemctl restart ismytripsafe`) and the unit's `WorkingDirectory` are aligned on `/root/ismytripsafe` since 2026-09-02 — previously the unit pointed at `/root/ismytripsafe-beta` and every deploy served a stale build. If one checkout drifts again, verify with `systemctl cat ismytripsafe.service` and `ls -l /proc/<next-server-pid>/cwd`.
 - `.env*` are gitignored; `.env.local` (OPENROUTER_API_KEY) is machine-local, the deploy writes `.env.production.local`.
 
 ## Architecture
