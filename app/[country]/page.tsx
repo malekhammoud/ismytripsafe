@@ -230,32 +230,36 @@ export default async function CountryHubPage({
         <div className="mx-auto max-w-[640px]">
           <Breadcrumbs trail={trail} />
 
-          {/* The one action on the page — big on purpose: personalisation is
-              the whole point of the checker, and it starts the interactive
-              flow with this country pre-filled. */}
+          {/* The one action on the page — big, orange, and explicit. Personalisation
+              is the whole point of the checker, and it starts the interactive flow
+              with this country pre-filled. */}
           <Link
             href={`/?place=${encodeURIComponent(hub.country)}`}
-            className="group mt-4 flex items-center gap-3.5 rounded-[14px] border border-[var(--hairline)] bg-white/55 px-5 py-4 transition-colors hover:border-[var(--accent)] hover:bg-white/80"
+            className="group mt-4 flex items-center gap-3.5 rounded-[14px] bg-[var(--orange-deep)] px-5 py-4 transition-transform hover:-translate-y-0.5 hover:bg-[#c03f21]"
+            style={{
+              color: "#fff8ec",
+              boxShadow:
+                "0 1px 2px rgba(140,48,22,0.24), 0 8px 20px -10px rgba(140,48,22,0.5)",
+            }}
           >
             <span
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-              style={{ background: "rgba(15,155,171,0.12)" }}
+              style={{ background: "rgba(255,248,236,0.18)" }}
             >
-              <SlidersHorizontal size={20} style={{ color: "var(--accent-deep)" }} />
+              <SlidersHorizontal size={20} />
             </span>
             <span className="min-w-0">
-              <span className="block text-[1rem] font-semibold text-[var(--ink)]">
-                Make this report personal
+              <span className="block text-[1.02rem] font-bold leading-tight">
+                Personalize Report Now
               </span>
-              <span className="mt-0.5 block text-[0.8rem] leading-snug text-[var(--ink-soft)]">
-                Who&apos;s travelling? A family, a woman alone, a business trip — the score
-                and the key findings are re-weighted for your group, not the average traveller.
+              <span className="mt-0.5 block text-[0.78rem] leading-snug" style={{ color: "rgba(255,248,236,0.9)" }}>
+                Tailor this report specifically to you and get the latest and most valuable
+                insights with one click.
               </span>
             </span>
             <ArrowRight
-              size={17}
+              size={18}
               className="ml-auto shrink-0 transition-transform group-hover:translate-x-0.5"
-              style={{ color: "var(--ink-faint)" }}
             />
           </Link>
 

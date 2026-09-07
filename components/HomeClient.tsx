@@ -61,19 +61,24 @@ export function HomeClient({
 
   // Re-hydrate from the URL — a reload, a direct link, or the browser's back/
   // forward button lands here with an empty store, so replay from cache using
-  // the place (and traveller profile) carried in the query string.
+  // the place (and traveller profile) carried in the query string. The store
+  // is module-level and survives navigation between report pages, so also
+  // switch places when the URL names a different place than the one already
+  // being shown — otherwise clicking "Personalize Report Now" on Porto after
+  // personalising Lisbon replays the Lisbon report.
   useEffect(() => {
-    if (status !== "idle") return
     const params = new URLSearchParams(window.location.search)
     const place = params.get("place")
-    if (place) {
-      const p = profileFromParams(params)
-      if (p) {
-        setProfile(p)
-        run({ place })
-      } else {
-        setPending({ place })
-      }
+    if (!place) return
+    const current = useReport.getState().query?.place
+    if (current === place) return
+    const p = profileFromParams(params)
+    if (p) {
+      setProfile(p)
+      run({ place })
+    } else {
+      setProfile(null)
+      setPending({ place })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -102,13 +102,15 @@ export function CityAutocomplete({
         return
       }
     }
-    try {
-      const data = await raw.json()
-      if (myReq !== reqId.current) return // stale response
-      const direct = !/^\/api\/search/.test(raw.url ?? "")
-      const results: Suggestion[] = (
-        direct ? (data.results ?? []) : (data.hits ?? [])
-      ).map((r: Record<string, unknown>) => {
+try {
+        const data = await raw.json()
+        if (myReq !== reqId.current) return // stale response
+        // Response.url is absolute ("https://ismytripsafe.com/api/search?…"),
+        // so an anchored regex can never match the path — compare pathnames.
+        const direct = !new URL(raw.url).pathname.startsWith("/api/")
+        const results: Suggestion[] = (
+          direct ? (data.results ?? []) : (data.hits ?? [])
+        ).map((r: Record<string, unknown>) => {
         if (direct) {
           return {
             type: "city",
