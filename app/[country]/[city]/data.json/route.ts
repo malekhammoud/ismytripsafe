@@ -25,7 +25,7 @@ export async function GET(
   }
   const { report, meta } = hit
   const s = report.bundle.safety
-  const final = computeFinalScore(s, report.enrichment)
+  const final = computeFinalScore(s, report.enrichment, report.bundle.geo?.countryCode)
 
   return Response.json(
     {

@@ -44,7 +44,11 @@ const load = cache(async (country: string, city: string) =>
 // ─── Deterministic content built from the report data ────────────────
 
 function finalScoreOf(report: CachedReport) {
-  return computeFinalScore(report.bundle.safety, report.enrichment)
+  return computeFinalScore(
+    report.bundle.safety,
+    report.enrichment,
+    report.bundle.geo?.countryCode
+  )
 }
 
 /** The 40–75-word dated answer capsule at the top of the page. */
@@ -141,6 +145,9 @@ export default async function CityReportPage({
   const related = await getRelated(meta)
   const e = report.enrichment
   const mapHref = `/map?place=${encodeURIComponent(`${meta.city}, ${meta.country}`)}`
+  const year = new Date(report.cachedAt).getFullYear()
+  const personalizeHref =
+    `/?place=${encodeURIComponent(`${meta.city}, ${meta.country}`)}`
 
   const trail: Crumb[] = [
     { name: "Home", href: "/" },
@@ -321,15 +328,36 @@ export default async function CityReportPage({
                 </div>
               </DocSection>
 
-              {/* FAQ — visible HTML answers (no FAQ schema: retired by Google) */}
-              <DocSection num={num()} kicker="Questions" title={`${meta.city} safety FAQ`}>
+              {/* FAQ — visible HTML answers (no JSON schema: retired by Google) */}
+              <DocSection num={num()} kicker="Questions" title={`${meta.city} safety FAQ (${year})`}>
                 <FaqList
                   items={[
                     {
-                      q: `Is ${meta.city} safe for tourists right now?`,
+                      q: `Is ${meta.city} safe right now (${year})?`,
                       a: (
                         <p>
                           {e.verdict} {e.summary} (Assessed {humanDate(report.cachedAt)}.)
+                        </p>
+                      ),
+                    },
+                    {
+                      q: `Is ${meta.city} safe for women, families and solo travelers?`,
+                      a: (
+                        <p>
+                          Safety is not one number, and this {meta.city} report does not
+                          pretend it is: the score is re-weighted for who is travelling.
+                          A woman travelling alone, a family with children and a solo
+                          backpacker face different street-level risks, so the headline
+                          score shifts and the report leads with the findings that matter
+                          for that group.{" "}
+                          <Link
+                            href={personalizeHref}
+                            className="font-medium text-[var(--accent-deep)] hover:underline"
+                          >
+                            Personalize this report
+                          </Link>{" "}
+                          in one click to see the {year} score and safety briefing for
+                          your specific travellers.
                         </p>
                       ),
                     },
@@ -351,7 +379,7 @@ export default async function CityReportPage({
                         ),
                     },
                     {
-                      q: `What are the most common scams in ${meta.city}?`,
+                      q: `What are the most common scams in ${meta.city} (${year})?`,
                       a: e.scams?.length ? (
                         <ul className="list-disc pl-5">
                           {e.scams.slice(0, 4).map((s) => (
@@ -363,7 +391,7 @@ export default async function CityReportPage({
                       ),
                     },
                     {
-                      q: `How does ${meta.city} compare with other places in ${meta.country}?`,
+                      q: `How does ${meta.city} compare with other places in ${meta.country} (${year})?`,
                       a:
                         countryRank && related.sameCountry.length ? (
                           <p>
@@ -385,14 +413,17 @@ export default async function CityReportPage({
                         ),
                     },
                     {
-                      q: `How is this ${meta.city} safety score calculated?`,
+                      q: `How is this ${city} safety score calculated (${year})?`,
                       a: (
                         <p>
                           The score blends {report.bundle.safety.sources.length || "15"}+ public data
-                          sources — government advisories, UNODC/World Bank crime statistics, WHO health
-                          data, live air quality and disaster alerts — with AI field research over current
-                          local reporting. The databases carry 82% of the weight; the traveller-sentiment
-                          score from field research carries 18%.{" "}
+                          sources — government advisories, UNODC/World Bank crime statistics, FBI crime
+                          data for U.S. cities, WHO health data, live air quality and disaster alerts —
+                          with AI field research over current local reporting. The databases carry the
+                          bulk of the weight{report.bundle.geo.countryCode === "US"
+                            ? " (and U.S. reports lean more on the latest field research)"
+                            : ""}; the traveller-sentiment
+                          score from field research carries the rest.{" "}
                           <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
                             Full methodology
                           </Link>

@@ -65,7 +65,7 @@ function usablePhoto(url: string | null | undefined): url is string {
 function metaFromReport(report: CachedReport): ReportMeta | null {
   const { geo, bundle, enrichment } = report
   if (!geo?.city || !geo.countryCode || !bundle?.safety || !enrichment) return null
-  const final = computeFinalScore(bundle.safety, enrichment)
+  const final = computeFinalScore(bundle.safety, enrichment, geo?.countryCode)
   const countrySlug = countrySlugFor(geo.countryCode, geo.country)
   const citySlug = slug(geo.city)
   if (!countrySlug || !citySlug) return null

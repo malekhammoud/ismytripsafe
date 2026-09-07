@@ -296,15 +296,48 @@ export const SIGNAL_BANDS: Record<string, (v: number) => number> = {
 
   // ── City Differentiation Signals ──
   // Urban scale factor based on city population. Larger metropolitan areas carry higher
-  // petty crime, transit risk, and theft density compared to small towns.
+  // petty crime, transit risk, and theft density compared to smaller cities. This curve
+  // and the pillar weight below were made steeper so a big US metro (where the FBI and
+  // field research say the street-level truth) reads distinctly riskier than a small town
+  // that is genuinely close to 100.
   city_population_scale: (v) =>
     band(v, [
-      [20000, 92],
+      [20000, 94],
       [100000, 86],
-      [500000, 78],
-      [1500000, 70],
-      [5000000, 60],
-      [12000000, 50],
+      [400000, 77],
+      [1000000, 67],
+      [2500000, 56],
+      [6000000, 45],
+      [12000000, 35],
+    ]),
+
+  // FBI UCR city-agency crime rates, per 100k. These are the same source for
+  // every US city, so the curve is what separates St. Louis from St. Paul.
+  // Calibrated to the US spread: healthy metros sit under ~450, troubled big
+  // cities 600–1000, St. Louis twice that again.
+  fbi_violent_crime_rate: (v) =>
+    band(v, [
+      [60, 94],
+      [120, 88],
+      [200, 80],
+      [300, 72],
+      [450, 62],
+      [650, 50],
+      [900, 38],
+      [1300, 24],
+      [2000, 12],
+      [3000, 3],
+    ]),
+  fbi_property_crime_rate: (v) =>
+    band(v, [
+      [1500, 90],
+      [2500, 78],
+      [3500, 66],
+      [4500, 54],
+      [5500, 42],
+      [7000, 29],
+      [9000, 16],
+      [12000, 5],
     ]),
 
   // Qualitative street-crime ratings (1=Severe, 2=High, 3=Moderate, 4=Low).
@@ -436,21 +469,27 @@ export const PILLARS: PillarDef[] = [
     core: true,
     signals: {
       // ── city-level signals & AI research (0.75) ──
-      research_sentiment_score: 0.22,
-      research_robbery_risk: 0.18,
-      research_pickpocket_risk: 0.15,
-      numbeo_safety_night: 0.10,
-      numbeo_crime_index: 0.08,
-      city_population_scale: 0.05,
-      numbeo_violent_crime: 0.04,
-      numbeo_worry_mugged: 0.04,
+      research_sentiment_score: 0.20,
+      research_robbery_risk: 0.16,
+      research_pickpocket_risk: 0.13,
+      numbeo_safety_night: 0.08,
+      numbeo_crime_index: 0.06,
+      // Urban scale is deliberately weighted higher now: a big metro carries
+      // denser petty crime and transit/opportunistic-theft risk than a small
+      // town, and it is the only city-level input that exists for nearly
+      // every place we publish (see the NOTE above the bands).
+      city_population_scale: 0.10,
+      numbeo_violent_crime: 0.03,
+      numbeo_worry_mugged: 0.03,
       numbeo_property_crime: 0.02,
-      // ── national statistics baseline (0.25) ──
-      homicide: 0.12,
-      safe_walking_dark: 0.05,
+      fbi_violent_crime_rate: 0.08,
+      fbi_property_crime_rate: 0.04,
+      // ── national statistics baseline ──
+      homicide: 0.10,
+      safe_walking_dark: 0.04,
       violence_victimization: 0.03,
-      sexual_violence: 0.02,
-      bribery_contact_rate: 0.02,
+      sexual_violence: 0.01,
+      bribery_contact_rate: 0.01,
       human_trafficking_victims: 0.01,
     },
   },

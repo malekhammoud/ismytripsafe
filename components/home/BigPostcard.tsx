@@ -39,7 +39,7 @@ export function BigPostcard({ meta, report }: { meta: ReportMeta; report: Cached
   const photo = suppliedPhotoFor(meta.path)
   if (!photo) return null
 
-  const final = computeFinalScore(report.bundle.safety, report.enrichment)
+  const final = computeFinalScore(report.bundle.safety, report.enrichment, report.bundle.geo?.countryCode)
   const level = LEVELS[final.level]
   const byKey = new Map(
     computeCategories(report.bundle.safety.signals, report.enrichment).map((c) => [c.key, c]),

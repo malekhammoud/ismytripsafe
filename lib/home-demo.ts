@@ -48,7 +48,7 @@ export async function homeDemo(): Promise<HomeDemo | null> {
   if (!hit) return null
 
   const { report, meta } = hit
-  const final = computeFinalScore(report.bundle.safety, report.enrichment)
+  const final = computeFinalScore(report.bundle.safety, report.enrichment, report.bundle.geo?.countryCode)
   const byKey = new Map(
     computeCategories(report.bundle.safety.signals, report.enrichment).map((c) => [c.key, c]),
   )

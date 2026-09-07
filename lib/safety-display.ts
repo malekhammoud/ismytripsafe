@@ -109,8 +109,24 @@ export interface FinalScore {
 
 // ─── Traveller sentiment (the field-research score) ──────────────────
 
-/** Share of the published score carried by live field research. */
+/** Share of the published score carried by live field research (general). */
 export const FIELD_RESEARCH_WEIGHT = 0.18
+
+/**
+ * U.S. destinations lean harder on field research. The multi-database stack
+ * separates countries cleanly, but inside one country the statistics barely
+ * move while the streets differ enormously — big-city vs small-town US is
+ * exactly where the databases read near-identical and the on-the-ground
+ * research tells the real story. So US reports give the field research more
+ * of the score, and the city-level signals (FBI, Numbeo, urban scale) more
+ * of the crime pillar (see PILLARS in scoring.ts).
+ */
+export const US_FIELD_RESEARCH_WEIGHT = 0.28
+
+/** Field-research share for a report's country; 100 − this is the data share. */
+export function fieldResearchWeight(countryCode?: string | null): number {
+  return countryCode === "US" ? US_FIELD_RESEARCH_WEIGHT : FIELD_RESEARCH_WEIGHT
+}
 
 const SENTIMENT_WEIGHTS = { robbery: 0.45, reported: 0.35, pickpocket: 0.2 }
 
@@ -203,7 +219,8 @@ function sentimentLabel(score: number): string {
  */
 export function computeFinalScore(
   safety: SafetyReport,
-  intel: SafetyEnrichment | null
+  intel: SafetyEnrichment | null,
+  countryCode?: string | null
 ): FinalScore {
   const base = computeSafetyIndex(safety.signals)
   const sentiment = computeSentiment(intel)
@@ -221,7 +238,7 @@ export function computeFinalScore(
     }
   }
 
-  const w = FIELD_RESEARCH_WEIGHT
+  const w = fieldResearchWeight(countryCode)
   let index = Math.round((1 - w) * base.index + w * sentiment.score)
   for (const c of base.caps) index = Math.min(index, c.max)
   index = Math.max(0, Math.min(100, index))

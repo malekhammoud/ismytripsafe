@@ -67,8 +67,11 @@ export function CityMap({
           scrollWheelZoom: true, // zoom with the scroll wheel
           zoomControl: true,
         }).setView(center, zoom)
+        // The `?key=` is a CARTO basemaps API key (public by design — basemap keys
+// are meant to travel client-side). Without it CARTO overlays a "API key
+// required" watermark on every tile.
         L.tileLayer(
-          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_2zli_1_c8f7ed3b3b8b2b3347917aa6",
           {
             subdomains: "abcd",
             maxZoom: 20,

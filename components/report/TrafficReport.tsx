@@ -32,7 +32,7 @@ import {
   computeCategories,
   computeFinalScore,
   scoreColor,
-  FIELD_RESEARCH_WEIGHT,
+  fieldResearchWeight,
   LEVELS,
   type CategoryKey,
 } from "@/lib/safety-display"
@@ -396,7 +396,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
   // renders straight away and only the score itself waits. A traveller profile
   // then deterministically re-weights it for who's going.
   const scorePending = loading && !intel
-  const final = computeFinalScore(safety, intel)
+  const final = computeFinalScore(safety, intel, bundle.geo?.countryCode)
   const personal = personalizeScore(final, categories, profile)
   const levelCfg = LEVELS[personal.level]
   const indexTone = toneForScore(personal.index)
@@ -416,6 +416,10 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
   // traveller-sentiment score if the research has landed, otherwise the overall
   // rating — so a "not safe right now" verdict never sits on a green panel.
   const sentiment = final.sentiment
+  // The split of databases vs field research is country-aware — US reports
+  // lean harder on the field research (see safety-display.ts).
+  const researchShare = fieldResearchWeight(bundle.geo?.countryCode)
+  const dataShare = Math.round((1 - researchShare) * 100)
   const intelTone: Tone = sentiment.score != null ? toneForScore(sentiment.score) : indexTone
   const it = TONES[intelTone]
   const toneWord: Record<Tone, string> = { safe: "Stable", moderate: "Moderate", caution: "Caution", risky: "Elevated" }
@@ -511,7 +515,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
               <InfoTip
                 text={
                   (final.includesFieldResearch
-                    ? "A single 0–100 score. The database composite carries 82%; the live field research — street-crime ratings and current traveller sentiment — carries 18%. "
+                    ? `A single 0–100 score. The database composite carries ${dataShare}%; the live field research — street-crime ratings and current traveller sentiment — carries ${Math.round(researchShare * 100)}%. `
                     : "A single 0–100 score built from every indicator below. ") +
                   "Indicators are grouped into hazard families (crime, conflict, official guidance, institutions, everyday hazards, health) and combined so that severe risk in any one family dominates rather than being averaged away by the others. 100 = safest."
                 }
@@ -765,7 +769,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
                   <p className="flex items-center gap-1 text-[0.66rem] font-semibold uppercase tracking-[0.12em]" style={{ color: it.deep }}>
                     Traveller sentiment score
                     <InfoTip
-                      text={`How safe travellers report actually feeling, weighted with current robbery (45%) and pickpocketing (20%) risk; reported feel carries 35%. This score is ${Math.round(FIELD_RESEARCH_WEIGHT * 100)}% of the published ${personal.index}/100 — the database composite on its own is ${final.baseIndex}.`}
+                      text={`How safe travellers report actually feeling, weighted with current robbery (45%) and pickpocketing (20%) risk; reported feel carries 35%. This score is ${Math.round(researchShare * 100)}% of the published ${personal.index}/100 — the database composite on its own is ${final.baseIndex}.`}
                       color={it.deep}
                     />
                   </p>

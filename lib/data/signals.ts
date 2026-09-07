@@ -577,6 +577,97 @@ async function fetchNumbeo(iso2: string, city: string): Promise<NumbeoHit | null
   return cityHit ?? countryHit
 }
 
+// ─── FBI UCR city crime (US destinations only) ───────────────────────
+//
+// The FBI Crime Data Explorer's own API needs an api.data.gov key, so this
+// reads the same official numbers from the keyless Wikipedia mirror of the
+// CDE's "Table 8 — Offenses Known to Law Enforcement by City" (city-agency
+// crime rates per 100,000). It is the one source that ranks St. Louis
+// against St. Paul on the same yardstick, which the national homicide rate
+// cannot do. Fetched once per process and cached; non-US places skip it.
+
+const FBI_CDE_WIKI =
+  "https://en.wikipedia.org/w/api.php?action=parse&page=List_of_United_States_cities_by_crime_rate&format=json&prop=wikitext&formatversion=2"
+
+interface FbiCityRate {
+  /** Violent crimes per 100,000 — murder, rape, robbery, aggravated assault. */
+  violent: number
+  /** Property crimes per 100,000 — burglary, larceny-theft, motor vehicle theft. */
+  property: number
+}
+
+/** "St. Louis" → {stlouis, saintlouis} … so our names match the table's. */
+function fbiNameVariants(name: string): string[] {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "")
+  const base = norm(name)
+  const out = [base]
+  if (/^st[\s.]/i.test(name.trim()))
+    out.push(norm(name.trim().replace(/^st[\s.]/i, "saint ")))
+  else if (/^saint\s+/i.test(name.trim()))
+    out.push(norm(name.trim().replace(/^saint\s+/i, "st ")))
+  if (/\bdc\b|[d.]\s*c\./i.test(name))
+    out.push(norm(name.trim().replace(/\s*d\.?\s*c\.?\s*$/i, "")))
+  return Array.from(new Set(out))
+}
+
+let fbiTablePromise: Promise<Map<string, FbiCityRate> | null> | null = null
+
+async function fetchFbiTable(): Promise<Map<string, FbiCityRate> | null> {
+  const html = await fetchText(FBI_CDE_WIKI, 9000)
+  if (!html) return null
+  let data: { parse?: { wikitext?: string } } | null = null
+  try {
+    data = JSON.parse(html)
+  } catch {
+    return null
+  }
+  const wt = data?.parse?.wikitext
+  if (!wt) return null
+
+  // Some rows carry <sup> footnotes and multi-line <ref> citations inline
+  // (e.g. Baltimore) that would break line-by-line parsing — strip them first.
+  const cleaned = wt
+    .replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, "")
+    .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, "")
+
+  const map = new Map<string, FbiCityRate>()
+  const lines = cleaned.replace(/\\n/g, "\n").split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    // Row opener: {{flaglist|State}} || … [[City, State|City]] || population
+    const row = lines[i].match(
+      /\{\{flaglist\|[^}]+\}\}\s*\|\|.*?\[\[(?:[^\]|]+\|)?([^\]|]+)\]\]\s*\|\|.*?[\d,]+$/
+    )
+    if (!row) continue
+    const nums = (lines[i + 1]?.match(/\d+(?:\.\d+)?/g) ?? []).map(Number)
+    // Decoded columns: 0 Total, 1 Murder, 2 Rape, 3 Robbery, 4 Agg. assault,
+    // 5 Violent, 6 Arson, 7 Burglary, 8 Larceny, 9 Motor vehicle, 10 Property.
+    const violent = nums[5]
+    const property = nums[10]
+    if (!Number.isFinite(violent) || !Number.isFinite(property)) continue
+    for (const key of fbiNameVariants(row[1])) map.set(key, { violent, property })
+    i++
+  }
+  return map.size ? map : null
+}
+
+async function fetchFbiCityRates(city: string): Promise<FbiCityRate | null> {
+  fbiTablePromise ??= fetchFbiTable()
+  const table = await fbiTablePromise
+  if (!table) return null
+  for (const key of fbiNameVariants(city)) {
+    const hit = table.get(key)
+    if (hit) return hit
+  }
+  // City not in the CDE table (FBI only covers places with a full year of
+  // reports) — no data, never a guess.
+  return null
+}
+
 async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySignal[]> {
   // Numbeo and the SDG series are independent; only the SDG *data* depends on
   // the area-code lookup. Awaiting both up front chained Numbeo's budget in
@@ -658,6 +749,38 @@ async function fetchCrimeExtras(iso2: string, city: string): Promise<SafetySigna
   }
 
   if (sdgPromise) signals.push(...(await sdgPromise))
+
+  // FBI city-agency crime rates — the strongest US-specific street-crime read.
+  // Only US places have this, so it runs in parallel with nothing blocking.
+  if (iso2.toUpperCase() === "US" && city) {
+    const fbi = await timed("crime.fbi", fetchFbiCityRates(city).catch(() => null))
+    if (fbi) {
+      signals.push({
+        key: "fbi_violent_crime_rate",
+        label: "Violent crime rate (FBI)",
+        group: "Violent crime",
+        source: "FBI Crime Data Explorer",
+        value: fbi.violent,
+        display: `${fbi.violent.toFixed(0)} / 100k`,
+        year: null,
+        score: scoreFor("fbi_violent_crime_rate", fbi.violent),
+        lowerIsBetter: true,
+        note: `FBI-published violent crime per 100,000 people (murder, rape, robbery and aggravated assault) reported by ${city}'s own law-enforcement agency — UCR Table 8, most recent annual release. City-level, which is what separates ${city} from other US cities.`,
+      })
+      signals.push({
+        key: "fbi_property_crime_rate",
+        label: "Property crime rate (FBI)",
+        group: "Violent crime",
+        source: "FBI Crime Data Explorer",
+        value: fbi.property,
+        display: `${fbi.property.toFixed(0)} / 100k`,
+        year: null,
+        score: scoreFor("fbi_property_crime_rate", fbi.property),
+        lowerIsBetter: true,
+        note: `FBI-published property crime per 100,000 people (burglary, larceny-theft, motor vehicle theft) reported by ${city}'s own law-enforcement agency — UCR. City-level.`,
+      })
+    }
+  }
 
   return signals
 }
