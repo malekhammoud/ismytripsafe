@@ -388,24 +388,33 @@ for (const k of WGI_KEYS) SIGNAL_BANDS[k] = (v) => clamp(v)
  * AVERAGE across issuing governments (see advisorySignal in lib/data/safety),
  * so it can be fractional — the curve reads averages directly:
  *
- *   all at level 1          → 100
- *   average under 2         → 75
- *   average under 3         → 50
- *   average under 4         → 25
- *   both at level 4         → 0
+ *   average 1.0 (all level 1) → 100
+ *   average 1.5 (2 + 1)       →  85
+ *   average 2.0 (all level 2) →  75
+ *   average 2.5 (3 + 2)       →  50
+ *   average 3.0 (all level 3) →  25
+ *   average 4.0 (all level 4) →   0
  *
+ * Linear between those points, so a 2 + 1 pair lands in the middle at 85.
  * The average also drives the hard cap (see hardCaps), so score and ceiling
  * read the same number. An ungraded advisory returns NaN (no data) instead of
  * the old 60, which quietly voted "average" for every place we could not
  * grade.
  */
+export const ADVISORY_CURVE: [number, number][] = [
+  [1, 100],
+  [1.5, 85],
+  [2, 75],
+  [2.5, 50],
+  [3, 25],
+  [4, 0],
+]
+
 export const advisoryScore = (level: number): number => {
   if (!Number.isFinite(level) || level <= 0) return NaN
   if (level <= 1) return 100
-  if (level < 2) return 75
-  if (level < 3) return 50
-  if (level < 4) return 25
-  return 0
+  if (level >= 4) return 0
+  return band(level, ADVISORY_CURVE)
 }
 
 SIGNAL_BANDS.advisory = advisoryScore

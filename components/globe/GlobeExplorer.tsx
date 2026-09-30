@@ -302,14 +302,48 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
 
   // ─── Load the country outlines ─────────────────────────────────────
 
+  /**
+   * French Guiana exists at neither 110m nor 50m in world-atlas (Natural
+   * Earth folds it into France's polygon), so the whole landmass used to
+   * tint and click as France. It's drawn here as its own coarse feature so
+   * it reads as French Guiana — sand, "No report yet" — like every other
+   * country we haven't reported on.
+   */
+  const FRENCH_GUIANA_POLYGON: [number, number][] = [
+    [-54.55, 5.72],
+    [-53.68, 5.92],
+    [-53.05, 5.05],
+    [-52.1, 4.62],
+    [-51.62, 4.29],
+    [-51.87, 3.89],
+    [-51.7, 3.3],
+    [-52.2, 2.25],
+    [-53.2, 2.35],
+    [-54.15, 2.95],
+    [-54.45, 3.7],
+    [-54.55, 4.7],
+  ]
+
   useEffect(() => {
     let alive = true
-    fetch("/geo/countries-110m.json")
+    fetch("/geo/countries-50m.json")
       .then((r) => r.json())
       .then((topo: Topology<{ countries: GeometryCollection }>) => {
         if (!alive) return
         const fc = feature(topo, topo.objects.countries) as unknown as { features: Feat[] }
-        setPolys(fc.features as Poly[])
+        const feats = fc.features as Poly[]
+        if (!feats.some((f) => String(f.id) === "254")) {
+          feats.push({
+            type: "Feature",
+            id: "254",
+            properties: { name: "French Guiana" },
+            geometry: {
+              type: "Polygon",
+              coordinates: [FRENCH_GUIANA_POLYGON.map(([lng, lat]) => [lng, lat])],
+            },
+          } as unknown as Poly)
+        }
+        setPolys(feats)
       })
       .catch(() => setPolys([]))
     return () => {

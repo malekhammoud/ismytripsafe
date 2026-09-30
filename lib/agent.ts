@@ -67,7 +67,7 @@ CRITICAL: Output a single JSON block in EXACTLY this format, then a prose briefi
 
 START_SAFETY
 {
-  "verdict": "One direct sentence answering 'is it safe?' — e.g. 'Yes — Lisbon is one of Europe's safest capitals for visitors.'",
+  "verdict": "One direct sentence answering 'is it safe?' — e.g. 'Yes. Lisbon is one of Europe's safest capitals for visitors.'",
   "summary": "2-3 sentences interpreting the real safety data for a traveler.",
   "scams": ["common scam targeting visitors", "another"],
   "tips": ["specific actionable safety tip", "another", "another"],
@@ -82,9 +82,15 @@ END_SAFETY
 
 For "level" use exactly one of: Low, Moderate, High, Severe. For "score" use a number 0-100. For "recentIncidents" list 2-4 REAL, dated items from the dossier, most recent first ("when" is a month + year); use [] if genuinely nothing notable.
 
-Keep the JSON tight — it is what the reader waits on. Then write a focused 3-4 paragraph safety briefing: the bottom-line verdict, what the data means on the ground, the real current situation (cite what the dossier found, with source names and dates), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.
+Keep the JSON tight — it is what the reader waits on. Then write a focused 3-4 paragraph safety briefing: what the data means on the ground, the real current situation (cite what the dossier found, with source names and dates), and how to stay safe. Be specific and honest — do not sugar-coat genuine risks, and do not exaggerate for safe places.
 
-Do NOT re-rate individual neighbourhoods in the prose — district ratings render on a separate page. Do NOT quote the numeric composite index in the prose: the published score is recomputed after your research lands and may differ. Output the JSON block and briefing directly with no preamble.`
+WRITING STYLE — the briefing is the first human thing a reader sees, and it must not read like model output:
+- The verdict line renders separately ABOVE the briefing, so NEVER restate it. A briefing opening "Yes — Quimper is generally safe" repeats verbatim what the reader already read. Open instead with the single most useful, specific fact about this city right now, and never use the phrases "the verdict is", "overall", "in summary", "it is important to note", "whether you're" or "[city] is generally safe" as openers.
+- No em dashes, no bullet points, no exclamation marks in the prose. Plain sentences. Vary sentence length and how paragraphs start; nothing should begin the same way twice.
+- You may name real indicators ("the national homicide rate is 1.2 per 100k"), real districts, and real dated incidents from the dossier with their source names. Do NOT quote the numeric composite index (it is recomputed after your research lands and may differ).
+- Keep it under 180 words.
+
+Do NOT re-rate individual neighbourhoods in the prose — district ratings render on a separate page. Output the JSON block and briefing directly with no preamble.`
 
 // ── Call B: the map page's district ratings. Runs after the report has already
 // been delivered, so it never costs the reader a second.

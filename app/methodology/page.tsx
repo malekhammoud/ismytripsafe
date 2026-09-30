@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import Link from "next/link"
 import { absUrl } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { Breadcrumbs, SeoFooter, SiteHeader } from "@/components/seo/shared"
@@ -7,7 +6,7 @@ import { Breadcrumbs, SeoFooter, SiteHeader } from "@/components/seo/shared"
 export const metadata: Metadata = {
   title: "Methodology — How IsMyTripSafe Scores Travel Safety",
   description:
-    "Exactly how each 0–100 safety score is computed: the 20+ indicators, the six hazard families and how they combine, the hard caps, the databases behind them, how AI field research is used and verified, and the system's limitations.",
+    "How each 0–100 travel-safety score is built: official government advisories, crime and governance statistics, health and hazards data, and on-the-ground field research — with the database list and our limitations.",
   alternates: { canonical: "/methodology" },
 }
 
@@ -17,10 +16,11 @@ const SOURCES: { name: string; role: string; url: string }[] = [
   { name: "Government of Canada travel advisories", role: "Canada's official risk level (normal precautions → avoid all travel), from its open-data feed", url: "https://travel.gc.ca/travelling/advisories" },
   { name: "World Bank Open Data (WDI)", role: "Homicide rate per 100,000 (UNODC-sourced)", url: "https://data.worldbank.org/" },
   { name: "Worldwide Governance Indicators", role: "Political stability, rule of law, control of corruption, government effectiveness, regulatory quality, voice & accountability (percentile ranks)", url: "https://www.worldbank.org/en/publication/worldwide-governance-indicators" },
+  { name: "FBI Crime Data Explorer", role: "City-level violent and property crime rates per 100,000 for U.S. destinations (UCR Table 8)", url: "https://cde.ucr.cjis.gov/LATEST/webapp/" },
   { name: "UN SDG Global Database", role: "Feeling safe walking alone at night (16.1.4), physical and sexual violence victimisation (16.1.3), trafficking (16.2.2), bribery (16.5.1)", url: "https://unstats.un.org/sdgs/dataportal" },
   { name: "World Bank Enterprise Surveys", role: "Businesses experiencing theft/vandalism; crime as a business constraint", url: "https://www.enterprisesurveys.org/" },
   { name: "Global Terrorism Database (via Our World in Data)", role: "Terrorism deaths in the latest recorded year", url: "https://www.start.umd.edu/gtd/" },
-  { name: "WHO Global Health Observatory", role: "Road-traffic death rates; hospital-bed density fallback", url: "https://www.who.int/data/gho" },
+  { name: "WHO Global Health Observatory", role: "Road-traffic death rates; hospital data fallbacks", url: "https://www.who.int/data/gho" },
   { name: "Numbeo Crime Index", role: "Crowdsourced crime & safety perception, city-level where available", url: "https://www.numbeo.com/crime/" },
   { name: "CDC Travelers' Health", role: "Active disease outbreak notices (Watch / Alert / Warning)", url: "https://wwwnc.cdc.gov/travel/notices" },
   { name: "GDACS", role: "Live natural-disaster alerts (earthquakes, cyclones, floods, volcanoes, wildfires) within 500 km", url: "https://www.gdacs.org/" },
@@ -61,131 +61,68 @@ export default function MethodologyPage() {
             computed from the sources below, so scores are comparable across destinations.
           </p>
 
-          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">The composite index</h2>
+          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">The score</h2>
           <p>
             20+ indicators are grouped into six <strong>hazard families</strong>: crime,
             conflict &amp; terrorism, official guidance, institutions &amp; rule of law,
-            everyday hazards, and health &amp; environment. Within a family the indicators are
+            everyday hazards, and health &amp; environment. Within a family, indicators are
             averaged — they are several noisy readings of one underlying thing, so averaging
-            cancels noise. Across families they are <em>not</em> averaged.
+            cancels noise. Across families they are <em>not</em> averaged: a good score in
+            one family cannot buy off a bad one elsewhere. High risk in any single family
+            dominates the result, which is the only honest way to combine hazards a
+            traveller would meet all at once.
           </p>
           <p>
-            That distinction is the whole design. Averaging across families is
-            &quot;compensatory&quot;: a good indicator cancels a bad one. For travel risk that
-            is simply wrong — clean air does not offset an armed conflict. So families are
-            combined on the risk scale through a generalised mean that weights severity, which
-            means high risk in any one family dominates the result instead of being diluted by
-            the calmer ones. Family weights: crime 45%, conflict 15%, official guidance 15%,
-            institutions 15%, everyday hazards 6%, health 4% — renormalised over whichever
-            families actually have data, and never raised above the hard caps below.
+            A few facts are categorical, not quantitative. A &quot;Do Not Travel&quot;
+            advisory or active-conflict conditions set a <strong>ceiling</strong> on the
+            score that no other indicator can argue away; when a ceiling binds, the report
+            says so and names the reason.
           </p>
           <p>
-            Raw values are normalised onto a 0–100 safety scale with piecewise bands calibrated
-            per indicator (a homicide rate of 1/100k ≈ 94, 20/100k ≈ 26). Governance percentiles
-            are used as-is. Counts are always per-capita, never absolute. When a primary source
-            has no data, the pipeline falls back through independent secondary databases (UNODC
-            via Our World in Data, WHO, V-Dem), then regional aggregates — each fallback labeled
-            as such on the report. Every report also carries a <strong>confidence</strong> figure:
-            the share of the weighting actually backed by measured data.
+            Where institutions are weak, flattering recorded-crime figures are read with
+            appropriate caution, and a missing hazard family is never silently assumed
+            safe — each report carries a <strong>confidence</strong> figure that says how
+            much of the score is backed by measured data rather than estimates.
           </p>
 
-          <h3 className="font-display !mt-6 text-[1.1rem] font-medium tracking-tight text-[var(--ink)]">Hard caps</h3>
+          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">AI-assisted field research</h2>
           <p>
-            Some facts are categorical, not quantitative. &quot;Do not travel&quot; is not a
-            data point to be weighed against air quality — it is a statement that bounds the
-            answer. So a handful of conditions set a <strong>ceiling</strong> on the score
-            rather than contributing a term to it: a pair of Level 4 (&quot;Do Not Travel&quot;)
-            advisories caps the score at 20, a Level 3 advisory average at 44, extreme
-            homicide (50+/100k) at 28, sustained terrorism (25+ deaths per million) at 32,
-            and bottom-5% political stability (active conflict) at 22. When a cap binds, the
-            report says so and names the reason. No other indicator — and no traveller-type
-            re-weighting — can lift a score above its cap.
+            Databases lag reality, so each report also includes AI-assisted field research:
+            an agent searches current news and traveller reporting for recent incidents,
+            unrest, district-level safety, scams and traveller sentiment, with the
+            database profile and official advisories supplied as fixed ground truth it must
+            not contradict. That research contributes to the published score — its share
+            is disclosed on every report — and its street-crime and sentiment findings are
+            shown on the page with their sources.
+          </p>
+          <p>
+            Advisory levels are never AI-generated — they are shown verbatim from the
+            issuing governments&apos; own feeds. The scoring, the data and the published
+            numbers are fully transparent; only the prose research summary is written by a
+            model, over real, cited evidence.
           </p>
 
-          <h3 className="font-display !mt-6 text-[1.1rem] font-medium tracking-tight text-[var(--ink)]">Reporting reliability</h3>
+          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">Personalised scores</h2>
           <p>
-            Recorded-crime statistics are only as trustworthy as the institutions producing
-            them. A country in the 40th percentile for rule of law reporting 1.2 homicides per
-            100k is not making the same claim as one in the 87th percentile reporting 0.5. So
-            where institutions are weak, flattering crime figures are shrunk toward what the
-            institutional data supports. The adjustment only ever lowers a crime score, never
-            raises one — a country with strong institutions honestly reporting high crime keeps
-            its high crime.
+            Safety is not one number. Per-traveller scores — solo, family, a women-only
+            party, nightlife, 65+ — are deterministic re-weightings of the same category
+            scores: more weight on health for families and older travellers, more on
+            street-crime where it matters most. Same inputs, same answers, same number,
+            every time — nothing about personalisation is AI-generated.
           </p>
 
-          <h3 className="font-display !mt-6 text-[1.1rem] font-medium tracking-tight text-[var(--ink)]">Missing data</h3>
+          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">Update cadence</h2>
           <p>
-            Dropping a missing hazard family and renormalising the rest quietly assumes it
-            matches the families we <em>can</em> see — which systematically flatters closed and
-            unsurveyed countries, exactly the places least likely to publish crime statistics.
-            Instead, a missing core family is filled with a conservative prior derived from the
-            families that did resolve, marked as estimated on the report, and reflected in the
-            confidence figure.
-          </p>
-
-          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">AI field research — and how it&apos;s bounded</h2>
-          <p>
-            Databases lag reality, so each report also includes AI-assisted field research: an
-            agent searches current news and traveller reporting for recent incidents, unrest,
-            district-level safety, scams and sentiment, with the database profile and official
-            advisories supplied as fixed ground truth it must not contradict. Its street-crime
-            ratings and traveller-sentiment read contribute <strong>18%</strong> of the final
-            published score; the databases keep 82%. Robbery and pickpocketing are scored on
-            separate scales, because a threat to your person and a threat to your wallet are
-            not the same risk. The field research is bound by the same caps as the composite —
-            a positive sentiment read cannot argue away a &quot;Do Not Travel&quot; advisory. Advisory levels are never AI-generated —
-            they are shown verbatim from the issuing governments&apos; own feeds. We disclose
-            this on every report because you should know which parts are measured and which are
-            researched.
-          </p>
-          <p>
-            That research is published as a score of its own — the{" "}
-            <strong>traveller-sentiment score</strong>, shown beside the crime score on every
-            report. It combines how safe travellers report actually feeling day to day (35%) with
-            current robbery (45%) and pickpocketing (20%) risk, on the same 0–100 scale as
-            everything else. It is not a second opinion sitting next to the headline number: it
-            is exactly the 18% term inside it, the part the databases cannot see.
-          </p>
-
-          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">The score pyramid</h2>
-          <p>
-            Each report leads with the composite, then the five scores behind it, arranged by how
-            directly a traveller meets them. <strong>Crime</strong> and{" "}
-            <strong>traveller sentiment</strong> sit on the upper tier — the two you feel walking
-            down a street. <strong>Advisories</strong>, <strong>stability</strong> and{" "}
-            <strong>health &amp; air</strong> sit below as context. Every tile reads straight off
-            the same engine as the headline, so a tile can never disagree with the number above it,
-            and each one links to the evidence it came from.
-          </p>
-
-          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">Traveller-type adjustments</h2>
-          <p>
-            Per-traveller scores (solo, family, nightlife, 65+) are deterministic re-weightings
-            of the already-computed category scores — extra weight on crime for a solo nightlife
-            trip, on health &amp; care for families and older travellers, capped so the general
-            score stays the backbone and re-bounded by the same hard caps. Same inputs, same number, every time.
-          </p>
-          <p>
-            Who is in the party counts too. A women-only party puts a further 12% of the weight
-            on the crime family, which is where the two indicators that track this most directly
-            live — sexual-violence victimisation and the share of people who say they feel safe
-            walking alone after dark; a mixed party adds 4%. The answers also change the written
-            report: the findings pulled to the top are the ones that bear on that party, quoted
-            from the same data shown further down the page. Nothing about the personalisation is
-            AI-generated, and it can never lift a score above a hard cap.
-          </p>
-
-          <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">Update cadence &amp; dates</h2>
-          <p>
-            Live feeds (advisories, air quality, disaster alerts, weather) are fetched at report
-            build time. A report&apos;s &quot;last updated&quot; date is the moment its data was
-            actually rebuilt — we never bump dates without rebuilding the data behind them.
-            Reports are rebuilt on demand once they&apos;re older than seven days.
+            Live feeds (advisories, air quality, disaster alerts, weather) are fetched at
+            report build time, and a report&apos;s &quot;last updated&quot; date is the
+            moment its data was actually rebuilt — we never bump dates without rebuilding
+            the data behind them. Reports are rebuilt on demand once they&apos;re older
+            than seven days.
           </p>
 
           <h2 className="font-display !mt-8 text-[1.35rem] font-medium tracking-tight text-[var(--ink)]">Limitations</h2>
           <ul className="list-disc space-y-1.5 pl-5">
-            <li>Most statistical indicators are national; city-level nuance comes from Numbeo (where cities have enough contributors), OpenStreetMap, live environmental feeds and the field research.</li>
+            <li>Most statistical indicators are national; city-level nuance comes from FBI and Numbeo (where cities have enough contributors), OpenStreetMap, live environmental feeds and the field research.</li>
             <li>Survey-based indicators (victimisation, feeling safe at night) can be years old — every value shows its year on the report.</li>
             <li>Crowdsourced indices reflect perception, which can diverge from recorded crime.</li>
             <li>A score is a summary, not a guarantee. Conditions change fast; check your government&apos;s advisory before you travel.</li>
@@ -205,11 +142,21 @@ export default function MethodologyPage() {
           ))}
         </div>
 
+        <div className="card mt-6 border-l-4 px-4 py-4" style={{ borderLeftColor: "var(--accent)" }}>
+          <p className="text-[0.92rem] text-[var(--ink)]">
+            Want the full scoring specification?{" "}
+            <a href="mailto:malek@ismytripsafe.com?subject=Scoring%20methodology" className="font-semibold text-[var(--accent-deep)] hover:underline">
+              Email us
+            </a>{" "}
+            — we&apos;re happy to explain exactly how a specific report was scored.
+          </p>
+        </div>
+
         <p className="mt-6 text-[0.9rem] leading-relaxed text-[var(--ink-soft)]">
           Questions about the methodology? See{" "}
-          <Link href="/about" className="font-medium text-[var(--accent-deep)] hover:underline">who runs IsMyTripSafe</Link>{" "}
+          <a href="/about" className="font-medium text-[var(--accent-deep)] hover:underline">who runs IsMyTripSafe</a>{" "}
           or start from{" "}
-          <Link href="/destinations" className="font-medium text-[var(--accent-deep)] hover:underline">all destination reports</Link>.
+          <a href="/destinations" className="font-medium text-[var(--accent-deep)] hover:underline">all destination reports</a>.
         </p>
 
         <SeoFooter />

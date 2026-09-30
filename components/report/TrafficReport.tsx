@@ -40,6 +40,7 @@ import { personalizeScore, profileSummary, type TravelerProfile } from "@/lib/pr
 import { extractSourceLinksFromText, sourceUrlForName, sourceUrlForSearchQuery } from "@/lib/source-links"
 import { ScorePyramid } from "./ScorePyramid"
 import { PersonalBrief } from "./PersonalBrief"
+import { FeedbackForm } from "./FeedbackForm"
 import { InfoTip } from "./InfoTip"
 import { ShareButton } from "./ShareButton"
 import { SourceLink } from "./SourceLink"
@@ -888,6 +889,9 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
           </div>
         )}
       </Block>
+
+      {/* one honest ask at the end — the report is done, feedback takes a moment */}
+      <FeedbackForm place={`${geo.city}, ${geo.country}`} page={permalink ?? undefined} />
 
       {/* footer */}
       <footer className="rise-in px-7 py-6 sm:px-9" style={{ background: INK, borderTop: `1px solid ${RULE}`, animationDelay: "560ms" }}>
