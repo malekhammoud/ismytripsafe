@@ -303,27 +303,13 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
   // ─── Load the country outlines ─────────────────────────────────────
 
   /**
-   * French Guiana exists at neither 110m nor 50m in world-atlas (Natural
-   * Earth folds it into France's polygon), so the whole landmass used to
-   * tint and click as France. It's drawn here as its own coarse feature so
-   * it reads as French Guiana — sand, "No report yet" — like every other
-   * country we haven't reported on.
+   * world-atlas folds French Guiana INTO France's polygon (its landmass is
+   * one of France's MultiPolygon parts), so the whole region used to tint and
+   * click as France. Detach it at load time: pull the South-American polygon
+   * out of France and present it as its own feature — sand, "No report yet" —
+   * exactly like every other country we haven't reported on. Works for any
+   * topology file, because it uses the real geometry.
    */
-  const FRENCH_GUIANA_POLYGON: [number, number][] = [
-    [-54.55, 5.72],
-    [-53.68, 5.92],
-    [-53.05, 5.05],
-    [-52.1, 4.62],
-    [-51.62, 4.29],
-    [-51.87, 3.89],
-    [-51.7, 3.3],
-    [-52.2, 2.25],
-    [-53.2, 2.35],
-    [-54.15, 2.95],
-    [-54.45, 3.7],
-    [-54.55, 4.7],
-  ]
-
   useEffect(() => {
     let alive = true
     fetch("/geo/countries-50m.json")
@@ -332,16 +318,34 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
         if (!alive) return
         const fc = feature(topo, topo.objects.countries) as unknown as { features: Feat[] }
         const feats = fc.features as Poly[]
+
+        // French Guiana is already its own feature? Nothing to do.
         if (!feats.some((f) => String(f.id) === "254")) {
-          feats.push({
-            type: "Feature",
-            id: "254",
-            properties: { name: "French Guiana" },
-            geometry: {
-              type: "Polygon",
-              coordinates: [FRENCH_GUIANA_POLYGON.map(([lng, lat]) => [lng, lat])],
-            },
-          } as unknown as Poly)
+          const france = feats.find((f) => String(f.id) === "250")
+          if (france) {
+            const geom = (france as unknown as { geometry: { type: string; coordinates: unknown } }).geometry
+            const polys =
+              geom.type === "MultiPolygon"
+                ? (geom.coordinates as unknown[][][])
+                : ([geom.coordinates] as unknown as unknown[][][])
+            // France's part that sits in South America is French Guiana.
+            const guyanese = polys.filter((p) =>
+              p[0].some((c) => (c as number[])[1] < 10 && (c as number[])[0] < -50)
+            )
+            if (guyanese.length) {
+              for (const p of guyanese) {
+                feats.push({
+                  type: "Feature",
+                  id: "254",
+                  properties: { name: "French Guiana" },
+                  geometry: { type: "Polygon", coordinates: p },
+                } as unknown as Poly)
+              }
+              if (geom.type === "MultiPolygon") {
+                ;(geom.coordinates as unknown[][][]) = polys.filter((p) => !guyanese.includes(p))
+              }
+            }
+          }
         }
         setPolys(feats)
       })
