@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server"
-import { searchPlace, normQuery, matchCountryQuery, MIN_QUERY_LEN } from "@/lib/search"
+import { searchPlace, normQuery, matchCountryQuery, flagOf, MIN_QUERY_LEN } from "@/lib/search"
 import { openMeteoSearch } from "@/lib/data/geo"
 import { englishCountryName } from "@/lib/data/country"
 import { withBudget } from "@/lib/timing"
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
           lat: r.latitude,
           lon: r.longitude,
           population: r.population ?? null,
-          flag: "",
+          flag: flagOf(cc),
           tier: 0,
           hasReport: false,
           quality: 40,
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
           lat: cc.lat,
           lon: cc.lon,
           population: null,
-          flag: "",
+          flag: flagOf(cc.countryCode),
           tier: 0,
           hasReport: false,
           quality: 100,

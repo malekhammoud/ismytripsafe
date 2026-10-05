@@ -33,7 +33,22 @@ function rebuildOnce(geo: GeoPoint, key: string, place: string): () => Promise<v
 }
 
 export async function POST(request: Request) {
-  const input: SafetyQuery = await request.json()
+  const body = (await request.json().catch(() => null)) as
+    | Partial<SafetyQuery>
+    | null
+  const input: SafetyQuery | null =
+    body && typeof body.place === "string" && body.place.trim().length > 0
+      ? (body as SafetyQuery)
+      : null
+  if (!input) {
+    return Response.json(
+      {
+        error:
+          'Missing or invalid body: expected a JSON object with a non-empty "place" string, e.g. {"place":"Lisbon, Portugal"}.',
+      },
+      { status: 400, headers: { "Cache-Control": "no-store" } }
+    )
+  }
   const encoder = new TextEncoder()
 
   // Work to run once the response has finished streaming: the deferred map-zone

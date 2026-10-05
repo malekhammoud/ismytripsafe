@@ -81,6 +81,14 @@ interface Entity {
 const FOLD = /[\u0300-\u036f]/g
 const JUNK = /[^a-z0-9]+/g
 
+/** ISO2 country code → flag emoji ("PT" → 🇵🇹). "" for anything else. */
+export function flagOf(cc: string): string {
+  if (!cc || cc.length !== 2) return ""
+  const a = cc.toUpperCase()
+  if (!/^[A-Z]{2}$/.test(a)) return ""
+  return String.fromCodePoint(...[...a].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65))
+}
+
 /** Case-fold, strip accents and punctuation. "Côte d'Ivoire" → "cote d ivoire". */
 export function normQuery(s: string): string {
   return s
@@ -237,7 +245,7 @@ for (const c of countries as RawCountry[]) {
     population: null,
     tier: 0,
     hasReport: false,
-    flag: c.flag ?? "",
+    flag: flagOf(c.cca2),
     variants: countryVariants(c),
   }
   STATIC_COUNTRIES.push(e)
@@ -347,7 +355,7 @@ async function buildIndex(): Promise<Index> {
       hasReport: true,
       path: m.path,
       score: m.score,
-      flag: "",
+      flag: flagOf(cc),
       variants: [normQuery(m.city)],
     })
   }

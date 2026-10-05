@@ -11,12 +11,21 @@
 // ─────────────────────────────────────────────────────────────────────
 
 import { candidateNames, findByName, normQuery, type SearchHit } from "./search"
+import { withBudget } from "./timing"
 
 const FREE_MODELS = (process.env.OPENROUTER_MODELS ??
   "nvidia/nemotron-3-nano-30b-a3b:free").split(",").map((m) => m.trim())
 
 const CACHE_MAX = 200
 const HOURLY_BUDGET = 40
+/**
+ * Hard wall-clock ceiling for the whole resolve, whatever the upstream does.
+ * The search box already waited 550ms on the local engine before calling
+ * here — nobody should wait on a model for longer. (The per-request socket
+ * abort below handles the polite case; this catches the rest, e.g. an
+ * undici body read that doesn't react to abort().)
+ */
+const RESOLVE_DEADLINE_MS = Number(process.env.RESOLVE_TIMEOUT_MS ?? 8000)
 
 const cache = new Map<string, SearchHit | null>()
 let callsThisHour = 0
@@ -64,7 +73,8 @@ function extractJson(text: string): Record<string, unknown> | null {
 /**
  * Resolve a free-text query to a real destination from our own list.
  * Returns null when the model can't pin it down (or any failure — this is a
- * progressive enhancement, never a blocker).
+ * progressive enhancement, never a blocker). Never takes longer than
+ * RESOLVE_DEADLINE_MS: the fallback is null, not a hang.
  */
 export async function aiResolvePlace(query: string): Promise<SearchHit | null> {
   const q = normQuery(query)
@@ -75,6 +85,17 @@ export async function aiResolvePlace(query: string): Promise<SearchHit | null> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey || !FREE_MODELS.length) return null
 
+  // The budget races the model call and answers null at the deadline even if
+  // the upstream is stuck; the call itself keeps running and still lands in
+  // the cache (see lib/timing.ts:withBudget).
+  const out = await withBudget(modelResolve(q, query, apiKey), RESOLVE_DEADLINE_MS)
+  callsThisHour++
+  remember(q, out)
+  return out
+}
+
+/** The upstream round-trip: candidate list + one grounded model call. */
+async function modelResolve(q: string, rawQuery: string, apiKey: string): Promise<SearchHit | null> {
   const candidates = await candidateNames(420)
   const system =
     "You map a traveller's free-text query to exactly one destination from a provided list. " +
@@ -83,7 +104,7 @@ export async function aiResolvePlace(query: string): Promise<SearchHit | null> {
     'safe", "travelling to", "beach holiday", dates and adjectives. Prefer the most literal ' +
     "reading. Do not invent names that are not on the list."
 
-  const user = `Queries so far are one line each, in the form: query | destination list items separated by commas.\n\nQuery: "${query}"\n\nDestinations: ${candidates.join(", ")}`
+  const user = `Queries so far are one line each, in the form: query | destination list items separated by commas.\n\nQuery: "${rawQuery}"\n\nDestinations: ${candidates.join(", ")}`
 
   let out: SearchHit | null = null
   try {
@@ -127,7 +148,5 @@ export async function aiResolvePlace(query: string): Promise<SearchHit | null> {
     // null is the graceful failure state
   }
 
-  callsThisHour++
-  remember(q, out)
   return out
 }
