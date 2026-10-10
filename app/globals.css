@@ -1784,3 +1784,12 @@ body::after {
   .pc-scroller-track { animation: none; }
 }
 
+
+/* Utility — hide scrollbars on the sticky section nav (and any chip row). */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

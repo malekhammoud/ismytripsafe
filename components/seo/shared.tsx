@@ -90,6 +90,7 @@ export function DocSection({
   title,
   pill,
   first = false,
+  id,
   children,
 }: {
   num: string
@@ -97,11 +98,14 @@ export function DocSection({
   title: string
   pill?: string
   first?: boolean
+  /** Anchor target for the report's jump menu. */
+  id?: string
   children: React.ReactNode
 }) {
   return (
     <section
-      className="px-6 py-7 sm:px-9 sm:py-8"
+      id={id}
+      className={`px-6 py-7 sm:px-9 sm:py-8 ${id ? "scroll-mt-24" : ""}`}
       style={first ? undefined : { borderTop: `1px solid ${RULE}` }}
     >
       <header className="mb-5 flex items-start justify-between gap-4">

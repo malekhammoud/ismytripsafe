@@ -18,6 +18,7 @@ import {
   Siren,
   Eye,
   Search,
+  SlidersHorizontal,
 } from "lucide-react"
 import type {
   SafetyBundle,
@@ -100,7 +101,7 @@ function Block({
   return (
     <section
       id={id}
-      className="rise-in scroll-mt-4 px-7 py-8 sm:px-9"
+      className="rise-in scroll-mt-24 px-7 py-8 sm:px-9"
       style={{ background: t.fill, borderTop: `1px solid ${RULE}`, animationDelay: `${delay}ms` }}
     >
       <header className="mb-5 flex items-start justify-between gap-4">
@@ -467,10 +468,6 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
                   IsMyTripSafe<span style={{ color: "rgba(238,242,248,0.5)" }}>.com</span>
                 </span>
               </p>
-              {/* nothing worth sharing until the score is final */}
-              {!scorePending && (
-                <ShareButton targetId="report-hero" city={geo.city} score={personal.index} answer={levelCfg.answer} />
-              )}
             </span>
           </div>
 
@@ -539,6 +536,37 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
                 — {final.caps[0].reason}. No other indicator can raise the score above this.
               </p>
             )}
+
+            {/* the next steps — what a reader does with this verdict. Always
+                the same three, so the report knows what its job is: see the
+                places, make it theirs, spread it. */}
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
+              <a
+                href={`/map?place=${encodeURIComponent(`${geo.city}, ${geo.country}`)}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(238,242,248,0.38)] bg-[rgba(238,242,248,0.1)] px-4 py-2 text-[0.8rem] font-semibold text-white transition-colors hover:bg-[rgba(238,242,248,0.22)]"
+              >
+                <MapPin size={13} strokeWidth={2.2} />
+                District map
+              </a>
+              {!profile && permalink && (
+                <a
+                  href={`/?place=${encodeURIComponent(`${geo.city}, ${geo.country}`)}`}
+                  className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[0.8rem] font-semibold text-white"
+                  style={{ background: "var(--orange-deep)" }}
+                >
+                  <SlidersHorizontal size={13} strokeWidth={2.2} />
+                  Personalize for my trip
+                </a>
+              )}
+              {!scorePending && (
+                <ShareButton
+                  targetId="report-hero"
+                  city={geo.city}
+                  score={personal.index}
+                  answer={levelCfg.answer}
+                />
+              )}
+            </div>
           </div>
 
           {/* the pyramid: headline above, the two scores felt directly, then

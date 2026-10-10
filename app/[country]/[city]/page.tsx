@@ -18,15 +18,16 @@ import {
   DocSection,
   FaqList,
   ReportDoc,
-  ReportLinkGrid,
   SeoFooter,
   SiteHeader,
   sectionNumberer,
   type Crumb,
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
+import { RelatedGrid } from "@/components/seo/DestinationCards"
+import { ReportJumpNav, BackToTopPill } from "@/components/report/ReportJumpNav"
 import type { CachedReport } from "@/lib/cache"
-import { ArrowRight, SlidersHorizontal } from "lucide-react"
+import { ArrowRight, Globe2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
 
 // Always render fresh from the report store — new and refreshed reports
 // appear immediately, and Googlebot/AI crawlers get full HTML.
@@ -191,6 +192,22 @@ export default async function CityReportPage({
         <div className="mx-auto max-w-[640px]">
           <Breadcrumbs trail={trail} />
 
+          {/* The whole report on one page — the jump menu keeps it navigable.
+              Every pill is an anchor: no JS, always works, each a click. */}
+          <ReportJumpNav
+            items={[
+              { label: "The verdict", href: "#report-hero" },
+              { label: "Crime", href: "#sec-crime" },
+              { label: "Advisories", href: "#sec-advisories" },
+              { label: "On the ground", href: "#sec-local-intel" },
+              { label: "Health", href: "#sec-health" },
+              { label: "Stability", href: "#sec-stability" },
+              ...(zones.length > 0 ? [{ label: "Districts", href: "#sec-districts" }] : []),
+              { label: "Night safety", href: "#sec-night" },
+              { label: "FAQ", href: "#sec-faq" },
+            ]}
+          />
+
           {/* The one action on the page — big, orange, and explicit. Personalisation
               is the whole point of the checker, and it starts the interactive flow
               with this place pre-filled. */}
@@ -257,6 +274,7 @@ export default async function CityReportPage({
                   kicker="Neighbourhoods"
                   title={`Safest areas and areas to avoid`}
                   pill={`${zones.length} districts`}
+                  id="sec-districts"
                   first
                 >
                   <p className="text-[0.88rem] leading-relaxed text-[var(--ink-soft)]">
@@ -291,6 +309,27 @@ export default async function CityReportPage({
                       </article>
                     ))}
                   </div>
+
+                  {/* the district map — the most visual thing on the page, and
+                      the click that opens it should be impossible to miss */}
+                  <div className="mt-5 flex flex-wrap items-center gap-2.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold" style={{ background: "rgba(23,160,95,0.12)", color: "var(--safe)" }}>
+                      {safeZones.length} safer
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold" style={{ background: "rgba(226,106,44,0.14)", color: "var(--caution)" }}>
+                      {cautionZones.length} caution
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold" style={{ background: "rgba(214,69,65,0.12)", color: "var(--risky)" }}>
+                      {avoidZones.length} avoid
+                    </span>
+                    <Link
+                      href={mapHref}
+                      className="btn ml-auto inline-flex items-center gap-2 px-4 py-2 text-[0.82rem] font-semibold"
+                    >
+                      <MapIcon size={14} />
+                      Open the district map
+                    </Link>
+                  </div>
                 </DocSection>
               )}
 
@@ -300,6 +339,7 @@ export default async function CityReportPage({
                 kicker="After Dark"
                 title={`Is ${meta.city} safe at night?`}
                 first={zones.length === 0}
+                id="sec-night"
               >
                 <div className="space-y-2.5 text-[0.9rem] leading-relaxed text-[var(--ink-soft)]">
                   {walkDark?.value != null && (
@@ -329,7 +369,7 @@ export default async function CityReportPage({
               </DocSection>
 
               {/* FAQ — visible HTML answers (no JSON schema: retired by Google) */}
-              <DocSection num={num()} kicker="Questions" title={`${meta.city} safety FAQ (${year})`}>
+              <DocSection num={num()} kicker="Questions" title={`${meta.city} safety FAQ (${year})`} id="sec-faq">
                 <FaqList
                   items={[
                     {
@@ -437,32 +477,44 @@ export default async function CityReportPage({
             </ReportDoc>
           </div>
 
-          {/* Related reports — the internal-linking modules */}
-          <ReportLinkGrid
+          {/* Related reports — doors to more, not lines of text */}
+          <RelatedGrid
             title={`More ${meta.country} reports`}
             items={related.sameCountry.slice(0, 6)}
           />
-          <ReportLinkGrid
-            title="Nearby destinations"
-            items={related.nearby.slice(0, 4)}
-            anchors={(m) => `${m.city} safety report`}
-          />
-          <ReportLinkGrid
-            title="Similar safety profile"
-            items={related.similarScore.slice(0, 4)}
-            anchors={(m) => `How safe is ${m.city}?`}
-          />
+          <RelatedGrid title="Nearby destinations" items={related.nearby.slice(0, 4)} />
+          <RelatedGrid title="Similar safety profile" items={related.similarScore.slice(0, 4)} />
 
-          <p className="mt-8 text-[0.85rem] text-[var(--ink-soft)]">
-            Browse the{" "}
-            <Link href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
-              {meta.country} safety overview
-            </Link>{" "}
-            or{" "}
-            <Link href="/destinations" className="font-medium text-[var(--accent-deep)] hover:underline">
-              all destinations
-            </Link>
-            . Raw data:{" "}
+          {/* Keep exploring — one last, impossible-to-miss row of doors */}
+          <section className="card mt-10 px-6 py-6 text-center">
+            <p className="postcard-greeting">Keep exploring</p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+              <Link
+                href={mapHref}
+                className="btn inline-flex items-center gap-2 px-4 py-2 text-[0.84rem] font-semibold"
+              >
+                <MapIcon size={14} />
+                {meta.city} district map
+              </Link>
+              <Link
+                href={`/${meta.countrySlug}`}
+                className="btn-secondary inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] px-4 py-2 text-[0.84rem] font-semibold text-[var(--ink-soft)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-deep)]"
+              >
+                All of {meta.country}
+              </Link>
+              <Link
+                href="/destinations"
+                className="btn-secondary inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] px-4 py-2 text-[0.84rem] font-semibold text-[var(--ink-soft)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-deep)]"
+              >
+                <Globe2 size={14} />
+                Spin the globe
+              </Link>
+              <BackToTopPill />
+            </div>
+          </section>
+
+          <p className="mt-6 text-center text-[0.8rem] text-[var(--ink-faint)]">
+            Raw data:{" "}
             <a href={`${meta.path}/data.json`} className="font-medium text-[var(--accent-deep)] hover:underline">
               {meta.citySlug}.json
             </a>{" "}
