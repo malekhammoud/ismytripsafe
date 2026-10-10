@@ -15,6 +15,7 @@ import {
   wbRegionCode,
   owidLatest,
   ghoLatest,
+  fetchJsonRetry,
   type RefHit,
 } from "./refdata"
 import { SIGNAL_BANDS } from "../scoring"
@@ -373,25 +374,44 @@ async function fetchText(url: string, timeoutMs: number): Promise<string | null>
   }
 }
 
-async function fetchSdgAreaCode(iso2: string): Promise<number | null> {
-  try {
-    const list = (await fetchJson(
-      "https://unstats.un.org/SDGAPI/v1/sdg/GeoArea/List",
-      7000
-    )) as SDGGeoArea[]
-    if (!Array.isArray(list)) return null
-    const wanted = countryNameVariants(iso2)
-    if (!wanted.size) return null
-    for (const row of list) {
-      const norm = normalizeCountryName(row.geoAreaName ?? "")
-      if (!norm || !wanted.has(norm)) continue
-      const code = Number(row.geoAreaCode)
-      if (Number.isFinite(code)) return code
+/**
+ * The UN SDG GeoArea list is one shared lookup for every report, so it is
+ * cached per process (done once, reused for all five indicators and all
+ * future reports). Routed through fetchJsonRetry with a real ladder — a
+ * hiccup on this call previously blanked the entire SDG block.
+ */
+const sdgAreaCache = new Map<string, Promise<number | null>>()
+
+function fetchSdgAreaCode(iso2: string): Promise<number | null> {
+  const up = iso2.toUpperCase()
+  let p = sdgAreaCache.get(up)
+  if (p) return p
+  p = (async () => {
+    try {
+      const list = (await fetchJsonRetry(
+        "https://unstats.un.org/SDGAPI/v1/sdg/GeoArea/List",
+        [8000, 10000]
+      )) as SDGGeoArea[]
+      if (!Array.isArray(list)) return null
+      const wanted = countryNameVariants(iso2)
+      if (!wanted.size) return null
+      for (const row of list) {
+        const norm = normalizeCountryName(row.geoAreaName ?? "")
+        if (!norm || !wanted.has(norm)) continue
+        const code = Number(row.geoAreaCode)
+        if (Number.isFinite(code)) return code
+      }
+      return null
+    } catch {
+      return null
     }
-    return null
-  } catch {
-    return null
-  }
+  })()
+  p.then((code) => {
+    // A failed lookup must retry, not poison the cache for the process.
+    if (code == null) sdgAreaCache.delete(up)
+  })
+  sdgAreaCache.set(up, p)
+  return p
 }
 
 function sdgPriority(point: SDGDataPoint): number {
@@ -424,7 +444,12 @@ function fetchSdgRows(areaCode: number, indicator: string): Promise<SDGDataPoint
         const url =
           `https://unstats.un.org/SDGAPI/v1/sdg/Indicator/Data` +
           `?indicator=${encodeURIComponent(indicator)}&areaCode=${areaCode}&pageSize=1000`
-        const data = (await fetchJson(url, 8000)) as SDGIndicatorData
+        // Retry ladder: the UN SDG API flaps hard (measured >15s hangs), and
+        // one cold-country miss previously blanked the whole SDG block until
+        // a lucky later build. A second attempt usually survives the blip;
+        // anything still unsolved stays unsolved, and resolveMetric's
+        // background continuation persists a late success for the next build.
+        const data = (await fetchJsonRetry(url, [8000, 12000])) as SDGIndicatorData
         return Array.isArray(data.data) ? data.data : null
       } catch {
         return null
