@@ -403,8 +403,14 @@ function sdgPriority(point: SDGDataPoint): number {
   return rank
 }
 
-/** Wall-clock cap for one SDG indicator on a cold country. */
-const SDG_BUDGET_MS = 3_000
+/**
+ * Wall-clock cap for one SDG indicator on a cold country. 3s was aborting
+ * the trafficking indicator (16.2.2 answers with the entire global dataset,
+ * ~550KB / ~6s) — the richest crime-pillar sources then landed as "No data"
+ * until the warm store filled on the NEXT build. 8s fits the slowest cold
+ * response; the warm store (resolveMetric) makes repeat builds fast again.
+ */
+const SDG_BUDGET_MS = 8_000
 
 // One request per SDG indicator per country; series are filtered locally.
 const sdgDataCache = new Map<string, Promise<SDGDataPoint[] | null>>()
@@ -487,62 +493,77 @@ interface NumbeoDetail {
   problemDrugs?: number
 }
 
+/**
+ * Wall-clock budgets for the proxied Numbeo fetches (r.jina.ai is a free,
+ * shared proxy that routinely answers in 4–5s — a 4s timeout was aborting
+ * ~97% of city fetches and silently demoting every report to country data).
+ * The city page is the single highest-value crime read, so it gets a real
+ * budget and one retry; the country ranking is cheap.
+ */
+const NUMBEO_CITY_BUDGET_MS = 12_000
+const NUMBEO_COUNTRY_BUDGET_MS = 8_000
+const NUMBEO_RETRIES = 1
+
 /** City-level Numbeo crime page — the finest-grained crime read we have. */
 async function fetchNumbeoCity(city: string): Promise<NumbeoHit | null> {
-  try {
-    const slug = city
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^A-Za-z0-9 ]/g, "")
-      .trim()
-      .replace(/\s+/g, "-")
-    if (!slug) return null
-    const html = await fetchText(
-      `https://r.jina.ai/http://www.numbeo.com/crime/in/${slug}`,
-      4000
-    )
-    if (!html) return null
-    const crime = html.match(/Crime Index:?\s*\|?\s*([0-9]+(?:\.[0-9]+)?)/i)
-    const safety = html.match(/Safety Index:?\s*\|?\s*([0-9]+(?:\.[0-9]+)?)/i)
-    if (!crime || !safety) return null
-    const crimeIndex = Number(crime[1])
-    const safetyIndex = Number(safety[1])
-    if (!Number.isFinite(crimeIndex) || !Number.isFinite(safetyIndex)) return null
-    // The page renders zeros when a city has too few contributors.
-    if (crimeIndex === 0 && safetyIndex === 0) return null
+  const slug = city
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Za-z0-9 ]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+  if (!slug) return null
 
-    // The same page carries a breakdown that is far more useful to a traveller
-    // than the headline index: how safe people feel walking alone at night,
-    // and how much they worry about being mugged. Rows read
-    // "<label> <value> <band>", e.g. "Safety walking alone during night 72.17 High".
-    const row = (label: string): number | undefined => {
-      const m = html.match(
-        new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+([0-9]+(?:\\.[0-9]+)?)", "i")
+  for (let attempt = 0; attempt <= NUMBEO_RETRIES; attempt++) {
+    try {
+      const html = await fetchText(
+        `https://r.jina.ai/http://www.numbeo.com/crime/in/${slug}`,
+        NUMBEO_CITY_BUDGET_MS
       )
-      const v = m ? Number(m[1]) : NaN
-      return Number.isFinite(v) ? v : undefined
-    }
-    const detail: NumbeoDetail = {
-      safetyNight: row("Safety walking alone during night"),
-      safetyDay: row("Safety walking alone during daylight"),
-      worryMugged: row("Worries being mugged or robbed"),
-      problemViolentCrime: row("Problem violent crimes such as assault and armed robbery"),
-      problemPropertyCrime: row("Problem property crimes such as vandalism and theft"),
-      problemDrugs: row("Problem people using or dealing drugs"),
-    }
-    const hasDetail = Object.values(detail).some((v) => v != null)
+      if (!html) { if (attempt < NUMBEO_RETRIES) continue; return null }
+      const crime = html.match(/Crime Index:?\s*\|?\s*([0-9]+(?:\.[0-9]+)?)/i)
+      const safety = html.match(/Safety Index:?\s*\|?\s*([0-9]+(?:\.[0-9]+)?)/i)
+      if (!crime || !safety) { if (attempt < NUMBEO_RETRIES) continue; return null }
+      const crimeIndex = Number(crime[1])
+      const safetyIndex = Number(safety[1])
+      if (!Number.isFinite(crimeIndex) || !Number.isFinite(safetyIndex)) { if (attempt < NUMBEO_RETRIES) continue; return null }
+      // The page renders zeros when a city has too few contributors.
+      if (crimeIndex === 0 && safetyIndex === 0) return null
 
-    return { crimeIndex, safetyIndex, scope: "city", ...(hasDetail ? { detail } : {}) }
-  } catch {
-    return null
+      // The same page carries a breakdown that is far more useful to a traveller
+      // than the headline index: how safe people feel walking alone at night,
+      // and how much they worry about being mugged. Rows read
+      // "<label> <value> <band>", e.g. "Safety walking alone during night 72.17 High".
+      const row = (label: string): number | undefined => {
+        const m = html.match(
+          new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+([0-9]+(?:\\.[0-9]+)?)", "i")
+        )
+        const v = m ? Number(m[1]) : NaN
+        return Number.isFinite(v) ? v : undefined
+      }
+      const detail: NumbeoDetail = {
+        safetyNight: row("Safety walking alone during night"),
+        safetyDay: row("Safety walking alone during daylight"),
+        worryMugged: row("Worries being mugged or robbed"),
+        problemViolentCrime: row("Problem violent crimes such as assault and armed robbery"),
+        problemPropertyCrime: row("Problem property crimes such as vandalism and theft"),
+        problemDrugs: row("Problem people using or dealing drugs"),
+      }
+      const hasDetail = Object.values(detail).some((v) => v != null)
+
+      return { crimeIndex, safetyIndex, scope: "city", ...(hasDetail ? { detail } : {}) }
+    } catch {
+      if (attempt >= NUMBEO_RETRIES) return null
+    }
   }
+  return null
 }
 
 async function fetchNumbeoCountry(iso2: string): Promise<NumbeoHit | null> {
   try {
     const html = await fetchText(
       "https://r.jina.ai/http://www.numbeo.com/crime/rankings_by_country.jsp",
-      4000
+      NUMBEO_COUNTRY_BUDGET_MS
     )
     if (!html) return null
     const variants = countryNameVariants(iso2)

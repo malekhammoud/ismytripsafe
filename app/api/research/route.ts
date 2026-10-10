@@ -20,6 +20,14 @@ export const maxDuration = 300
  */
 const rebuilding = new Set<string>()
 
+/**
+ * Cache keys already scheduled for a data-repair rebuild this process (a
+ * report served with a sparse crime section). One queue per key so cities
+ * without any Numbeo page can't re-schedule themselves on every hit; a
+ * restart resets it and the stale-rebuild path re-covers the backlog.
+ */
+const repairQueued = new Set<string>()
+
 function rebuildOnce(geo: GeoPoint, key: string, place: string): () => Promise<void> {
   return async () => {
     if (rebuilding.has(key)) return
@@ -151,6 +159,21 @@ export async function POST(request: Request) {
         if (!input.refresh) {
           const hit = await readCache(key)
           if (hit) {
+            // Self-heal sparse crime sections: reports built while a fetcher
+            // was down (Numbeo city pages, FBI, UN SDG) carry only the country
+            // baseline. Serve the stored copy now — the reader never waits —
+            // and rebuild in the background so the next visit has the full
+            // city-level read. Queued once per key per process so a city with
+            // genuinely no Numbeo page can't reschedule itself every hit.
+            const signalsOf = hit.bundle.safety.signals ?? []
+            const hasCityCrime =
+              signalsOf.some((s) => s.key === "numbeo_safety_night" || s.key === "numbeo_safety_day") ||
+              (hit.geo.countryCode.toUpperCase() === "US" &&
+                signalsOf.some((s) => s.key === "fbi_violent_crime_rate"))
+            if (!hasCityCrime && !repairQueued.has(key)) {
+              repairQueued.add(key)
+              background.push(rebuildOnce(geo, key, input.place))
+            }
             send({ type: "geo", place: hit.geo })
             if (hit.images.hero || hit.images.gallery.length) {
               send({ type: "image", images: hit.images })
