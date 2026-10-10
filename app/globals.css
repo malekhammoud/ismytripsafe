@@ -1,65 +1,66 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════
-   BETA — "Postcard" beach theme.
+   SUN-WASHED — bright beach-vacation theme.
 
-   Deliberately the same variable NAMES as production so every page that
-   already reads --accent / --navy / --orange re-skins for free. Only the
-   values move: cool mist paper → sun-bleached sand, cerulean → lagoon
-   turquoise, the brand orange → a sunset coral.
+   Deliberately the same variable NAMES throughout the site so every page
+   that already reads --accent / --navy / --orange re-skins for free. Only
+   the values move: cool cream paper → sun-bleached sand, lagoon teal →
+   sea-glass, the brand orange → a warmer sunset coral. Long-form report
+   pages stay light and high-contrast; the home hero adds its own sky-and-
+   sun composition on top.
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
   /* Canvas — sun-bleached postcard stock */
-  --paper: #fbf4e6;
-  --paper-deep: #f2e5cd;
-  --ink: #1d2f38;
-  --ink-soft: #46606d;
-  --ink-faint: #8b9ca4;
+  --paper: #fdfaf3;
+  --paper-deep: #f7e8c8;
+  --ink: #123b46;
+  --ink-soft: #41616e;
+  --ink-faint: #8fa2a9;
 
-  /* Accents — lagoon turquoise + deep water */
-  --accent: #0f9bab;
-  --accent-deep: #05646f;
-  --teal: #0b7b86;
-  --teal-bright: #23bcc7;
-  --sand: #e9d6b2;
-  --sand-deep: #d9bf90;
-  --gold: #e0a13c;
+  /* Accents — sea-glass teal + deep water */
+  --accent: #0c9fb4;
+  --accent-deep: #067e95;
+  --teal: #0b899c;
+  --teal-bright: #1ec3d4;
+  --sand: #f1dcb2;
+  --sand-deep: #e2c58d;
+  --gold: #e6a63a;
 
-  /* Brand chrome — the postcard's ink stamp is deep ocean, the swash is a
-     sunset coral. Score colours below still own their own meanings. */
-  --navy: #0d3b4d;
-  --navy-soft: #165065;
-  --orange: #f2704a;
-  --orange-bright: #ff9a5c;
-  --orange-deep: #d84a29;
+  /* Brand chrome — deep sea ink, sunset coral CTA */
+  --navy: #0d3c4c;
+  --navy-soft: #16526a;
+  --orange: #ff7c52;
+  --orange-bright: #ffa16e;
+  --orange-deep: #e04921;
 
-  /* Sun & sea — the theme's own extras (no production equivalent) */
+  /* Sun & sea — the theme's own extras */
   --sun: #ffc857;
-  --sun-deep: #f5a63c;
-  --sky: #bfe6ef;
-  --sea: #1a8fa3;
-  --sea-deep: #0b5c72;
-  --foam: #e4f5f4;
-  --palm: #2f7d5c;
+  --sun-deep: #f2a53c;
+  --sky: #d3f0f5;
+  --sea: #148fa6;
+  --sea-deep: #086a7f;
+  --foam: #edf9fa;
+  --palm: #2f8f63;
 
-  /* Safety spectrum — warmed to sit inside the sand/sea palette */
-  --safe: #17a07a;
-  --moderate: #e0a13c;
-  --caution: #ef8348;
-  --risky: #e0544a;
+  /* Safety spectrum — tuned for contrast on white/cream */
+  --safe: #17a05f;
+  --moderate: #dc9a1e;
+  --caution: #e26a2c;
+  --risky: #d64541;
 
   /* Glass */
-  --glass: rgba(255, 252, 244, 0.74);
-  --glass-strong: rgba(255, 253, 247, 0.92);
-  --glass-border: rgba(255, 255, 255, 0.66);
-  --hairline: rgba(29, 47, 56, 0.12);
+  --glass: rgba(255, 254, 250, 0.78);
+  --glass-strong: rgba(255, 255, 253, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --hairline: rgba(18, 59, 70, 0.14);
 
-  --shadow-card: 0 1px 2px rgba(29, 47, 56, 0.05),
-    0 8px 24px -8px rgba(29, 47, 56, 0.14),
-    0 24px 48px -24px rgba(29, 47, 56, 0.2);
-  --shadow-float: 0 2px 8px rgba(29, 47, 56, 0.09),
-    0 16px 40px -12px rgba(29, 47, 56, 0.24),
-    0 40px 80px -32px rgba(29, 47, 56, 0.32);
+  --shadow-card: 0 1px 2px rgba(18, 59, 70, 0.05),
+    0 10px 28px -10px rgba(18, 59, 70, 0.15),
+    0 28px 56px -28px rgba(18, 59, 70, 0.22);
+  --shadow-float: 0 2px 8px rgba(18, 59, 70, 0.09),
+    0 18px 44px -14px rgba(18, 59, 70, 0.26),
+    0 44px 88px -36px rgba(18, 59, 70, 0.34);
 
   /* Night — the home page's first screen. A warm black, not a cool one: this
      is lamplight on a wooden table, not a dashboard at 2am. */
@@ -213,9 +214,9 @@ body::after {
 }
 
 .card {
-  background: #fffdf7;
+  background: rgba(255, 255, 255, 0.82);
   border: 1px solid var(--hairline);
-  border-radius: 16px;
+  border-radius: 20px;
   box-shadow: var(--shadow-card);
 }
 
@@ -313,7 +314,7 @@ body::after {
 .field:focus {
   border-color: var(--accent);
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(15, 155, 171, 0.14);
+  box-shadow: 0 0 0 4px rgba(12, 159, 180, 0.16);
 }
 .field::placeholder {
   color: var(--ink-faint);
@@ -510,8 +511,8 @@ body::after {
 
 /* Stoplight cards on the how-it-works page */
 .light-card {
-  border-radius: 4px;
-  padding: 1.1rem 1.15rem 1.25rem;
+  border-radius: 18px;
+  padding: 1.25rem 1.2rem 1.4rem;
   color: #fff;
   position: relative;
   overflow: hidden;
@@ -1784,3 +1785,133 @@ body::after {
   .pc-scroller-track { animation: none; }
 }
 
+/* ═══ SUN-WASHED HERO — the home page's first screen ═════════════════
+   Bright, open, friendly. Sky-to-sand wash, a soft sun arch behind the
+   headline, three real postcards scattered at the flanks, and exactly one
+   search pill in the middle. The copy reassures; the composition welcomes.
+   Mobile drops the photos and the wash, and keeps the search-first rule. */
+.sh-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 52% at 16% -4%, rgba(12, 159, 180, 0.12), transparent 64%),
+    radial-gradient(58% 60% at 92% -6%, rgba(255, 200, 87, 0.26), transparent 66%),
+    linear-gradient(180deg, #fffdf8 0%, #fdf4df 60%, #f6e6c2 100%);
+}
+.sh-hero::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -30rem;
+  width: 60rem;
+  height: 60rem;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 198, 91, 0.32), rgba(255, 198, 91, 0) 62%);
+  pointer-events: none;
+}
+.sh-photo {
+  position: absolute;
+  z-index: 0;
+  width: clamp(9rem, 15vw, 12.5rem);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 18px 18px 18px 5px;
+  border: 7px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 22px 44px -14px rgba(14, 52, 61, 0.32);
+  pointer-events: none;
+}
+.sh-photo--1 { left: max(0.5rem, 4vw); top: 5.2rem; transform: rotate(-6deg); }
+.sh-photo--2 { right: max(0.5rem, 4vw); top: 8.5rem; transform: rotate(5deg); }
+.sh-photo--3 { left: max(1.5rem, 7vw); bottom: 4.5rem; width: clamp(7rem, 11vw, 9.5rem); transform: rotate(3deg); }
+@media (max-width: 767px) {
+  .sh-photo { display: none; }
+}
+
+.sh-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 4.6rem 1.25rem 4.2rem;
+  text-align: center;
+}
+.sh-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+}
+.sh-h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.04;
+  font-size: clamp(2.35rem, 6.4vw, 4.1rem);
+  color: var(--navy);
+  margin-top: 0.65rem;
+}
+.sh-sub {
+  margin: 1rem auto 0;
+  max-width: 34rem;
+  color: var(--ink-soft);
+  font-size: clamp(0.95rem, 1.5vw, 1.08rem);
+  line-height: 1.6;
+}
+.sh-search {
+  margin: 1.8rem auto 0;
+  max-width: 38rem;
+  text-align: left;
+}
+.sh-search .card {
+  border-radius: 999px;
+  padding: 0.5rem;
+  border-color: rgba(12, 159, 180, 0.35);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 56px -20px rgba(14, 52, 61, 0.35);
+}
+.sh-search .field { border-radius: 999px; }
+.sh-search .btn {
+  border-radius: 999px;
+  padding-left: 1.6rem;
+  padding-right: 1.6rem;
+}
+.sh-trust {
+  margin-top: 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.sh-chips {
+  margin-top: 1.7rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+.sh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.42rem 0.95rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--hairline);
+  box-shadow: 0 6px 18px -8px rgba(14, 52, 61, 0.25);
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+.sh-chip:hover { transform: translateY(-1px); box-shadow: 0 10px 24px -8px rgba(14, 52, 61, 0.3); }
+.sh-chip b { font-family: var(--font-mono); font-weight: 700; }
+.sh-chip--free {
+  background: linear-gradient(150deg, var(--sun), var(--sun-deep));
+  border-color: transparent;
+  color: #6d4a00;
+}

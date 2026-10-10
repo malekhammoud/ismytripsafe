@@ -29,7 +29,7 @@ export function SiteHeader() {
     <header
       className="sticky top-0 z-40 border-b border-[var(--hairline)]"
       style={{
-        background: "rgba(251, 244, 230, 0.88)",
+        background: "rgba(253, 250, 243, 0.9)",
         backdropFilter: "blur(16px) saturate(1.4)",
         WebkitBackdropFilter: "blur(16px) saturate(1.4)",
       }}
@@ -83,7 +83,7 @@ export function SiteHeader() {
       {open && (
         <nav
           className="border-t border-[var(--hairline)] px-4 pb-4 pt-2 sm:hidden"
-          style={{ background: "rgba(251, 244, 230, 0.97)" }}
+          style={{ background: "rgba(253, 250, 243, 0.98)" }}
         >
           {LINKS.map((l) => {
             const active = pathname === l.href

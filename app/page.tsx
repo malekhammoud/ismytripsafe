@@ -4,7 +4,6 @@ import { HomeClient } from "@/components/HomeClient"
 import { getCityReport, listCountries, listReports } from "@/lib/reports"
 import { graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { PostcardScroller } from "@/components/home/PostcardScroller"
-import { homeDemo } from "@/lib/home-demo"
 import { BigPostcard } from "@/components/home/BigPostcard"
 import { StoplightStrip } from "@/components/home/StoplightStrip"
 import { SiteFooter } from "@/components/SiteFooter"
@@ -69,11 +68,10 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const [reports, countries, showcase, demo] = await Promise.all([
+  const [reports, countries, showcase] = await Promise.all([
     listReports(),
     listCountries(),
     getCityReport(SHOWCASE.country, SHOWCASE.city),
-    homeDemo(),
   ])
 
   const cities = reports.filter((m) => m.path.split("/").filter(Boolean).length === 2)
@@ -96,36 +94,30 @@ export default async function Home() {
     }
   }
 
+  // The hero's proof chips: four famous cities with real, current scores.
+  const chips = seatedCards.slice(0, 4).map((m) => ({
+    city: m.city,
+    path: m.path,
+    score: m.score,
+  }))
+
+  // The "wander" row is an exploration exit, not an entrance — twelve cards
+  // is enough to say "there is a whole world of these".
+  const wanderCards = seatedCards.slice(0, 12)
+
   const jsonLd = graph(organizationNode(), websiteNode())
 
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
-      <HomeClient demo={demo} footer={<SiteFooter />}>
-        {seatedCards.length > 0 && (
-          <section className="mt-4 rise-in">
-            <div>
-              <PostcardScroller cards={seatedCards} />
-            </div>
-            {countries.length > 0 && (
-              <p className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.78rem] text-[var(--ink-soft)]">
-                {countries.slice(0, 8).map((c) => (
-                  <Link key={c.countrySlug} href={`/${c.countrySlug}`} className="font-medium hover:text-[var(--accent)]">
-                    {c.flag} {c.country}
-                  </Link>
-                ))}
-                <Link href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
-                  Spin the globe →
-                </Link>
-              </p>
-            )}
-          </section>
-        )}
-
+      <HomeClient chips={chips} footer={<SiteFooter />}>
+        {/* ── 1. Proof: a real report, at a glance ────────────────────────
+            The single most persuasive thing on the page is an actual report,
+            so it comes first — before the explainers and the wander row. */}
         {showcase && (
-          <section className="mt-14 rise-in" style={{ animationDelay: "0.16s" }}>
+          <section className="mt-14 rise-in">
             <div className="text-center">
-              <p className="postcard-greeting">What you get</p>
+              <p className="postcard-greeting">A real report, real numbers</p>
               <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
                 One card, one answer, and the reasons behind it
               </h2>
@@ -136,7 +128,8 @@ export default async function Home() {
           </section>
         )}
 
-        <section className="mt-14 rise-in" style={{ animationDelay: "0.28s" }}>
+        {/* ── 2. Explain: how to read the score ────────────────────────── */}
+        <section className="mt-14 rise-in" style={{ animationDelay: "0.16s" }}>
           <div className="mx-auto max-w-2xl text-center">
             <p className="postcard-greeting">Reading the score</p>
             <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
@@ -155,6 +148,33 @@ export default async function Home() {
             />
           </div>
         </section>
+
+        {/* ── 3. Explore: the wander row, and the door to everything ───── */}
+        {wanderCards.length > 0 && (
+          <section className="mt-14 rise-in" style={{ animationDelay: "0.28s" }}>
+            <div className="text-center">
+              <p className="postcard-greeting">Where will you go next?</p>
+              <h2 className="font-display mt-1 text-[1.5rem] font-medium tracking-tight text-[var(--navy)]">
+                Popular destinations, scored for you
+              </h2>
+            </div>
+            <div className="mt-4">
+              <PostcardScroller cards={wanderCards} />
+            </div>
+            {countries.length > 0 && (
+              <p className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.78rem] text-[var(--ink-soft)]">
+                {countries.slice(0, 8).map((c) => (
+                  <Link key={c.countrySlug} href={`/${c.countrySlug}`} className="font-medium hover:text-[var(--accent)]">
+                    {c.flag} {c.country}
+                  </Link>
+                ))}
+                <Link href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
+                  Spin the globe →
+                </Link>
+              </p>
+            )}
+          </section>
+        )}
       </HomeClient>
     </>
   )

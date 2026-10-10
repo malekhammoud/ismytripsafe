@@ -3,15 +3,14 @@
 import { useEffect, useState, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { SiteHeader } from "@/components/SiteHeader"
-import { HeaderBand } from "@/components/home/HeaderBand"
 
 import { AssessmentProgress } from "@/components/AssessmentProgress"
 import { ProfileSetup } from "@/components/ProfileSetup"
 import { TrafficReport } from "@/components/report/TrafficReport"
 import { TopNav } from "@/components/report/TopNav"
+import { HeaderBand, type HeroChip } from "@/components/home/HeaderBand"
 import { useReport } from "@/lib/store"
 import { profileFromParams, profileToParams, type TravelerProfile } from "@/lib/profile"
-import type { HomeDemo } from "@/lib/home-demo"
 import type { SafetyQuery } from "@/lib/types"
 
 /**
@@ -27,12 +26,12 @@ import type { SafetyQuery } from "@/lib/types"
  * gives way to the report the moment a search starts.
  */
 export function HomeClient({
-  demo,
+  chips,
   children,
   footer,
 }: {
-  /** A real destination's live scores, for the header band. */
-  demo: HomeDemo | null
+  /** A row of real, live city-score chips for the hero — the proof value. */
+  chips: HeroChip[]
   children?: ReactNode
   footer?: ReactNode
 }) {
@@ -133,7 +132,7 @@ export function HomeClient({
       />
 
       {/* Full-bleed, directly under the nav — the first thing anyone sees */}
-      <HeaderBand demo={demo} onSearch={search} loading={loading} />
+      <HeaderBand chips={chips} onSearch={search} loading={loading} />
 
       <main className="relative z-10 mx-auto flex max-w-5xl flex-col px-5 pb-4">
         {/* Server-rendered latest-reports directory (crawlable) */}
