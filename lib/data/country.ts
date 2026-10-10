@@ -89,6 +89,48 @@ export function countryNameVariants(iso2: string): Set<string> {
   return out
 }
 
+/** Case/accent/punctuation-folding that KEEPS word order and stopwords. */
+function strictName(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/**
+ * How well a raw country name from an external feed matches an ISO2 country:
+ *   2 — exact after word-order-preserving folding ("Republic of Korea" →
+ *       South Korea, but NOT North Korea)
+ *   1 — loose match (normalizeCountryName equal, which strips stopwords —
+ *       "korea" matches BOTH Koreas)
+ *   0 — no match
+ *
+ * Loose matching exists because feeds spell names unpredictably (South Korea /
+ * Korea, Republic of / ROK); but two countries can collapse to the same loose
+ * form (both Koreas → "korea", both Congos → "congo"), and a first-match loop
+ * then silently resolves to the wrong one. Exact folding breaks those ties —
+ * the UN SDG GeoArea lookup filed every South-Korea report under North-Korea's
+ * area code (no data, forever) until this existed.
+ */
+export function countryNameMatchScore(iso2: string, rawName: string): 0 | 1 | 2 {
+  const name = String(rawName ?? "").trim()
+  if (!name) return 0
+  const c = byCode.get(iso2.toUpperCase()) as
+    | (RawCountry & { name?: { common?: string; official?: string } })
+    | undefined
+  if (!c) return 0
+  const ours = [c.name?.common, c.name?.official, ...(c.altSpellings ?? [])]
+    .filter((n): n is string => typeof n === "string" && n.length > 0)
+  const exact = strictName(name)
+  if (ours.some((n) => strictName(n) === exact)) return 2
+  const loose = normalizeCountryName(name)
+  if (loose && countryNameVariants(iso2).has(loose)) return 1
+  return 0
+}
+
 /**
  * Static ISO country facts (currency, languages, region, flag) from the
  * bundled `world-countries` dataset — replaces the deprecated REST Countries

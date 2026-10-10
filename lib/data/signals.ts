@@ -6,7 +6,13 @@ import type {
   HealthNotice,
 } from "../types"
 import { fetchJson } from "./geo"
-import { countryNameVariants, englishCountryName, iso3Code, normalizeCountryName } from "./country"
+import {
+  countryNameVariants,
+  countryNameMatchScore,
+  englishCountryName,
+  iso3Code,
+  normalizeCountryName,
+} from "./country"
 import { getEnvironment } from "./environment"
 import { getHazards, type HazardEvent } from "./hazards"
 import {
@@ -393,15 +399,24 @@ function fetchSdgAreaCode(iso2: string): Promise<number | null> {
         [8000, 10000]
       )) as SDGGeoArea[]
       if (!Array.isArray(list)) return null
+      // Best-scoring row wins. Loose names collapse pairs — both Koreas
+      // normalize to "korea" and the UN list is ordered so North Korea
+      // (408) came first, filing South Korea (KR) under an area with no
+      // data. countryNameMatchScore breaks the tie with exact folding.
       const wanted = countryNameVariants(iso2)
       if (!wanted.size) return null
+      let best: SDGGeoArea | null = null
+      let bestScore = 0
       for (const row of list) {
-        const norm = normalizeCountryName(row.geoAreaName ?? "")
-        if (!norm || !wanted.has(norm)) continue
-        const code = Number(row.geoAreaCode)
-        if (Number.isFinite(code)) return code
+        const score = countryNameMatchScore(iso2, row.geoAreaName ?? "")
+        if (score > bestScore) {
+          best = row
+          bestScore = score
+        }
       }
-      return null
+      if (!best) return null
+      const code = Number(best.geoAreaCode)
+      return Number.isFinite(code) ? code : null
     } catch {
       return null
     }
