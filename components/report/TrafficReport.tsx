@@ -142,12 +142,12 @@ function SignalRow({ signal, extra }: { signal: SafetySignal | undefined; extra?
   const src = sourceUrlForName(signal.source)
   return (
     <div className="py-2.5" style={{ borderTop: `1px solid rgba(20,25,34,0.1)` }}>
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <p className="flex items-center gap-1 text-[0.85rem] font-medium" style={{ color: INK }}>
           {signal.label}
           <InfoTip text={signal.note} color={INK} align="left" />
         </p>
-        <div className="tnum flex shrink-0 items-center gap-1.5 text-[0.82rem]" style={{ color: "var(--ink-soft)" }}>
+        <div className="tnum ml-auto flex items-center gap-1.5 text-[0.82rem]" style={{ color: "var(--ink-soft)" }}>
           {signal.display}
           {extra}
         </div>

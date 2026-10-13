@@ -1846,10 +1846,10 @@ html {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 0.35rem;
+  gap: 0.3rem;
   width: 100%;
   max-width: 40rem;
-  padding: 0.42rem 0.55rem;
+  padding: 0.38rem 0.5rem;
   border-radius: 18px;
   background: rgba(253, 250, 243, 0.95);
   border: 1px solid var(--hairline);
@@ -1859,12 +1859,12 @@ html {
 }
 .report-nav-chip {
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  padding: 0.3rem 0.68rem;
+  padding: 0.28rem 0.6rem;
   border-radius: 999px;
   border: 1px solid transparent;
   transition: color 0.15s, background 0.15s, transform 0.15s;

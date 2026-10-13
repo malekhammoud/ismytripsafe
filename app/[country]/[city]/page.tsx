@@ -190,8 +190,9 @@ export default async function CityReportPage({
 
       {/* The trust band — the home page's promise, carried onto every report.
           It is the first thing a reader sees after the nav: fast, reliable,
-          free, made for them. */}
-      <div className="trust-band -mx-4 sm:-mx-6">
+          free, made for them. Full-width already (it sits on <body>), so no
+          negative margins. */}
+      <div className="trust-band">
         <p className="trust-band-title">Fast. Reliable. Free.</p>
         <p className="trust-band-sub">Made for travelers, by travelers</p>
       </div>
@@ -208,7 +209,7 @@ export default async function CityReportPage({
               { label: "Verdict", href: "#report-hero" },
               { label: "Crime", href: "#sec-crime" },
               { label: "Advisories", href: "#sec-advisories" },
-              { label: "Local intel", href: "#sec-local-intel" },
+              { label: "Intel", href: "#sec-local-intel" },
               { label: "Health", href: "#sec-health" },
               { label: "Stability", href: "#sec-stability" },
               ...(zones.length > 0 ? [{ label: "Districts", href: "#sec-districts" }] : []),
