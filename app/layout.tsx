@@ -78,7 +78,7 @@ export default function RootLayout({
       className={`${display.variable} ${text.variable} ${mono.variable} h-full antialiased`}
     >
       {/* TravelPayouts Drive monetization loader — the exact snippet supplied
-          by the network: an async self-appending <script> for emrldtp.com.
+          by the network: an async self-appending <script> for emrldtp.cc.
           Remove this <script> block to turn it off. */}
       <script
         dangerouslySetInnerHTML={{
@@ -86,7 +86,7 @@ export default function RootLayout({
   var script = document.createElement("script");
   script.async = 1;
   script.setAttribute("data-cmp-ab","2");
-  script.src = 'https://emrldtp.com/NTg0ODc5.js?t=584879';
+  script.src = 'https://emrldtp.cc/NTgzNjQ3.js?t=583647';
   document.head.appendChild(script);
 })();`,
         }}
