@@ -25,7 +25,7 @@ import {
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
 import { RelatedGrid } from "@/components/seo/DestinationCards"
-import { ReportJumpNav, BackToTopPill } from "@/components/report/ReportJumpNav"
+import { SectionNav, BackToTopPill } from "@/components/report/SectionNav"
 import type { CachedReport } from "@/lib/cache"
 import { ArrowRight, Check, Globe2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
 
@@ -203,16 +203,16 @@ export default async function CityReportPage({
 
           {/* The whole report on one page — the jump menu keeps it navigable.
               Every pill is an anchor: no JS, always works, each a click. */}
-          <ReportJumpNav
+          <SectionNav
             items={[
-              { label: "The verdict", href: "#report-hero" },
+              { label: "Verdict", href: "#report-hero" },
               { label: "Crime", href: "#sec-crime" },
               { label: "Advisories", href: "#sec-advisories" },
-              { label: "On the ground", href: "#sec-local-intel" },
+              { label: "Local intel", href: "#sec-local-intel" },
               { label: "Health", href: "#sec-health" },
               { label: "Stability", href: "#sec-stability" },
               ...(zones.length > 0 ? [{ label: "Districts", href: "#sec-districts" }] : []),
-              { label: "Night safety", href: "#sec-night" },
+              { label: "Night", href: "#sec-night" },
               { label: "FAQ", href: "#sec-faq" },
             ]}
           />

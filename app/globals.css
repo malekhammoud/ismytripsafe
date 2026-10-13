@@ -1822,3 +1822,82 @@ body::after {
   text-transform: uppercase;
   opacity: 0.88;
 }
+
+/* ─── The "On this report" section nav ───────────────────────────────
+   Wrapped chips — every button always visible, no scrollbar, no hidden
+   items. A scroll-spy highlights the section in view; a thin progress line
+   across the bottom of the bar shows how far through the report you are. */
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+.report-nav {
+  position: sticky;
+  top: 56px;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  padding: 0.55rem 0.75rem 0.6rem;
+}
+.report-nav-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 40rem;
+  padding: 0.42rem 0.55rem;
+  border-radius: 18px;
+  background: rgba(253, 250, 243, 0.95);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.report-nav-chip {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  padding: 0.3rem 0.68rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  transition: color 0.15s, background 0.15s, transform 0.15s;
+  white-space: nowrap;
+}
+.report-nav-chip:hover {
+  color: var(--accent-deep);
+  background: rgba(12, 159, 180, 0.09);
+}
+.report-nav-chip:active {
+  transform: translateY(1px);
+}
+.report-nav-chip--active {
+  color: #fff8ec;
+  background: linear-gradient(150deg, var(--accent), var(--accent-deep));
+  border-color: transparent;
+  box-shadow: 0 2px 8px -2px rgba(6, 126, 149, 0.5);
+}
+.report-nav-chip--active:hover {
+  color: #fff8ec;
+  background: linear-gradient(150deg, var(--accent), var(--accent-deep));
+}
+.report-nav-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(
+    to right,
+    var(--orange) var(--p, 0%),
+    rgba(255, 124, 82, 0.14) var(--p, 0%)
+  );
+  opacity: 0.7;
+  pointer-events: none;
+}
