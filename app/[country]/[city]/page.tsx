@@ -27,7 +27,7 @@ import { TrafficReport } from "@/components/report/TrafficReport"
 import { RelatedGrid } from "@/components/seo/DestinationCards"
 import { ReportJumpNav, BackToTopPill } from "@/components/report/ReportJumpNav"
 import type { CachedReport } from "@/lib/cache"
-import { ArrowRight, Globe2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
+import { ArrowRight, Check, Globe2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
 
 // Always render fresh from the report store — new and refreshed reports
 // appear immediately, and Googlebot/AI crawlers get full HTML.
@@ -187,6 +187,15 @@ export default async function CityReportPage({
   return (
     <>
       <SiteHeader />
+
+      {/* The trust band — the home page's promise, carried onto every report.
+          It is the first thing a reader sees after the nav: fast, reliable,
+          free, made for them. */}
+      <div className="trust-band -mx-4 sm:-mx-6">
+        <p className="trust-band-title">Fast. Reliable. Free.</p>
+        <p className="trust-band-sub">Made for travelers, by travelers</p>
+      </div>
+
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
         <div className="mx-auto max-w-[640px]">
@@ -208,37 +217,48 @@ export default async function CityReportPage({
             ]}
           />
 
-          {/* The one action on the page — big, orange, and explicit. Personalisation
-              is the whole point of the checker, and it starts the interactive flow
-              with this place pre-filled. */}
+          {/* The one action on the page — big, orange, explicit, and readable at a
+              glance. Centered title, then what it actually does, one bullet
+              per line: no wall of text, four quick promises. */}
           <Link
-            href={`/?place=${encodeURIComponent(`${meta.city}, ${meta.country}`)}`}
-            className="group mt-4 flex items-center gap-3.5 rounded-[14px] bg-[var(--orange-deep)] px-5 py-4 transition-transform hover:-translate-y-0.5 hover:bg-[#c03f21]"
+            href={personalizeHref}
+            className="group mt-5 block rounded-[16px] bg-[var(--orange-deep)] px-6 py-5 text-center transition-transform hover:-translate-y-0.5 hover:bg-[#c03f21]"
             style={{
               color: "#fff8ec",
               boxShadow:
                 "0 1px 2px rgba(140,48,22,0.24), 0 8px 20px -10px rgba(140,48,22,0.5)",
             }}
           >
-            <span
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
-              style={{ background: "rgba(255,248,236,0.18)" }}
-            >
-              <SlidersHorizontal size={20} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[1.02rem] font-bold leading-tight">
-                Personalize Report Now
-              </span>
-              <span className="mt-0.5 block text-[0.78rem] leading-snug" style={{ color: "rgba(255,248,236,0.9)" }}>
-                Tailor this report specifically to you and get the latest and most valuable
-                insights with one click.
+            <span className="flex items-center justify-center gap-2">
+              <SlidersHorizontal size={18} />
+              <span className="text-[1.06rem] font-bold leading-tight">
+                Personalize report now
               </span>
             </span>
-            <ArrowRight
-              size={18}
-              className="ml-auto shrink-0 transition-transform group-hover:translate-x-0.5"
-            />
+            <span className="mx-auto mt-3.5 block max-w-[23rem] space-y-1.5 text-left">
+              {[
+                "Tailor this report to you.",
+                "Next: age, gender, group size preference…",
+                "Next: the latest news and insights",
+                "Next: one click, 5 seconds, no cost",
+              ].map((line) => (
+                <span
+                  key={line}
+                  className="flex items-start gap-2 text-[0.8rem] leading-snug"
+                  style={{ color: "rgba(255,248,236,0.95)" }}
+                >
+                  <Check size={13} className="mt-[3px] shrink-0" style={{ color: "var(--sun)" }} />
+                  {line}
+                </span>
+              ))}
+            </span>
+            <span className="mt-3.5 inline-flex items-center gap-1.5 text-[0.82rem] font-bold">
+              Start now
+              <ArrowRight
+                size={15}
+                className="transition-transform group-hover:translate-x-0.5"
+              />
+            </span>
           </Link>
 
           {/* H1 + answer capsule — the self-contained, quotable verdict */}
