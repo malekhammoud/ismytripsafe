@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "nightlife": "node scripts/nightlife.cjs",
+    "test:nightlife": "node --require ./scripts/typescript-worker.cjs tests/nightlife.test.cjs && node tests/nightlife-integration.cjs",
+    "check:nightlife": "node scripts/check-nightlife.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",

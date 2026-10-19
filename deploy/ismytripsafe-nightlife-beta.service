@@ -1,0 +1,16 @@
+[Unit]
+Description=Refresh stored IsMyTripSafe beta nightlife reports
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/ismytripsafe-beta
+Environment=NODE_ENV=production
+Environment=NIGHTLIFE_CACHE_DIR=/root/ismytripsafe-nightlife-data
+EnvironmentFile=-/etc/ismytripsafe.env
+EnvironmentFile=-/root/ismytripsafe-beta/.env.nightlife
+ExecStartPre=/usr/bin/mkdir -p /root/ismytripsafe-nightlife-data
+ExecStart=/usr/bin/flock -n /root/ismytripsafe-nightlife-data/batch.lock /usr/bin/node scripts/nightlife.cjs --refresh-due
+TimeoutStartSec=7200
+Nice=10

@@ -47,3 +47,6 @@ next-env.d.ts
 # River's second art drop (chat export). The derived web assets in
 # public/photos/supplied and public/photos/hero are what's committed.
 /WhatsAppChatRiver2/
+
+# Optional nightlife worker dependencies
+/workers/nightlife/node_modules/

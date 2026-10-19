@@ -1,3 +1,4 @@
+import { SafetyCrosslink } from "@/components/nightlife/SafetyCrosslink"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound, permanentRedirect } from "next/navigation"
@@ -271,6 +272,8 @@ export default async function CityReportPage({
             <time dateTime={report.cachedAt}>{humanDate(report.cachedAt)}</time>
           </p>
           <p className="mt-4 text-[1rem] leading-[1.75] text-[var(--ink)]">{capsule}</p>
+
+          <SafetyCrosslink country={country.toLowerCase()} city={city.toLowerCase()} />
 
           {/* The full report card — sections 01–05 */}
           <div className="mt-7">

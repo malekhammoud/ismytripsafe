@@ -10,6 +10,7 @@ import { Logo } from "@/components/Logo"
 // report and the map. It knows where it is from the path rather than from a
 // prop, so no page can drift out of step with the others.
 const LINKS = [
+  { href: "/nightlife", label: "Nightlife" },
   { href: "/destinations", label: "Destinations" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/methodology", label: "Methodology" },
@@ -46,9 +47,9 @@ export function SiteHeader() {
         </Link>
 
         {/* Desktop */}
-        <nav className="hidden items-center gap-6 sm:flex">
+        <nav className="hidden items-center gap-6 lg:flex">
           {LINKS.map((l) => {
-            const active = pathname === l.href
+            const active = pathname === l.href || (l.href === "/nightlife" && !!pathname?.endsWith("/nightlife"))
             return (
               <Link
                 key={l.href}
@@ -74,7 +75,7 @@ export function SiteHeader() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-label={open ? "Close menu" : "Open menu"}
-          className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[rgba(29,47,56,0.07)] sm:hidden"
+          className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[rgba(29,47,56,0.07)] lg:hidden"
         >
           {open ? <X size={19} /> : <Menu size={19} />}
         </button>
@@ -82,11 +83,11 @@ export function SiteHeader() {
 
       {open && (
         <nav
-          className="border-t border-[var(--hairline)] px-4 pb-4 pt-2 sm:hidden"
+          className="border-t border-[var(--hairline)] px-4 pb-4 pt-2 lg:hidden"
           style={{ background: "rgba(251, 244, 230, 0.97)" }}
         >
           {LINKS.map((l) => {
-            const active = pathname === l.href
+            const active = pathname === l.href || (l.href === "/nightlife" && !!pathname?.endsWith("/nightlife"))
             return (
               <Link
                 key={l.href}

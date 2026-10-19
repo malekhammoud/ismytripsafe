@@ -1,3 +1,4 @@
+import { listNightlife, nightlifePath, nightlifeUrl } from "@/lib/nightlife/store"
 import type { MetadataRoute } from "next"
 import { listCountries, listReports } from "@/lib/reports"
 import { absUrl } from "@/lib/site"
@@ -33,5 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: m.updatedAt,
     }))
 
-  return [...staticPages, ...countryPages, ...cityPages]
+  const nightlife = await listNightlife()
+  const nightlifePages: MetadataRoute.Sitemap = nightlife.map(r => ({ url: nightlifeUrl(nightlifePath(r)), lastModified: r.updatedAt }))
+  return [...staticPages, { url: nightlifeUrl("/nightlife") }, ...countryPages, ...cityPages, ...nightlifePages]
 }
