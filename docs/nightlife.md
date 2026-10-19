@@ -11,9 +11,9 @@ though its webhook fetches `origin/beta`; use an explicit `HEAD:beta` push.
 - `/{country}/{city}/nightlife`: sourced, server-rendered report.
 - `/{country}/{city}/nightlife/data.json`: ODbL venue export, excluding all
   proprietary ratings, popularity, review counts, tips, and sentiment labels.
-- Existing city safety pages link to nightlife only when a report qualifies.
+- Existing city safety pages start nightlife research on a real browser visit and show a teaser even before the first report qualifies.
 - Published nightlife pages link back to safety and to the nearest available
-  nightlife reports. Withheld cities never get a card, route, or sitemap URL.
+  nightlife reports. Withheld cities never get a scored report, directory card, data export, or sitemap URL. Known cities can show a noindex research/availability screen while data is being gathered.
 
 The evening palette uses charcoal/plum, lime, and the existing paper/serif
 identity. Five accessible star cards lead into the venue mix, filterable map
@@ -217,3 +217,54 @@ reports were modified. Shell DNS/network, GitHub push and systemd access are
 blocked in this session, so deployment and live HTTP/browser verification
 remain outstanding. API licences/keys and the optional opening-hours worker
 installation must be configured on the host before a complete live-source run.
+
+
+## Visit-triggered generation
+
+Visiting either a known city's safety report or its nightlife page mounts a
+small browser component that starts `POST /api/nightlife/{country}/{city}`.
+This only accepts cities already backed by a safety report. Metadata requests,
+link prefetches, API GETs, and visitors who never open the report do not create
+research jobs. No batch run is needed to discover a report.
+
+The POST claims a durable research slot, responds immediately with progress,
+and uses Next's `after` callback to perform collection and scoring. A status-only
+GET powers polling; real source phases are persisted, not a fabricated progress
+percentage. The browser refreshes the server-rendered page once a report is
+available. A cold known-city route is noindex until it has publishable data;
+unknown cities remain 404. Stale scored reports remain readable during refresh.
+
+Locks and job state live in `NIGHTLIFE_CACHE_DIR/jobs`, alongside a UTC daily
+attempt budget. Independent requests/processes share one active on-demand
+research slot. Each job callback runs once, lock heartbeats prevent accidental
+expiry during active collection, and abandoned jobs recover after 15 minutes.
+Source failures cool down for ten minutes; genuinely insufficient evidence is
+retried after a day. Neither can create made-up ratings or overwrite a healthy
+report with broken data.
+
+`NIGHTLIFE_ON_DEMAND_DAILY_LIMIT` controls new on-demand research attempts
+(default 10 with public Overpass, 100 with a configured provider, maximum 1000).
+Cached reports and status polling do not spend the budget. Capacity screens
+check again automatically while the browser is open. Licensing flags and
+credentials from the original adapters still apply; automatic generation does
+not unlock unavailable licensed sources.
+
+`npm run test:nightlife` additionally tests cold visits, concurrent requests
+across independent coordinator instances, fresh-cache reuse, stale refreshes,
+error cooldowns, thin data, global capacity, persisted daily budgets, crash
+recovery, optional-source TTLs, source/formula changes, API GET/POST separation,
+unknown cities, same-origin enforcement and after-response scheduling.
+
+
+## Nightlife directory refresh
+
+The nightlife homepage is a compact city directory rather than a promotional
+landing page: plain paper background, restrained typography, city/country
+search, region filtering, and a two-column list that becomes one column on
+mobile. It includes real cities from the safety index so an empty nightlife
+store does not create a dead end. Opening a city starts the on-demand flow.
+Published guides show their real rating/count and are listed first; unresearched
+cities have an Explore link without invented scores. Prefetch is disabled on
+these research links. The interface distinguishes saved reports from first
+visits, which may take a few minutes. No generic hero art or placeholder city
+photographs are used.

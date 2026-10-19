@@ -45,6 +45,11 @@ async function run() {
  const previous=await readNightlife('xx_preview');global.fetch=async()=>{throw new Error('Simulated outage')};await assert.rejects(()=>buildNightlife(base,safety,{force:true}),/kept the previous published report/);assert.equal((await readNightlife('xx_preview')).updatedAt,previous.updatedAt);const priorLimited=await readNightlife('xx_limited');const refreshed=await buildNightlife({...base,key:'xx_limited',citySlug:'limited'},safety,{force:true});assert.equal(refreshed.venues.length,priorLimited.venues.length);assert.equal(refreshed.sources.find(s=>s.id==='osm').status,'error');assert.equal(refreshed.sources.find(s=>s.id==='osm').fetchedAt,priorLimited.sources.find(s=>s.id==='osm').fetchedAt)
  // Safety index is deterministic, and uses after-dark score rather than raw safety index.
  const night=nightlifeSafety(safety);assert.equal(night.nightIndex,75);assert.ok(Number.isFinite(night.index))
+ const {collectMentions}=require('../lib/nightlife/sentiment.ts')
+ process.env.OPENROUTER_API_KEY='fixture-model-key';process.env.NIGHTLIFE_SENTIMENT_MODEL='fixture-model';process.env.REDDIT_COMMERCIAL_ANALYSIS_LICENSED='1';process.env.REDDIT_ACCESS_TOKEN='fixture-token'
+ let retryCalls=0;global.fetch=async()=>{retryCalls++;throw new Error('Simulated Reddit outage')}
+ const failedMentions=await collectMentions(base,[]),retriedMentions=await collectMentions(base,[])
+ assert.ok(failedMentions.errors.length);assert.ok(retriedMentions.errors.length);assert.equal(retryCalls,2,'A failed sentiment fetch must not be cached as a successful monthly fetch')
  console.log('PASS: full/limited/withheld pipeline, eight source statuses, current FSQ contract, raw caches, stale-source dates, safety weighting, and licence-safe public export')
  console.log('Preview fixture store: '+root)
 }

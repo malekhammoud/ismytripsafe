@@ -93,7 +93,7 @@ export async function collectMentions(city: City, venues: Venue[], force = false
   if (!process.env.NIGHTLIFE_SENTIMENT_MODEL || !process.env.OPENROUTER_API_KEY) return { mentions: [], fetchedAt: null, errors: [] }
   const file = path.join(NIGHTLIFE_DIR, "raw", safeKey(city.key), "sentiment.json")
   const config = createHash("sha256").update(JSON.stringify([process.env.NIGHTLIFE_SENTIMENT_MODEL, process.env.REDDIT_COMMERCIAL_ANALYSIS_LICENSED, process.env.FOURSQUARE_DURABLE_STORAGE_LICENSED, process.env.FOURSQUARE_TIPS_LICENSED, process.env.NIGHTLIFE_BLOG_ANALYSIS_LICENSED, process.env.NIGHTLIFE_BLOG_ALLOWED_DOMAINS])).digest("hex")
-  try { const old = JSON.parse(await fs.readFile(file, "utf8")); if (!force && old.config === config && Date.now() - Date.parse(old.fetchedAt) < 30 * 86400000) return old }
+  try { const old = JSON.parse(await fs.readFile(file, "utf8")); if (!force && !old.errors?.length && old.config === config && Date.now() - Date.parse(old.fetchedAt) < 30 * 86400000) return old }
   catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e }
   const raw = await Promise.allSettled([redditInputs(city), blogInputs(city), tipInputs(venues)])
   const errors = raw.flatMap((r, i) => r.status === "rejected" ? [`${["Reddit", "Blogs", "Foursquare tips"][i]} collection failed`] : [])

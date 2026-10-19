@@ -1,3 +1,4 @@
+import type { BuildPhase } from "./visit-types"
 import type { CachedReport } from "../cache"
 import { computeFinalScore } from "../safety-display"
 import { scoreReport, FORMULA_VERSION } from "./scoring"
@@ -18,7 +19,7 @@ export function nightlifeSafety(report: CachedReport): SafetyInput | null {
   for (const cap of final.caps) index = Math.min(index, cap.max)
   return { index, baseIndex: final.index, nightIndex: night?.score ?? null, sentiment: final.sentiment.score, updatedAt: report.cachedAt, summary: report.enrichment.verdict, signals: night ? [{ label: night.label, value: night.display, source: night.source, year: night.year }] : [], zones: report.enrichment.mapZones ?? [] }
 }
-export async function buildNightlife(seed: City, safetyReport: CachedReport | null, options: { force?: boolean; rescore?: boolean; eventsOnly?: boolean } = {}): Promise<NightlifeReport> {
+export async function buildNightlife(seed: City, safetyReport: CachedReport | null, options: { force?: boolean; rescore?: boolean; eventsOnly?: boolean; onProgress?: (phase: BuildPhase) => Promise<void> } = {}): Promise<NightlifeReport> {
   const previous = await readNightlife(seed.key)
   let safety = safetyReport ? nightlifeSafety(safetyReport) : null
   if ((options.rescore || options.eventsOnly) && !previous) throw new Error("No stored report to refresh")
@@ -36,12 +37,15 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   const collect = async <T>(id: SourceId, run: () => Promise<T>) => {
     try { return await run() } catch (e) { sources.push({ ...unavailable(id, e instanceof Error ? e.message : "Fetch failed"), status: "error" }); return null }
   }
+  await options.onProgress?.("resolve")
   const resolved = await collect("wikidata", () => resolveCity(seed, options.force))
   let city: City = resolved?.data ?? { ...seed, population: null, populationDate: null, boundaryVerified: false }
   if (resolved) sources.push({ ...resolved.source, url: `https://www.wikidata.org/wiki/${city.wikidataId}`, note: "Latest dated population; matched name, country and nearby coordinates." })
+  await options.onProgress?.("venues")
   const osm = await collect("osm", () => fetchOsm(city, options.force))
   if (osm) { sources.push(osm.source); city = { ...city, boundaryVerified: true } }
   if (safety && city.boundaryVerified) safety = await resolveSafetyZones(city, safety)
+  await options.onProgress?.("details")
   const [fsq, tm, prices, imported] = await Promise.all([
     collect("foursquare", () => fetchFoursquare(city, options.force)), collect("ticketmaster", () => fetchEvents(city, options.force)),
     collect("numbeo", () => fetchBeer(city, options.force)), importedMentions(seed.key),
@@ -67,6 +71,7 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   const inBoundary = (fsq?.venues ?? []).filter(f => osm?.boundary ? withinBoundary(f, osm.boundary) : (osm?.venues ?? []).some(o => distance(o, f) <= 50 && normalizeName(o.name) === normalizeName(f.name)))
   const venues: Venue[] = mergeVenues(osm?.venues ?? [], inBoundary)
   const peers = (await listNightlife()).flatMap(r => { const d = r.density; return r.city.population && typeof d === "number" ? [{ key: r.city.key, population: r.city.population, density: d }] : [] })
+  await options.onProgress?.("score")
   const scores = scoreReport(city, venues, mentions, safety, new Date(), peers)
   const dateFor = (id: SourceId) => sources.find(s => s.id === id)?.fetchedAt ?? ""
   const next: NightlifeReport = { version: 1, formulaVersion: FORMULA_VERSION, city, updatedAt: new Date().toISOString(), ...scores, venues, mentions, events: tm?.data.events ?? [], beer: prices?.data.beer ?? null, safety, lateness: lateness(venues, city), sources, refresh: { venues: dateFor("osm"), events: dateFor("ticketmaster"), population: dateFor("wikidata"), beer: dateFor("numbeo") } }

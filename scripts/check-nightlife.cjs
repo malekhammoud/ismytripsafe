@@ -8,7 +8,7 @@ async function get(path,status=200) {
  return r.text()
 }
 async function main(){
- const directory=await get('/nightlife');if(!directory.includes('after-dark')&&!directory.includes('After-Dark'))throw new Error('Missing nightlife directory content')
+ const directory=await get('/nightlife');if(!directory.includes('nightlife-city-search'))throw new Error('Missing nightlife directory content')
  if(!/<meta[^>]+name="robots"[^>]+content="[^"]*noindex/.test(directory))throw new Error('Beta nightlife directory is indexable')
  await get('/not-a-real-country/not-a-real-city/nightlife',404)
  if(city){

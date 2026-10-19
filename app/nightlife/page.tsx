@@ -1,14 +1,52 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { ArrowUpRight, Moon } from "lucide-react"
 import { SiteHeader } from "@/components/SiteHeader"
 import { SiteFooter } from "@/components/SiteFooter"
-import { Stars } from "@/components/nightlife/Stars"
+import { NightlifeDirectory, type DirectoryCity } from "@/components/nightlife/Directory"
+import { listReports } from "@/lib/reports"
 import { listNightlife, nightlifePath, nightlifeUrl, NIGHTLIFE_INDEXABLE } from "@/lib/nightlife/store"
 import "@/components/nightlife/nightlife.css"
+import "@/components/nightlife/directory.css"
+
 export const dynamic = "force-dynamic"
-export const metadata: Metadata = { title: "City Nightlife Reports: Bars, Clubs & After-Dark Safety", description: "Independent nightlife reports for curious travelers. Five sourced ratings for density, quality, variety, vibe and safety — with honest gaps where data is thin.", robots: { index: NIGHTLIFE_INDEXABLE, follow: NIGHTLIFE_INDEXABLE }, alternates: { canonical: nightlifeUrl("/nightlife") } }
+export const metadata: Metadata = {
+  title: "City Nightlife Reports: Bars, Clubs & After-Dark Safety",
+  description: "Find city nightlife guides with venue maps, ratings, traveler accounts and safety after dark. Reports are researched when you open a city.",
+  robots: { index: NIGHTLIFE_INDEXABLE, follow: NIGHTLIFE_INDEXABLE },
+  alternates: { canonical: nightlifeUrl("/nightlife") },
+}
+
 export default async function NightlifeIndex() {
-  const reports = (await listNightlife()).sort((a, b) => a.city.city.localeCompare(b.city.city))
-  return <div className="nl-page"><SiteHeader/><main><header className="nl-hero"><div className="nl-container"><nav className="nl-breadcrumb" aria-label="Breadcrumb"><Link href="/">Home</Link><span>/</span><span>Nightlife</span></nav><div className="nl-index-intro"><p className="nl-eyebrow nl-lime"><Moon size={13}/> A DIFFERENT SIDE OF THE CITY</p><h1>Go somewhere.<br/><em>Stay out a little.</em></h1><p className="nl-hero-deck">Big nights in unexpected places. Sourced city guides to the bars, the music, the atmosphere — and getting home safely.</p><div className="nl-hero-chips"><span>Five independent ratings</span><span>Every figure sourced</span><span>Honest about the gaps</span></div></div><p className="nl-data-line">Density · Quality · Variety · Vibe · Safety</p></div></header><div className="nl-container nl-index-list"><p className="nl-eyebrow">THE AFTER-DARK DIRECTORY</p><h2 className="font-display text-3xl mt-2">A good night starts here.</h2>{reports.length ? <div className="nl-nearby">{reports.map(r => <Link href={nightlifePath(r)} key={r.city.key}><span>{r.city.country}</span><h3>{r.city.city}<ArrowUpRight size={18}/></h3><Stars value={r.overall}/><small>{r.venueCount} mapped venues · {r.overall?.toFixed(1)}/5{r.outcome === "limited" ? " · Limited data" : ""}</small></Link>)}</div> : <div className="nl-index-empty nl-empty"><Moon size={26}/><h3>The first nights are taking shape.</h3><p>We publish a city only when at least 10 venues and three of the five ratings are backed by usable data. The first batch is being researched. In the meantime, explore our city safety reports.</p><div className="nl-index-search"><Link href="/destinations">Explore destinations ↗</Link><Link href="/methodology">How our safety scores work ↗</Link></div></div>}<div className="nl-data-notice"><div><strong>Evidence before enthusiasm.</strong><p>Every report includes source dates, a venue map and the inputs behind its stars. Smaller cities get an honest “Limited data” label when evidence is thin. Booking links live separately from the ratings.</p></div></div><SiteFooter/></div></main></div>
+  const [safetyReports, nightlife] = await Promise.all([listReports(), listNightlife()])
+  const reportsByPath = new Map(nightlife.map(report => [nightlifePath(report), report]))
+  const cities = new Map<string, DirectoryCity>()
+  for (const city of safetyReports.filter(city => city.path.split("/").filter(Boolean).length === 2)) {
+    const path = `${city.path}/nightlife`, report = reportsByPath.get(path)
+    cities.set(path, {
+      key: city.key, city: city.city, country: city.country, region: city.region, path,
+      report: report && report.overall != null ? { overall: report.overall, venueCount: report.venueCount, limited: report.outcome === "limited" } : null,
+    })
+  }
+  // Keep already-published guides reachable if a safety cache entry is moved.
+  for (const report of nightlife) {
+    const path = nightlifePath(report)
+    if (!cities.has(path) && report.overall != null) cities.set(path, {
+      key: report.city.key, city: report.city.city, country: report.city.country, region: "", path,
+      report: { overall: report.overall, venueCount: report.venueCount, limited: report.outcome === "limited" },
+    })
+  }
+  return <div className="nl-page nld-page">
+    <SiteHeader/>
+    <main className="nld-main">
+      <header className="nld-intro">
+        <Link href="/" className="nld-back">← IsMyTripSafe</Link>
+        <div className="nld-intro-grid">
+          <div><h1>Nightlife, city by city.</h1><p className="nld-description">Bars, clubs, live music.<br/>And a clearer picture of safety after dark.</p></div>
+          <aside className="nld-intro-note"><Link href="/destinations">City safety reports ↗</Link></aside>
+        </div>
+      </header>
+      <NightlifeDirectory cities={[...cities.values()]}/>
+      <SiteFooter/>
+    </main>
+  </div>
 }

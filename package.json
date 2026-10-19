@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "nightlife": "node scripts/nightlife.cjs",
-    "test:nightlife": "node --require ./scripts/typescript-worker.cjs tests/nightlife.test.cjs && node tests/nightlife-integration.cjs",
+    "test:nightlife": "node --require ./scripts/typescript-worker.cjs tests/nightlife.test.cjs && node tests/nightlife-integration.cjs && node tests/nightlife-visits.test.cjs && node tests/nightlife-api.test.cjs",
     "check:nightlife": "node scripts/check-nightlife.cjs"
   },
   "dependencies": {
