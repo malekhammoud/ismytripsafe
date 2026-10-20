@@ -1,6 +1,8 @@
 {
   "name": "ismytripsafe-nightlife-worker",
   "private": true,
-  "description": "Optional OSM opening-hours interpreter for offline nightlife jobs",
-  "dependencies": { "opening_hours": "^3.9.0" }
+  "description": "OSM opening-hours interpreter for nightlife generation",
+  "dependencies": {
+    "opening_hours": "3.15.0"
+  }
 }

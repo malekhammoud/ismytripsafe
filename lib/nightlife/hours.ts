@@ -7,7 +7,7 @@ export function lateness(venues: Venue[], city: City, now = new Date(), provided
   let ParserClass = provided
   if (!ParserClass) {
     try { ParserClass = createRequire(`${process.cwd()}/workers/nightlife/package.json`)("opening_hours") as Parser }
-    catch { return { known: 0, total: venues.length, afterMidnight: 0, after2: 0, after4: 0, note: "Opening hours have not been evaluated. Install the opening_hours worker dependency to enable this section." } }
+    catch { return { known: 0, total: venues.length, afterMidnight: 0, after2: 0, after4: 0, note: "Opening-hour data is not available for this report yet. Check current hours with the venue." } }
   }
   // opening_hours uses local Date fields. Synthetic local dates represent city
   // wall-clock times, avoiding a dependency on the batch server's time zone.

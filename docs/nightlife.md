@@ -2,8 +2,7 @@
 
 This feature belongs to `/root/ismytripsafe-beta`, served by
 `ismytripsafe-beta.service` on port 3002. Do not deploy to `main`, production,
-beta2, or beta3. Beta currently has a local `main` branch checked out even
-though its webhook fetches `origin/beta`; use an explicit `HEAD:beta` push.
+beta2, or beta3. The local feature branch targets `origin/beta`; use an explicit `HEAD:beta` push.
 
 ## Routes and design
 
@@ -18,7 +17,7 @@ though its webhook fetches `origin/beta`; use an explicit `HEAD:beta` push.
 The evening palette uses charcoal/plum, lime, and the existing paper/serif
 identity. Five accessible star cards lead into the venue mix, filterable map
 (with a text list), shortlist, late hours, events, beer, traveler themes,
-separate future booking block, safety, and a source ledger. Half-star icons
+safety, and a source ledger. Booking content stays absent until there are actual links; it never affects ratings. Half-star icons
 accompany precise numeric subscores; the overall displays one decimal.
 
 New nightlife pages are **noindex by default**, independently of the existing
@@ -46,7 +45,7 @@ are never persisted. External-source failures preserve a previous valid raw
 response and its original timestamp. A source failure cannot replace a
 published report with a withheld one or reduce its score coverage.
 
-Install the optional batch-only opening-hours library before generating:
+The root `npm install` now installs the pinned opening-hours worker automatically through `postinstall`, including during beta deployment. Its dependency scripts are disabled. For an existing install made with `--ignore-scripts`, install it explicitly before generating:
 
 ```sh
 cd /root/ismytripsafe-beta
@@ -63,9 +62,8 @@ The worker loads Next's local environment files through `@next/env` and also
 accepts ordinary process environment variables. API source credentials are
 server-only. `--force` bypasses raw-source TTLs. `--rescore` recomputes stored
 inputs without calling external APIs. City resolution requires an existing
-city safety report, then matches Wikidata by label/alias, country ISO code,
-and coordinates. It reads the latest dated, nondeprecated population and
-requires the OSM administrative relation to identify the same Wikidata item.
+city safety report, then matches Wikidata by settlement/administrative type (P31/P279), label/alias, country ISO code, and coordinates. Exact city labels outrank aliases; nearby landmarks are excluded. Resolution caches carry a version so a corrected resolver never reuses an old wrong-city match. It reads the latest dated, nondeprecated population and
+supports year-only and month-only dates without inventing a day, and excludes population claims for only part of a city. The OSM administrative relation must identify the same Wikidata item. If P402 is absent, the adapter can find a unique administrative relation tagged with that item; it never substitutes a radius for a boundary.
 Unverified boundaries/populations do not produce density scores.
 
 The pilot is Budapest, London, Tbilisi, Shkoder, Gdansk, and Luang Prabang.
@@ -76,7 +74,7 @@ publication outcome. Density's initial cut-offs and Quality's cut-offs are
 **provisional**, not empirically calibrated. Do not claim this pilot has been
 calibrated until a live-source run has succeeded and been reviewed.
 
-Public Overpass runs are capped at 10 cities per invocation. Larger jobs must
+The default Overpass endpoint is `https://overpass.private.coffee/api/interpreter`, whose listed policy permits use in any project. Public Overpass runs remain capped at 10 cities per invocation. Keep the single-worker limit and configure a dedicated endpoint before scaling. Larger jobs must
 configure `OVERPASS_URL` for a private/commercial endpoint or replace the
 adapter with a regional extract. The provided systemd service uses `flock`
 for one worker. The daily timer only checks due data: venues/ratings/mentions
@@ -125,7 +123,7 @@ It samples local wall-clock 00:01, 02:01, and 04:01 across a reference week,
 showing the share open on at least one sampled night. No library means an
 explicit unavailable section, not fabricated hours.
 
-## Source contracts and licensing check (19 October 2026)
+## Source contracts and licensing check (19–20 October 2026)
 
 These links were checked before implementation. They describe API contracts,
 not evidence that this account has a paid licence. Optional sources stay off
@@ -197,27 +195,22 @@ After the live pilot and isolated build succeed, commit the feature and push
 **only** `git push origin HEAD:beta`. The existing beta webhook builds and
 restarts only port 3002. Check the beta deploy log and HTTP responses for the
 directory, a qualified city, its safety crosslink, its data export and a
-withheld city's 404. Run `npm run check:nightlife -- country/city` for read-only HTTP checks.
+unknown city's 404 and a known withheld city's unscored availability screen. Run `npm run check:nightlife -- country/city` for read-only HTTP checks.
 Confirm noindex, source dates, mobile layout, map filter,
 JSON-LD and absence of browser errors. Do not mark deployment complete from
 a local build alone.
 
-## This implementation session
+## Recovery fixes (20 October 2026)
 
-32 unit tests and the mocked pipeline pass. Both full and limited pages
-server-render successfully. TypeScript and an isolated webpack production
-build with existing font assets pass. The normal Turbopack build is blocked
-by the session's Google Fonts network restriction and subprocess port-binding
-restriction. Browser launch is also denied by the sandbox.
+The live Tbilisi record had cached Q1341835 (Tbilisi Central Station) instead of Q994 (the city). Distance-only ranking selected the station's Tbilisi alias. With no population or boundary, the same cached result failed on every retry. The new resolver checks settlement types, ranks city labels before aliases, and invalidates the old resolution cache. Report and job pipeline versions bypass old failed/withheld cooldowns after a collector fix; no manual cache deletion is required.
 
-The real six-city batch was attempted against the existing safety corpus:
-all six were withheld after Wikidata/Overpass could not be reached. No scores
-or venues were invented, no real nightlife pages were seeded, and no safety
-reports were modified. Shell DNS/network, GitHub push and systemd access are
-blocked in this session, so deployment and live HTTP/browser verification
-remain outstanding. API licences/keys and the optional opening-hours worker
-installation must be configured on the host before a complete live-source run.
+Source requests retry transient failures once, honor short Retry-After values, and stop on authentication errors or longer rate limits. MediaWiki error documents returned with HTTP 200 are not treated as data. A four-minute source deadline bounds on-demand work; optional district lookups have their own short budget. Failed source names and genuine evidence shortages are distinct status outcomes. A publishable report remains ready even if an optional source fails.
 
+The browser reconnects after transient status failures, discovers an already-started job after a lost POST response, and retries source outages once after the advertised cooldown. It shows the real retry time and disables premature retries. An expired callback cannot run after another worker reclaims its lease. Concurrent JSON writes use unique temporary filenames.
+
+Broader beta fixes include public-host redirects for mixed-case beta links, a hostname-based noindex header, and safety-search cancellation so old results cannot overwrite a new destination. HTTP errors and prematurely ended safety streams no longer masquerade as completed reports. Cancelling a browser stream is safe, the API only advertises a permanent link after persistence, and an interrupted model cannot cache an unfinished report or replace a healthy report during background refresh. Report wording is simpler and the empty booking promotion is removed.
+
+Regression checks cover the actual wrong-entity failure, year/month population precision, old cache migration, API retries, partial source success, cooldown migration, abandoned jobs, browser polling, safety-stream errors, competing searches, stream cancellation, completion after persistence, interrupted models, and beta redirects. The test suite has 82 unit tests plus mocked pipeline and server-render checks. Browser launch, shell DNS/network and GitHub push are restricted in this environment; a local build is not evidence of a live deployment. The pinned opening-hours dependency must still be fetched by the host's deployment install.
 
 ## Visit-triggered generation
 
@@ -238,8 +231,7 @@ Locks and job state live in `NIGHTLIFE_CACHE_DIR/jobs`, alongside a UTC daily
 attempt budget. Independent requests/processes share one active on-demand
 research slot. Each job callback runs once, lock heartbeats prevent accidental
 expiry during active collection, and abandoned jobs recover after 15 minutes.
-Source failures cool down for ten minutes; genuinely insufficient evidence is
-retried after a day. Neither can create made-up ratings or overwrite a healthy
+Source failures cool down for ten minutes; genuinely insufficient evidence is retried after a day. Published reports remain ready during a failed optional refresh. Pipeline upgrades bypass older failure cooldowns and stale resolver cache identities. Neither can create made-up ratings or overwrite a healthy
 report with broken data.
 
 `NIGHTLIFE_ON_DEMAND_DAILY_LIMIT` controls new on-demand research attempts

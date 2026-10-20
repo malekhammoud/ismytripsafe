@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
+import { randomUUID } from "node:crypto"
 import type { NightlifeReport } from "./types"
 // Separate from production's safety cache. Never use REPORT_CACHE_DIR here.
 export const NIGHTLIFE_DIR = process.env.NIGHTLIFE_CACHE_DIR || "/root/ismytripsafe-nightlife-data"
@@ -11,9 +12,11 @@ export async function readNightlife(key: string): Promise<NightlifeReport | null
 }
 export async function writeJson(file: string, value: unknown) {
   await fs.mkdir(path.dirname(file), { recursive: true })
-  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`
-  await fs.writeFile(tmp, JSON.stringify(value, null, 2), { mode: 0o600 })
-  await fs.rename(tmp, file)
+  const tmp = `${file}.${randomUUID()}.tmp`
+  try {
+    await fs.writeFile(tmp, JSON.stringify(value, null, 2), { mode: 0o600, flag: "wx" })
+    await fs.rename(tmp, file)
+  } finally { await fs.unlink(tmp).catch(e => { if (e.code !== "ENOENT") throw e }) }
 }
 export function summarize(r: NightlifeReport): NightlifeSummary {
   const density = r.scores.find(s => s.key === "density")?.inputs.density

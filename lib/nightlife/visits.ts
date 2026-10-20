@@ -5,6 +5,8 @@ import type { CachedReport } from "../cache"
 import type { ReportMeta } from "../reports"
 import { buildNightlife } from "./build"
 import { FORMULA_VERSION } from "./scoring"
+import { PIPELINE_VERSION } from "./version"
+import { withResearchDeadline } from "./http"
 import { NIGHTLIFE_DIR, readNightlife, safeKey, writeJson } from "./store"
 import type { City, NightlifeReport } from "./types"
 import type { BuildPhase, VisitStatus } from "./visit-types"
@@ -12,7 +14,7 @@ export type CitySafety = { report: CachedReport; meta: ReportMeta }
 const DAY = 86400000
 const LEASE_MS = 15 * 60 * 1000
 const ERROR_COOLDOWN_MS = 10 * 60 * 1000
-interface Job { state: "running" | "ready" | "unavailable" | "failed"; updatedAt: string; retryAt?: string; phase?: BuildPhase }
+interface Job extends Pick<VisitStatus, "issue" | "failedSources" | "venueCount" | "scoreCount"> { state: "running" | "ready" | "unavailable" | "failed"; updatedAt: string; retryAt?: string; phase?: BuildPhase; token?: string; version?: string }
 interface Dependencies {
   directory: string
   now: () => number
@@ -25,13 +27,13 @@ export function cityFromSafety({ meta }: CitySafety): City {
 }
 export function needsNightlifeRefresh(r: NightlifeReport, now = Date.now()) {
   const older = (date: string, days: number) => !date || !Number.isFinite(Date.parse(date)) || now - Date.parse(date) >= days * DAY
-  return r.sources.some(s => s.status === "error") || r.formulaVersion !== FORMULA_VERSION || older(r.refresh.venues, 30) || older(r.refresh.population, 180) || older(r.updatedAt, 30)
+  return r.sources.some(s => s.status === "error") || r.pipelineVersion !== PIPELINE_VERSION || r.formulaVersion !== FORMULA_VERSION || older(r.refresh.venues || r.updatedAt, 30) || older(r.refresh.population || r.updatedAt, 180) || older(r.updatedAt, 30)
     || (!!process.env.TICKETMASTER_API_KEY && older(r.refresh.events, 7))
     || (!!process.env.NUMBEO_API_KEY && process.env.NUMBEO_STORAGE_LICENSED === "1" && older(r.refresh.beer, 180))
 }
 async function readJson<T>(file: string): Promise<T | null> {
   try { return JSON.parse(await fs.readFile(file, "utf8")) as T }
-  catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return null; throw e }
+  catch (e) { if (e instanceof SyntaxError || (e as NodeJS.ErrnoException).code === "ENOENT") return null; throw e }
 }
 export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
   const configuredLimit = Number(process.env.NIGHTLIFE_ON_DEMAND_DAILY_LIMIT) || (process.env.OVERPASS_URL ? 100 : 10)
@@ -39,6 +41,7 @@ export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
   const jobs = path.join(deps.directory, "jobs")
   const fileFor = (key: string) => path.join(jobs, `${safeKey(key)}.json`)
   const iso = () => new Date(deps.now()).toISOString()
+  const globalLock = path.join(jobs, "research.lock")
   const published = (r: NightlifeReport | null) => !!r && r.outcome !== "withheld"
   async function release(file: string, token: string) {
     const lock = await readJson<{ token: string }>(file)
@@ -65,17 +68,21 @@ export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
   async function inspect(key: string): Promise<VisitStatus> {
     const [report, job] = await Promise.all([deps.read(key), readJson<Job>(fileFor(key))])
     const available = published(report)
-    if (job?.state === "running" && deps.now() - Date.parse(job.updatedAt) < LEASE_MS) return { state: "running", available, phase: job.phase, retryAfter: 3 }
-    if (job?.retryAt && Date.parse(job.retryAt) > deps.now()) return { state: job.state === "unavailable" ? "unavailable" : "failed", available, retryAfter: Math.ceil((Date.parse(job.retryAt) - deps.now()) / 1000) }
+    if (job?.state === "running" && deps.now() - Date.parse(job.updatedAt) < LEASE_MS) {
+      const lock = await readJson<{ token: string }>(globalLock)
+      if (lock && (!job.token || lock.token === job.token)) return { state: "running", available, phase: job.phase, retryAfter: 3 }
+    }
+    const detail = job ? { issue: job.issue, failedSources: job.failedSources, venueCount: job.venueCount, scoreCount: job.scoreCount } : {}
+    if (job?.version === PIPELINE_VERSION && job.retryAt && Date.parse(job.retryAt) > deps.now()) return { ...detail, state: available ? "ready" : job.state === "unavailable" ? "unavailable" : "failed", available, retryAt: job.retryAt, retryAfter: Math.ceil((Date.parse(job.retryAt) - deps.now()) / 1000) }
     if (available && report && !needsNightlifeRefresh(report, deps.now())) return { state: "ready", available: true, updatedAt: report.updatedAt }
     // A genuine thin-data result is retried daily; outages use the shorter job cooldown.
-    if (report?.outcome === "withheld" && !report.sources.some(s => s.status === "error") && deps.now() - Date.parse(report.updatedAt) < DAY) return { state: "unavailable", available: false, retryAfter: Math.max(1, Math.ceil((DAY - (deps.now() - Date.parse(report.updatedAt))) / 1000)) }
+    if (report?.outcome === "withheld" && report.pipelineVersion === PIPELINE_VERSION && !report.sources.some(s => s.status === "error") && deps.now() - Date.parse(report.updatedAt) < DAY) return { ...detail, state: "unavailable", available: false, venueCount: report.venues.length, scoreCount: report.scores.filter(s => s.value != null).length, retryAt: new Date(Date.parse(report.updatedAt) + DAY).toISOString(), retryAfter: Math.max(1, Math.ceil((DAY - (deps.now() - Date.parse(report.updatedAt))) / 1000)) }
     return { state: "idle", available }
   }
   async function prepare(hit: CitySafety): Promise<{ status: VisitStatus; run?: () => Promise<void> }> {
     const key = safeKey(hit.meta.key), status = await inspect(key)
     if (status.state !== "idle") return { status }
-    const token = randomUUID(), globalLock = path.join(jobs, "research.lock")
+    const token = randomUUID()
     if (!await claim(globalLock, token)) return { status: { state: "busy", available: status.available, retryAfter: 5 } }
     let ownsLock = true
     try {
@@ -86,26 +93,34 @@ export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
       const budget = await readJson<{ attempts: number }>(budgetFile) ?? { attempts: 0 }
       if (budget.attempts >= deps.limit) {
         const tomorrow = Date.parse(`${date}T00:00:00Z`) + DAY
-        return { status: { state: "deferred", available: status.available, retryAfter: Math.ceil((tomorrow - deps.now()) / 1000) } }
+        return { status: { state: "deferred", available: status.available, retryAt: new Date(tomorrow).toISOString(), retryAfter: Math.ceil((tomorrow - deps.now()) / 1000) } }
       }
       await writeJson(budgetFile, { attempts: budget.attempts + 1 })
-      await writeJson(fileFor(key), { state: "running", phase: "resolve", updatedAt: iso() } satisfies Job)
+      const writeJob = (job: Job) => writeJson(fileFor(key), { ...job, token, version: PIPELINE_VERSION })
+      await writeJob({ state: "running", phase: "resolve", updatedAt: iso() })
       let started = false
       const run = async () => {
         if (started) return
         started = true
-        const heartbeat = setInterval(() => { const now = new Date(); void fs.utimes(globalLock, now, now).catch(() => {}) }, 30000)
+        if ((await readJson<{ token: string }>(globalLock))?.token !== token) return
+        const heartbeat = setInterval(() => { void (async () => {
+          if ((await readJson<{ token: string }>(globalLock))?.token !== token) return
+          const now = new Date(deps.now())
+          await fs.utimes(globalLock, now, now)
+        })().catch(() => {}) }, 30000)
         heartbeat.unref()
         try {
-          const onProgress = async (phase: BuildPhase) => { await writeJson(fileFor(key), { state: "running", phase, updatedAt: iso() } satisfies Job) }
-          const report = await deps.build(cityFromSafety(hit), hit.report, { onProgress })
+          const onProgress = async (phase: BuildPhase) => { await writeJob({ state: "running", phase, updatedAt: iso() }) }
+          const report = await withResearchDeadline(() => deps.build(cityFromSafety(hit), hit.report, { onProgress }))
           const sourceFailed = report.sources.some(s => s.status === "error")
-          const state = sourceFailed ? "failed" : published(report) ? "ready" : "unavailable"
-          await writeJson(fileFor(key), { state, updatedAt: iso(), ...(state === "ready" ? {} : { retryAt: new Date(deps.now() + (sourceFailed ? ERROR_COOLDOWN_MS : DAY)).toISOString() }) } satisfies Job)
+          const state = published(report) ? "ready" : sourceFailed ? "failed" : "unavailable"
+          const issue = sourceFailed ? "sources" : !report.city.wikidataId ? "city" : !report.city.boundaryVerified ? "boundary" : "evidence"
+          await writeJob({ state, updatedAt: iso(), venueCount: report.venues.length, scoreCount: report.scores.filter(s => s.value != null).length,
+            ...(state !== "ready" || sourceFailed ? { issue, failedSources: report.sources.filter(s => s.status === "error").map(s => s.name), retryAt: new Date(deps.now() + (sourceFailed ? ERROR_COOLDOWN_MS : DAY)).toISOString() } : {}) })
           console.info(`[nightlife] ${key}: ${report.outcome}; ${report.venues.length} venues${sourceFailed ? "; source refresh failed" : ""}`)
         } catch (error) {
           console.error(`[nightlife] ${key}: generation failed`, error instanceof Error ? error.message : "Unknown error")
-          await writeJson(fileFor(key), { state: "failed", updatedAt: iso(), retryAt: new Date(deps.now() + ERROR_COOLDOWN_MS).toISOString() } satisfies Job)
+          await writeJob({ state: "failed", issue: "service", updatedAt: iso(), retryAt: new Date(deps.now() + ERROR_COOLDOWN_MS).toISOString() })
         } finally {
           clearInterval(heartbeat)
           await release(globalLock, token)

@@ -32,7 +32,7 @@ async function main(){
  assert.equal(schema['@type'],'Article');assert.equal(schema.aggregateRating,undefined);assert.ok(schema.citation.length)
  await assert.rejects(()=>Page({params:Promise.resolve({country:'example',city:'withheld'})}),/404/)
  const cold={params:Promise.resolve({country:'example',city:'cold'})}
- const pending=render(await Page(cold));assert.ok(pending.includes('Cold City after dark'));assert.ok(pending.includes('Find the right city'));assert.ok(!pending.includes('application/ld+json'));assert.equal((await generateMetadata(cold)).robots.index,false)
+ const pending=render(await Page(cold));assert.ok(pending.includes('Cold City nightlife'));assert.ok(pending.includes('Find the right city'));assert.ok(!pending.includes('application/ld+json'));assert.equal((await generateMetadata(cold)).robots.index,false)
  console.log('PASS: known cold city renders research screen without fake ratings')
  reports.listReports=async()=>[{key:'xx_preview',city:'Preview City',country:'Example',region:'Europe',path:'/example/preview'},{key:'xx_cold',city:'Cold City',country:'Example',region:'Europe',path:'/example/cold'},{key:'xx_country',city:'Example',country:'Example',region:'Europe',path:'/example'}]
  const directory=render(await Index());assert.ok(directory.includes('Nightlife, city by city.'));assert.ok(directory.includes('nightlife-city-search'));assert.ok(directory.includes('nightlife-region'));assert.ok(directory.includes('/example/cold/nightlife'));assert.ok(directory.includes('Ready to read'));assert.ok(!directory.includes('Go somewhere.'));assert.ok(!directory.includes('/example/nightlife'))

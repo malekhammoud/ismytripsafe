@@ -2,9 +2,13 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { distance, venueType } from "./venues"
 import { boundaryFromMembers } from "./boundary"
+import { fetchJson } from "./http"
+import { SourceUnavailable } from "./source-errors"
+import { entityIds, placeKind, selectCity, RESOLUTION_VERSION, type Entity } from "./city-resolution"
+export { fetchJson } from "./http"
+export { latestPopulation } from "./city-resolution"
 import { NIGHTLIFE_DIR, safeKey, writeJson } from "./store"
 import type { BeerPrices, City, Mention, NightEvent, Source, SourceId, Venue } from "./types"
-const USER_AGENT = "IsMyTripSafe-nightlife/1.0 (+https://ismytripsafe.com/about)"
 const DAY = 86400000
 export const SOURCE_INFO: Record<SourceId, Pick<Source, "name" | "url" | "licence">> = {
   osm: { name: "OpenStreetMap", url: "https://www.openstreetmap.org/copyright", licence: "ODbL 1.0 · © OpenStreetMap contributors" },
@@ -17,77 +21,83 @@ export const SOURCE_INFO: Record<SourceId, Pick<Source, "name" | "url" | "licenc
   safety: { name: "IsMyTripSafe", url: "https://ismytripsafe.com/methodology", licence: "Internal safety report" },
 }
 export function unavailable(id: SourceId, note: string): Source { return { id, ...SOURCE_INFO[id], fetchedAt: null, status: "unavailable", note } }
-export async function fetchJson<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(url, { ...options, headers: { "User-Agent": USER_AGENT, Accept: "application/json", ...options.headers }, signal: AbortSignal.timeout(65000) })
-  if (!response.ok) throw new Error(`Source returned HTTP ${response.status}`)
-  return response.json() as Promise<T>
-}
-export async function cached<T>(key: string, id: SourceId, days: number, get: () => Promise<T>, force = false): Promise<{ data: T; source: Source }> {
+export async function cached<T>(key: string, id: SourceId, days: number, get: () => Promise<T>, force = false, identity?: string): Promise<{ data: T; source: Source }> {
   const file = path.join(NIGHTLIFE_DIR, "raw", safeKey(key), `${id}.json`)
-  let previous: { fetchedAt: string; data: T } | null = null
-  try { previous = JSON.parse(await fs.readFile(file, "utf8")) } catch (e) { if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e }
+  let previous: { fetchedAt: string; data: T; identity?: string } | null = null
+  try { previous = JSON.parse(await fs.readFile(file, "utf8")) } catch (e) { if (!(e instanceof SyntaxError) && (e as NodeJS.ErrnoException).code !== "ENOENT") throw e }
+  if (previous && (previous.identity !== identity || !Number.isFinite(Date.parse(previous.fetchedAt)))) previous = null
   if (previous && !force && Date.now() - Date.parse(previous.fetchedAt) < days * DAY) return { data: previous.data, source: { id, ...SOURCE_INFO[id], fetchedAt: previous.fetchedAt, status: "ok", note: "Stored source response." } }
   try {
     const data = await get(), fetchedAt = new Date().toISOString()
     // Never save URLs containing API keys or authentication headers.
-    await writeJson(file, { fetchedAt, data })
+    await writeJson(file, { fetchedAt, data, ...(identity ? { identity } : {}) })
     return { data, source: { id, ...SOURCE_INFO[id], fetchedAt, status: "ok", note: "Fetched successfully." } }
   } catch (e) {
     if (previous) return { data: previous.data, source: { id, ...SOURCE_INFO[id], fetchedAt: previous.fetchedAt, status: "error", note: "Refresh failed; retained the last successful response and its original date." } }
     throw e
   }
 }
-interface Claim { rank: string; mainsnak: { datavalue?: { value: unknown } }; qualifiers?: Record<string, { datavalue?: { value: { time?: string } } }[]> }
-interface Entity { id: string; labels?: Record<string, { value: string }>; aliases?: Record<string, { value: string }[]>; claims: Record<string, Claim[]> }
-const value = (c: Claim) => c.mainsnak.datavalue?.value
-export function latestPopulation(claims: Claim[]): { population: number; date: string } | null {
-  const dated = claims.filter(c => c.rank !== "deprecated").map(c => ({ claim: c, date: c.qualifiers?.P585?.[0]?.datavalue?.value.time?.replace(/^\+/, "") ?? "" }))
-    .filter(c => c.date && Number.isFinite(Date.parse(c.date)) && Date.parse(c.date) <= Date.now()).sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
-  for (const c of dated) { const n = Number((value(c.claim) as { amount?: string })?.amount); if (n > 0 && Number.isFinite(n)) return { population: n, date: c.date } }
-  return null
-}
-async function entities(ids: string[]) {
-  const params = new URLSearchParams({ action: "wbgetentities", ids: ids.join("|"), props: "claims|labels|aliases", languages: "en", format: "json" })
-  return (await fetchJson<{ entities: Record<string, Entity> }>(`https://www.wikidata.org/w/api.php?${params}`)).entities
+async function entities(ids: string[]): Promise<Record<string, Entity>> {
+  if (!ids.length) return {}
+  const result: Record<string, Entity> = {}
+  for (let i = 0; i < ids.length; i += 50) {
+    const params = new URLSearchParams({ action: "wbgetentities", ids: ids.slice(i, i + 50).join("|"), props: "claims|labels|aliases", languages: "en", format: "json", maxlag: "5" })
+    const raw = await fetchJson<{ entities: Record<string, Entity> }>(`https://www.wikidata.org/w/api.php?${params}`)
+    if (!raw.entities) throw new Error("Wikidata returned no entities")
+    Object.assign(result, raw.entities)
+  }
+  return result
 }
 export async function resolveCity(seed: City, force = false) {
   return cached(seed.key, "wikidata", 180, async () => {
-    const params = new URLSearchParams({ action: "wbsearchentities", search: seed.city, language: "en", type: "item", limit: "8", format: "json" })
+    const params = new URLSearchParams({ action: "wbsearchentities", search: seed.city, language: "en", type: "item", limit: "12", format: "json", maxlag: "5" })
     const search = await fetchJson<{ search: { id: string }[] }>(`https://www.wikidata.org/w/api.php?${params}`)
-    if (!search.search?.length) throw new Error("No Wikidata city match")
+    if (!Array.isArray(search.search)) throw new Error("Wikidata returned an invalid search response")
+    if (!search.search.length) throw new SourceUnavailable("No verified city match is available in Wikidata.")
     const candidates = await entities(search.search.map(s => s.id))
-    const countryIds = [...new Set(Object.values(candidates).flatMap(e => (e.claims.P17 ?? []).map(c => (value(c) as { id: string })?.id).filter(Boolean)))]
-    const countries = countryIds.length ? await entities(countryIds) : {}
-    const matched = Object.values(candidates).map(e => {
-      const coords = (e.claims.P625 ?? []).filter(c => c.rank !== "deprecated").map(value)[0] as { latitude: number; longitude: number } | undefined
-      const countryOk = (e.claims.P17 ?? []).some(c => (countries[(value(c) as { id: string })?.id]?.claims.P297 ?? []).some(p => value(p) === seed.countryCode.toUpperCase()))
-      const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
-      const nameOk = [e.labels?.en?.value, ...(e.aliases?.en ?? []).map(a => a.value)].some(n => n && normalize(n) === normalize(seed.city))
-      return { e, coords, countryOk, nameOk, distance: coords ? distance(seed, { lat: coords.latitude, lon: coords.longitude }) : Infinity }
-    }).filter(c => c.countryOk && c.nameOk && c.distance < 20000).sort((a, b) => a.distance - b.distance)
-    const match = matched[0]
-    if (!match?.coords) throw new Error("No unambiguous city match with matching country and coordinates")
-    const pop = latestPopulation(match.e.claims.P1082 ?? [])
-    const relation = (match.e.claims.P402 ?? []).filter(c => c.rank !== "deprecated").map(c => Number(value(c))).find(n => Number.isSafeInteger(n) && n > 0)
-    return { ...seed, wikidataId: match.e.id, population: pop?.population ?? null, populationDate: pop?.date ?? null, relationId: relation ?? null, lat: match.coords.latitude, lon: match.coords.longitude, boundaryVerified: false }
-  }, force)
+    const countryIds = [...new Set(Object.values(candidates).flatMap(e => entityIds(e, "P17")))]
+    const countries = await entities(countryIds)
+    const classes: Record<string, Entity> = {}
+    const ordered = search.search.flatMap(s => candidates[s.id] ? [candidates[s.id]] : [])
+    const direct = selectCity(seed, ordered, countries, classes)
+    // An exact, typed city with its own boundary is already verified. Looking
+    // up the class ancestry of unrelated search hits only adds failure points.
+    if (direct?.relationId && candidates[direct.wikidataId!]?.labels?.en?.value.localeCompare(seed.city, "en", { sensitivity: "base" }) === 0) return direct
+    let frontier = [...new Set(Object.values(candidates).flatMap(e => entityIds(e, "P31")))]
+    // Most cities directly name a known place class; country-specific classes
+    // (municipality of X, charter city, etc.) can inherit it via P279.
+    for (let depth = 0; depth < 4 && frontier.length; depth++) {
+      const unknown = frontier.filter(id => !classes[id] && !placeKind(id, classes)).slice(0, 50)
+      if (!unknown.length) break
+      const next = await entities(unknown)
+      Object.assign(classes, next)
+      frontier = [...new Set(Object.values(next).flatMap(e => entityIds(e, "P279")))]
+    }
+    const city = selectCity(seed, ordered, countries, classes)
+    if (!city) throw new SourceUnavailable("No city entity matches the name, country, location and settlement type.")
+    return city
+  }, force, `city-resolution-${RESOLUTION_VERSION}`)
 }
 interface OsmElement { type: "node" | "way" | "relation"; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string>; members?: { type: string; role: string; geometry?: { lat: number; lon: number }[] }[] }
 export async function fetchOsm(city: City, force = false) {
-  if (!city.relationId || !city.wikidataId) throw new Error("A Wikidata-linked OSM administrative boundary is required")
-  const endpoint = process.env.OVERPASS_URL || "https://overpass-api.de/api/interpreter"
-  const area = 3600000000 + city.relationId
-  const query = `[out:json][timeout:55];rel(${city.relationId});out geom;area(${area})->.city;(nwr(area.city)[amenity~"^(bar|pub|nightclub|biergarten|music_venue)$"];nwr(area.city)[amenity=restaurant][bar=yes];);out center tags;`
-  const result = await cached(city.key, "osm", 30, async () => {
-    const raw = await fetchJson<{ elements: OsmElement[]; remark?: string }>(endpoint, { method: "POST", body: new URLSearchParams({ data: query }) })
+  if (!city.wikidataId || !/^Q\d+$/.test(city.wikidataId)) throw new SourceUnavailable("A verified city identity is needed before mapping venues.")
+  const endpoint = process.env.OVERPASS_URL || "https://overpass.private.coffee/api/interpreter"
+  const selection = city.relationId ? `rel(${city.relationId});` : `rel[boundary=administrative][wikidata="${city.wikidataId}"];`
+  // The boundary and the venues share one query; map_to_area avoids assuming
+  // an unverified radius is equivalent to a city's population boundary.
+  const query = `[out:json][timeout:55];${selection}out geom;map_to_area->.city;(nwr(area.city)[amenity~"^(bar|pub|nightclub|biergarten|music_venue)$"];nwr(area.city)[amenity=restaurant][bar=yes];);out center tags;`
+  const verify = (raw: { elements: OsmElement[]; remark?: string }) => {
     if (raw.remark || !Array.isArray(raw.elements)) throw new Error("Overpass returned an incomplete query")
-    const boundary = raw.elements.find(e => e.type === "relation" && e.id === city.relationId)
-    if (boundary?.tags?.wikidata !== city.wikidataId || boundary.tags.boundary !== "administrative") throw new Error("OSM boundary does not match the resolved city")
+    const matches = raw.elements.filter(e => e.type === "relation" && e.tags?.boundary === "administrative" && e.tags.wikidata === city.wikidataId && (!city.relationId || e.id === city.relationId))
+    if (matches.length !== 1) throw new SourceUnavailable("A single matching city boundary is not available in OpenStreetMap.")
+    return matches[0]
+  }
+  const result = await cached(city.key, "osm", 30, async () => {
+    const raw = await fetchJson<{ elements: OsmElement[]; remark?: string }>(endpoint, { method: "POST", body: new URLSearchParams({ data: query }) }, { timeoutMs: 65000, retryDelayMs: 30000 })
+    verify(raw)
     return raw
-  }, force)
-  if (result.data.remark) throw new Error("Overpass returned an incomplete query; not used for scoring")
-  const boundary = result.data.elements.find(e => e.type === "relation" && e.id === city.relationId)
-  if (boundary?.tags?.wikidata !== city.wikidataId || boundary.tags.boundary !== "administrative") throw new Error("OSM boundary does not match the resolved Wikidata city")
+  }, force, `osm-v2:${city.wikidataId}:${city.relationId ?? "discover"}`)
+  const boundary = verify(result.data)
   const venues: Venue[] = result.data.elements.filter(e => e !== boundary).flatMap(e => {
     const t = e.tags ?? {}, loc = e.center ?? { lat: e.lat, lon: e.lon }
     if (!Number.isFinite(loc.lat) || !Number.isFinite(loc.lon) || !t.name || t.disused === "yes" || t.abandoned === "yes" || t.closed === "yes" || t.opening_hours === "closed" || t.opening_hours === "off") return []
@@ -98,7 +108,7 @@ export async function fetchOsm(city: City, force = false) {
     if (t.lgbtq === "primary" || t["gay:men"] === "primary" || t["gay:women"] === "primary") hint = "lgbtq bar"
     return [{ id: `osm-${e.type}-${e.id}`, name: t.name, lat: loc.lat!, lon: loc.lon!, type: venueType(hint ?? ""), hours: t.opening_hours, neighborhood: t["addr:suburb"] ?? t["addr:district"], tags: t, sources: [{ id: "osm" as const, url: `https://www.openstreetmap.org/${e.type}/${e.id}` }] }]
   })
-  return { venues, boundary: boundaryFromMembers(boundary.members), source: { ...result.source, url: `https://www.openstreetmap.org/relation/${city.relationId}`, note: "Complete administrative-boundary query. Mapped venues are a lower bound, not a census." } }
+  return { venues, relationId: boundary.id, boundary: boundaryFromMembers(boundary.members), source: { ...result.source, url: `https://www.openstreetmap.org/relation/${boundary.id}`, note: `${result.source.status === "error" ? "Refresh failed; showing the last successful boundary query. " : "Complete administrative-boundary query. "}Mapped venues are a lower bound, not a census.` } }
 }
 interface FsqPlace { fsq_place_id: string; name: string; latitude: number; longitude: number; date_closed?: string; categories?: { name: string }[]; rating?: number; popularity?: number; price?: number; stats?: { total_ratings?: number }; location?: { neighborhood?: string[] } }
 export async function fetchFoursquare(city: City, force = false) {

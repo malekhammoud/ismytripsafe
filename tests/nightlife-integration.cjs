@@ -9,6 +9,8 @@ async function run() {
  process.env.FOURSQUARE_API_KEY='secret-foursquare';process.env.FOURSQUARE_DURABLE_STORAGE_LICENSED='1';process.env.FOURSQUARE_CATEGORY_IDS='test-category'
  process.env.TICKETMASTER_API_KEY='secret-ticketmaster';process.env.NUMBEO_API_KEY='secret-numbeo';process.env.NUMBEO_STORAGE_LICENSED='1'
  delete process.env.NIGHTLIFE_SENTIMENT_MODEL
+ const http=require('../lib/nightlife/http.ts'),request=http.fetchJson
+ http.fetchJson=(url,options,policy)=>request(url,options,{...policy,sleep:async()=>{}})
  const {buildNightlife}=require('../lib/nightlife/build.ts'),{listNightlife,readNightlife}=require('../lib/nightlife/store.ts')
  const {nightlifeSafety}=require('../lib/nightlife/build.ts')
  const {GET}=require('../app/[country]/[city]/nightlife/data.json/route.ts')
@@ -19,9 +21,9 @@ async function run() {
   if(url.hostname==='www.wikidata.org') {
    const ids=url.searchParams.get('ids')
    if(url.searchParams.get('action')==='wbsearchentities')data={search:[{id:'Q123'}]}
-   else if(ids==='Qcountry')data={entities:{Qcountry:{id:'Qcountry',claims:{P297:[{mainsnak:{datavalue:{value:'XX'}}}]}}}}
-   else data={entities:{Q123:{id:'Q123',labels:{en:{value:'Preview City'}},claims:{P625:[{rank:'normal',mainsnak:{datavalue:{value:{latitude:42,longitude:10}}}}],P17:[{mainsnak:{datavalue:{value:{id:'Qcountry'}}}}],P1082:[{rank:'normal',mainsnak:{datavalue:{value:{amount:'+100000'}}},qualifiers:{P585:[{datavalue:{value:{time:'+2024-01-01T00:00:00Z'}}}]}}],P402:[{rank:'normal',mainsnak:{datavalue:{value:'123'}}}]}}}}
-  } else if(url.hostname==='overpass-api.de')data={elements:[{type:'relation',id:123,tags:{wikidata:'Q123',boundary:'administrative'},members:[{type:'way',role:'outer',geometry:[{lat:41,lon:9},{lat:41,lon:11},{lat:43,lon:11},{lat:43,lon:9},{lat:41,lon:9}]}]},...Array.from({length:count},(_,i)=>({type:'node',id:1000+i,lat:42+i*.001,lon:10+(i%4)*.001,tags:{name:`Venue ${i}`,amenity:['pub','bar','nightclub','music_venue'][i%4],opening_hours:'Mo-Su 18:00-03:00','addr:suburb':'Old Town'}}))]}
+   else if(ids==='Q999')data={entities:{Q999:{id:'Q999',claims:{P297:[{mainsnak:{datavalue:{value:'XX'}}}]}}}}
+   else data={entities:{Q123:{id:'Q123',labels:{en:{value:'Preview City'}},claims:{P31:[{mainsnak:{datavalue:{value:{id:'Q515'}}}}],P625:[{rank:'normal',mainsnak:{datavalue:{value:{latitude:42,longitude:10}}}}],P17:[{mainsnak:{datavalue:{value:{id:'Q999'}}}}],P1082:[{rank:'normal',mainsnak:{datavalue:{value:{amount:'+100000'}}},qualifiers:{P585:[{datavalue:{value:{time:'+2024-01-01T00:00:00Z'}}}]}}],P402:[{rank:'normal',mainsnak:{datavalue:{value:'123'}}}]}}}}
+  } else if(url.hostname==='overpass.private.coffee')data={elements:[{type:'relation',id:123,tags:{wikidata:'Q123',boundary:'administrative'},members:[{type:'way',role:'outer',geometry:[{lat:41,lon:9},{lat:41,lon:11},{lat:43,lon:11},{lat:43,lon:9},{lat:41,lon:9}]}]},...Array.from({length:count},(_,i)=>({type:'node',id:1000+i,lat:42+i*.001,lon:10+(i%4)*.001,tags:{name:`Venue ${i}`,amenity:['pub','bar','nightclub','music_venue'][i%4],opening_hours:'Mo-Su 18:00-03:00','addr:suburb':'Old Town'}}))]}
   else if(url.hostname==='places-api.foursquare.com')data={results:fsq?Array.from({length:12},(_,i)=>({fsq_place_id:`f${i}`,name:`Venue ${i}`,latitude:42+i*.001,longitude:10+(i%4)*.001,categories:[{name:['Pub','Cocktail Bar','Nightclub','Jazz Club'][i%4]}],rating:7.5+i*.1,popularity:.9-i*.01,stats:{total_ratings:40+i},location:{neighborhood:['Old Town']}})).concat([{fsq_place_id:'inside-extra',name:'Extra live music',latitude:42.02,longitude:10.02,categories:[{name:'Jazz Club'}],rating:8,popularity:.8,stats:{total_ratings:30}},{fsq_place_id:'outside-extra',name:'Wrong city club',latitude:50,longitude:20,categories:[{name:'Nightclub'}],rating:9,popularity:.9,stats:{total_ratings:100}}]):[]}
   else if(url.hostname==='app.ticketmaster.com')data={_embedded:{events:[{id:'event-1',name:'Preview jazz night',url:'https://www.ticketmaster.com/event/example',dates:{start:{dateTime:new Date(Date.now()+86400000*3).toISOString(),localDate:'2026-10-22'},status:{code:'onsale'}},_embedded:{venues:[{name:'Preview music hall'}]}}]}}
   else if(url.hostname==='www.numbeo.com')data={currency:url.searchParams.get('currency')||'EUR',yearLastUpdate:2026,monthLastUpdate:10,prices:[{item_id:4,average_price:4},{item_id:5,average_price:5}]}
@@ -41,7 +43,7 @@ async function run() {
  const limited=await buildNightlife({...base,key:'xx_limited',citySlug:'limited'},safety,{force:true});assert.equal(limited.outcome,'limited');assert.equal(limited.scores.filter(s=>s.value==null).length,2)
  count=9
  const withheld=await buildNightlife({...base,key:'xx_withheld',citySlug:'withheld'},safety,{force:true});assert.equal(withheld.outcome,'withheld');assert.equal((await listNightlife()).length,2);assert.equal((await listNightlife(true)).length,3)
- assert.ok(calls.some(c=>c.url.hostname==='places-api.foursquare.com'&&c.init.headers['X-Places-Api-Version']==='2025-06-17'))
+ assert.ok(calls.some(c=>c.url.hostname==='places-api.foursquare.com'&&c.init.headers.get('X-Places-Api-Version')==='2025-06-17'))
  const previous=await readNightlife('xx_preview');global.fetch=async()=>{throw new Error('Simulated outage')};await assert.rejects(()=>buildNightlife(base,safety,{force:true}),/kept the previous published report/);assert.equal((await readNightlife('xx_preview')).updatedAt,previous.updatedAt);const priorLimited=await readNightlife('xx_limited');const refreshed=await buildNightlife({...base,key:'xx_limited',citySlug:'limited'},safety,{force:true});assert.equal(refreshed.venues.length,priorLimited.venues.length);assert.equal(refreshed.sources.find(s=>s.id==='osm').status,'error');assert.equal(refreshed.sources.find(s=>s.id==='osm').fetchedAt,priorLimited.sources.find(s=>s.id==='osm').fetchedAt)
  // Safety index is deterministic, and uses after-dark score rather than raw safety index.
  const night=nightlifeSafety(safety);assert.equal(night.nightIndex,75);assert.ok(Number.isFinite(night.index))
@@ -49,7 +51,7 @@ async function run() {
  process.env.OPENROUTER_API_KEY='fixture-model-key';process.env.NIGHTLIFE_SENTIMENT_MODEL='fixture-model';process.env.REDDIT_COMMERCIAL_ANALYSIS_LICENSED='1';process.env.REDDIT_ACCESS_TOKEN='fixture-token'
  let retryCalls=0;global.fetch=async()=>{retryCalls++;throw new Error('Simulated Reddit outage')}
  const failedMentions=await collectMentions(base,[]),retriedMentions=await collectMentions(base,[])
- assert.ok(failedMentions.errors.length);assert.ok(retriedMentions.errors.length);assert.equal(retryCalls,2,'A failed sentiment fetch must not be cached as a successful monthly fetch')
+ assert.ok(failedMentions.errors.length);assert.ok(retriedMentions.errors.length);assert.equal(retryCalls,4,'A failed sentiment fetch must not be cached as a successful monthly fetch')
  console.log('PASS: full/limited/withheld pipeline, eight source statuses, current FSQ contract, raw caches, stale-source dates, safety weighting, and licence-safe public export')
  console.log('Preview fixture store: '+root)
 }

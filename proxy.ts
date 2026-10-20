@@ -47,14 +47,15 @@ export function proxy(request: NextRequest) {
   // reached on (127.0.0.1:3000), not the public one — redirecting to it
   // verbatim would send visitors to an address that isn't routable. Any
   // redirect we issue for a production host is pinned to the canonical origin.
-  if (redirect && isProdHost) {
+  if (redirect && (isProdHost || host === "beta.ismytripsafe.com")) {
     target.protocol = "https:"
-    target.host = CANONICAL_HOST
+    target.host = isProdHost ? CANONICAL_HOST : host
     target.port = ""
   }
 
-  if (redirect) return NextResponse.redirect(target, 301)
-  return NextResponse.next()
+  const response = redirect ? NextResponse.redirect(target, 301) : NextResponse.next()
+  if (host === "beta.ismytripsafe.com") response.headers.set("X-Robots-Tag", "noindex, nofollow")
+  return response
 }
 
 export const config = {

@@ -22,6 +22,7 @@ export interface City {
   safetyPath: string; lat: number; lon: number; countryCode: string
   wikidataId: string | null; population: number | null; populationDate: string | null
   relationId: number | null; boundaryVerified: boolean
+  resolutionVersion?: number
 }
 export interface Score {
   key: ScoreKey; label: string; value: number | null; bullets: string[]
@@ -36,7 +37,7 @@ export interface NightEvent { id: string; name: string; date: string; venue: str
 export interface BeerPrices { currency: string; domestic: number | null; imported: number | null; domesticUsd: number | null; importedUsd: number | null; updatedAt: string }
 export interface Lateness { known: number; total: number; afterMidnight: number; after2: number; after4: number; note: string }
 export interface NightlifeReport {
-  version: 1; formulaVersion: string; city: City; updatedAt: string
+  version: 1; formulaVersion: string; pipelineVersion?: string; city: City; updatedAt: string
   outcome: "full" | "limited" | "withheld"; reasons: string[]; overall: number | null
   scores: Score[]; venues: Venue[]; mentions: Mention[]; events: NightEvent[]
   beer: BeerPrices | null; safety: SafetyInput | null; lateness: Lateness; sources: Source[]

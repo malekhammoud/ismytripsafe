@@ -9,6 +9,8 @@ import { lateness } from "./hours"
 import { resolveSafetyZones } from "./zones"
 import { collectMentions, canonicalGroup } from "./sentiment"
 import { listNightlife, readNightlife, saveNightlife } from "./store"
+import { SourceUnavailable } from "./source-errors"
+import { PIPELINE_VERSION } from "./version"
 import type { City, NightlifeReport, SafetyInput, Source, SourceId, Venue } from "./types"
 export function nightlifeSafety(report: CachedReport): SafetyInput | null {
   if (!report.bundle.safety.signals.some(s => s.score != null && Number.isFinite(s.score))) return null
@@ -35,16 +37,21 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   }
   const sources: Source[] = []
   const collect = async <T>(id: SourceId, run: () => Promise<T>) => {
-    try { return await run() } catch (e) { sources.push({ ...unavailable(id, e instanceof Error ? e.message : "Fetch failed"), status: "error" }); return null }
+    try { return await run() } catch (e) {
+      const source = { ...unavailable(id, e instanceof Error ? e.message : "Fetch failed"), status: e instanceof SourceUnavailable ? "unavailable" as const : "error" as const }
+      sources.push(source)
+      console.warn(`[nightlife] ${seed.key}: ${id} ${source.status}: ${source.note}`)
+      return null
+    }
   }
   await options.onProgress?.("resolve")
   const resolved = await collect("wikidata", () => resolveCity(seed, options.force))
   let city: City = resolved?.data ?? { ...seed, population: null, populationDate: null, boundaryVerified: false }
-  if (resolved) sources.push({ ...resolved.source, url: `https://www.wikidata.org/wiki/${city.wikidataId}`, note: "Latest dated population; matched name, country and nearby coordinates." })
+  if (resolved) sources.push({ ...resolved.source, url: `https://www.wikidata.org/wiki/${city.wikidataId}`, note: `${resolved.source.status === "error" ? "Refresh failed; using the last verified city match. " : ""}Matched settlement type, name, country and coordinates. ${city.population ? "Latest dated population for this city." : "No dated population is available."}` })
   await options.onProgress?.("venues")
   const osm = await collect("osm", () => fetchOsm(city, options.force))
-  if (osm) { sources.push(osm.source); city = { ...city, boundaryVerified: true } }
-  if (safety && city.boundaryVerified) safety = await resolveSafetyZones(city, safety)
+  if (osm) { sources.push(osm.source); city = { ...city, relationId: osm.relationId, boundaryVerified: true } }
+  if (safety && city.boundaryVerified) safety = await resolveSafetyZones(city, safety).catch(() => safety!)
   await options.onProgress?.("details")
   const [fsq, tm, prices, imported] = await Promise.all([
     collect("foursquare", () => fetchFoursquare(city, options.force)), collect("ticketmaster", () => fetchEvents(city, options.force)),
@@ -74,7 +81,7 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   await options.onProgress?.("score")
   const scores = scoreReport(city, venues, mentions, safety, new Date(), peers)
   const dateFor = (id: SourceId) => sources.find(s => s.id === id)?.fetchedAt ?? ""
-  const next: NightlifeReport = { version: 1, formulaVersion: FORMULA_VERSION, city, updatedAt: new Date().toISOString(), ...scores, venues, mentions, events: tm?.data.events ?? [], beer: prices?.data.beer ?? null, safety, lateness: lateness(venues, city), sources, refresh: { venues: dateFor("osm"), events: dateFor("ticketmaster"), population: dateFor("wikidata"), beer: dateFor("numbeo") } }
+  const next: NightlifeReport = { version: 1, formulaVersion: FORMULA_VERSION, pipelineVersion: PIPELINE_VERSION, city, updatedAt: new Date().toISOString(), ...scores, venues, mentions, events: tm?.data.events ?? [], beer: prices?.data.beer ?? null, safety, lateness: lateness(venues, city), sources, refresh: { venues: dateFor("osm"), events: dateFor("ticketmaster"), population: dateFor("wikidata"), beer: dateFor("numbeo") } }
   // Never replace a published report with an upstream-outage artifact.
   if (previous && previous.outcome !== "withheld" && sources.some(s => s.status === "error") && (next.outcome === "withheld" || next.scores.filter(s => s.value != null).length < previous.scores.filter(s => s.value != null).length)) throw new Error("Refresh failed publication checks after a source error; kept the previous published report")
   await saveNightlife(next)

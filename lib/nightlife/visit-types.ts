@@ -6,4 +6,10 @@ export interface VisitStatus {
   phase?: BuildPhase
   retryAfter?: number
   updatedAt?: string
+  retryAt?: string
+  issue?: "sources" | "city" | "boundary" | "evidence" | "connection" | "service"
+  failedSources?: string[]
+  venueCount?: number
+  scoreCount?: number
+  retryScheduled?: boolean
 }
