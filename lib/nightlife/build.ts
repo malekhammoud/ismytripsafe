@@ -9,7 +9,7 @@ import { lateness } from "./hours"
 import { resolveSafetyZones } from "./zones"
 import { collectMentions, canonicalGroup } from "./sentiment"
 import { listNightlife, readNightlife, saveNightlife } from "./store"
-import { SourceUnavailable } from "./source-errors"
+import { SourceUnavailable, sourceFailure } from "./source-errors"
 import { PIPELINE_VERSION } from "./version"
 import type { City, NightlifeReport, SafetyInput, Source, SourceId, Venue } from "./types"
 export function nightlifeSafety(report: CachedReport): SafetyInput | null {
@@ -21,7 +21,7 @@ export function nightlifeSafety(report: CachedReport): SafetyInput | null {
   for (const cap of final.caps) index = Math.min(index, cap.max)
   return { index, baseIndex: final.index, nightIndex: night?.score ?? null, sentiment: final.sentiment.score, updatedAt: report.cachedAt, summary: report.enrichment.verdict, signals: night ? [{ label: night.label, value: night.display, source: night.source, year: night.year }] : [], zones: report.enrichment.mapZones ?? [] }
 }
-export async function buildNightlife(seed: City, safetyReport: CachedReport | null, options: { force?: boolean; rescore?: boolean; eventsOnly?: boolean; onProgress?: (phase: BuildPhase) => Promise<void> } = {}): Promise<NightlifeReport> {
+export async function buildNightlife(seed: City, safetyReport: CachedReport | null, options: { interactive?: boolean; force?: boolean; rescore?: boolean; eventsOnly?: boolean; onProgress?: (phase: BuildPhase) => Promise<void> } = {}): Promise<NightlifeReport> {
   const previous = await readNightlife(seed.key)
   let safety = safetyReport ? nightlifeSafety(safetyReport) : null
   if ((options.rescore || options.eventsOnly) && !previous) throw new Error("No stored report to refresh")
@@ -38,16 +38,16 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   const sources: Source[] = []
   const collect = async <T>(id: SourceId, run: () => Promise<T>) => {
     try { return await run() } catch (e) {
-      const source = { ...unavailable(id, e instanceof Error ? e.message : "Fetch failed"), status: e instanceof SourceUnavailable ? "unavailable" as const : "error" as const }
+      const source = { ...unavailable(id, e instanceof Error ? e.message : "Fetch failed"), failure: e instanceof SourceUnavailable ? undefined : sourceFailure(e), status: e instanceof SourceUnavailable ? "unavailable" as const : "error" as const }
       sources.push(source)
       console.warn(`[nightlife] ${seed.key}: ${id} ${source.status}: ${source.note}`)
       return null
     }
   }
   await options.onProgress?.("resolve")
-  const resolved = await collect("wikidata", () => resolveCity(seed, options.force))
+  const resolved = await collect("wikidata", () => resolveCity(seed, options.force, options.interactive))
   let city: City = resolved?.data ?? { ...seed, population: null, populationDate: null, boundaryVerified: false }
-  if (resolved) sources.push({ ...resolved.source, url: `https://www.wikidata.org/wiki/${city.wikidataId}`, note: `${resolved.source.status === "error" ? "Refresh failed; using the last verified city match. " : ""}Matched settlement type, name, country and coordinates. ${city.population ? "Latest dated population for this city." : "No dated population is available."}` })
+  if (resolved) sources.push({ ...resolved.source, url: `https://www.wikidata.org/wiki/${city.wikidataId}`, note: `${resolved.source.status === "error" ? "Refresh failed; using the last verified city match. " : ""}${city.resolutionMethod === "linked-data" ? "Verified through Wikipedia’s linked item and Wikidata entity JSON. " : ""}Matched settlement type, name, country and coordinates. ${city.population ? "Latest dated population for this city." : "No dated population is available."}` })
   await options.onProgress?.("venues")
   const osm = await collect("osm", () => fetchOsm(city, options.force))
   if (osm) { sources.push(osm.source); city = { ...city, relationId: osm.relationId, boundaryVerified: true } }

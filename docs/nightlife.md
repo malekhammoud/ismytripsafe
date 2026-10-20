@@ -66,6 +66,43 @@ city safety report, then matches Wikidata by settlement/administrative type (P31
 supports year-only and month-only dates without inventing a day, and excludes population claims for only part of a city. The OSM administrative relation must identify the same Wikidata item. If P402 is absent, the adapter can find a unique administrative relation tagged with that item; it never substitutes a radius for a boundary.
 Unverified boundaries/populations do not produce density scores.
 
+### Wikidata availability and visitor requests
+
+The October 20 beta logs showed repeated generic `HTTP 503` lookup failures.
+The old HTTP helper also converted MediaWiki's HTTP 200 `maxlag` response into
+that same error, so those historical logs cannot distinguish replication lag
+from an actual HTTP 503. The helper now preserves the real HTTP status, API
+error code, lookup operation and requested retry time. It reads at most 8 KiB
+of an error body to extract the code; response bodies and credentials never
+enter public status or logs.
+
+Visitor-triggered research uses interactive Wikidata requests without
+`maxlag`; CLI and scheduled requests retain `maxlag=5`, following
+[MediaWiki's documented distinction](https://www.mediawiki.org/wiki/Manual:Maxlag_parameter).
+Both modes keep the bounded retry, descriptive User-Agent and source cache.
+HTTP 200 API errors obey `Retry-After` too. Job cooldowns never shorten an
+upstream retry time longer than the normal ten-minute cooldown. Explicit retry
+times from the required Wikidata/OSM sources also cover other cities, across
+processes, without spending another attempt or blocking fresh saved reports.
+
+If search/entity reads fail with a service or transport error, the resolver
+can obtain a candidate ID from Wikipedia's summary API and read it through
+[Wikidata's linked-data interface](https://www.wikidata.org/wiki/Wikidata:Data_access).
+This fallback makes sequential reads, is capped at 12 entities, and applies
+the same settlement type, name, country and coordinate validation. A nearby
+station, an ambiguous page or a same-name city in another country cannot
+qualify. Wikipedia prose is neither stored nor used for population or scores.
+The source note identifies successful linked-data resolution. Access denials,
+rate limits, `maxlag`, `readonly` and explicit requests to wait do not trigger
+alternate-interface requests. Verified cached source data still survives an
+outage with its original date.
+
+Regression coverage includes visitor versus batch request parameters, both
+search and entity outages, full pipeline recovery, country/station rejection,
+HTTP 200 and 503 error documents, oversized bodies, rate limits and persisted
+retry times. These use controlled fixtures; they do not substitute for a
+successful live-source pilot after deployment.
+
 The pilot is Budapest, London, Tbilisi, Shkoder, Gdansk, and Luang Prabang.
 It spans a major nightlife destination, a megacity, and smaller/less-covered
 places. Before scaling, inspect boundary identity, population year, OSM

@@ -14,7 +14,7 @@ export type CitySafety = { report: CachedReport; meta: ReportMeta }
 const DAY = 86400000
 const LEASE_MS = 15 * 60 * 1000
 const ERROR_COOLDOWN_MS = 10 * 60 * 1000
-interface Job extends Pick<VisitStatus, "issue" | "failedSources" | "venueCount" | "scoreCount"> { state: "running" | "ready" | "unavailable" | "failed"; updatedAt: string; retryAt?: string; phase?: BuildPhase; token?: string; version?: string }
+interface Job extends Pick<VisitStatus, "issue" | "failedSources" | "sourceFailures" | "venueCount" | "scoreCount"> { state: "running" | "ready" | "unavailable" | "failed"; updatedAt: string; retryAt?: string; phase?: BuildPhase; token?: string; version?: string }
 interface Dependencies {
   directory: string
   now: () => number
@@ -42,6 +42,7 @@ export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
   const fileFor = (key: string) => path.join(jobs, `${safeKey(key)}.json`)
   const iso = () => new Date(deps.now()).toISOString()
   const globalLock = path.join(jobs, "research.lock")
+  const sourceCooldown = path.join(jobs, "source-cooldown.json")
   const published = (r: NightlifeReport | null) => !!r && r.outcome !== "withheld"
   async function release(file: string, token: string) {
     const lock = await readJson<{ token: string }>(file)
@@ -72,11 +73,15 @@ export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
       const lock = await readJson<{ token: string }>(globalLock)
       if (lock && (!job.token || lock.token === job.token)) return { state: "running", available, phase: job.phase, retryAfter: 3 }
     }
-    const detail = job ? { issue: job.issue, failedSources: job.failedSources, venueCount: job.venueCount, scoreCount: job.scoreCount } : {}
+    const detail = job ? { issue: job.issue, failedSources: job.failedSources, sourceFailures: job.sourceFailures, venueCount: job.venueCount, scoreCount: job.scoreCount } : {}
     if (job?.version === PIPELINE_VERSION && job.retryAt && Date.parse(job.retryAt) > deps.now()) return { ...detail, state: available ? "ready" : job.state === "unavailable" ? "unavailable" : "failed", available, retryAt: job.retryAt, retryAfter: Math.ceil((Date.parse(job.retryAt) - deps.now()) / 1000) }
     if (available && report && !needsNightlifeRefresh(report, deps.now())) return { state: "ready", available: true, updatedAt: report.updatedAt }
     // A genuine thin-data result is retried daily; outages use the shorter job cooldown.
     if (report?.outcome === "withheld" && report.pipelineVersion === PIPELINE_VERSION && !report.sources.some(s => s.status === "error") && deps.now() - Date.parse(report.updatedAt) < DAY) return { ...detail, state: "unavailable", available: false, venueCount: report.venues.length, scoreCount: report.scores.filter(s => s.value != null).length, retryAt: new Date(Date.parse(report.updatedAt) + DAY).toISOString(), retryAfter: Math.max(1, Math.ceil((DAY - (deps.now() - Date.parse(report.updatedAt))) / 1000)) }
+    // A provider's request to wait applies across cities. Opening a second
+    // destination must not consume another attempt against the same cooldown.
+    const cooldown = await readJson<VisitStatus>(sourceCooldown)
+    if (cooldown?.retryAt && Date.parse(cooldown.retryAt) > deps.now()) return { ...cooldown, state: available ? "ready" : "failed", available, retryAfter: Math.ceil((Date.parse(cooldown.retryAt) - deps.now()) / 1000) }
     return { state: "idle", available }
   }
   async function prepare(hit: CitySafety): Promise<{ status: VisitStatus; run?: () => Promise<void> }> {
@@ -111,12 +116,16 @@ export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
         heartbeat.unref()
         try {
           const onProgress = async (phase: BuildPhase) => { await writeJob({ state: "running", phase, updatedAt: iso() }) }
-          const report = await withResearchDeadline(() => deps.build(cityFromSafety(hit), hit.report, { onProgress }))
+          const report = await withResearchDeadline(() => deps.build(cityFromSafety(hit), hit.report, { onProgress, interactive: true }))
           const sourceFailed = report.sources.some(s => s.status === "error")
+          const sourceFailures = report.sources.filter(s => s.status === "error" && s.failure).map(s => ({ name: s.name, ...s.failure! }))
+          const requiredCooldowns = report.sources.filter(s => ["wikidata", "osm"].includes(s.id) && s.status === "error" && Date.parse(s.failure?.retryAt ?? "") > deps.now()).map(s => ({ name: s.name, ...s.failure! }))
+          if (requiredCooldowns.length) await writeJson(sourceCooldown, { state: "failed", available: false, issue: "sources", failedSources: requiredCooldowns.map(s => s.name), sourceFailures: requiredCooldowns, retryAt: new Date(Math.max(...requiredCooldowns.map(s => Date.parse(s.retryAt!)))).toISOString() })
+          const retryAt = Math.max(deps.now() + ERROR_COOLDOWN_MS, ...sourceFailures.map(f => Date.parse(f.retryAt ?? "")).filter(Number.isFinite))
           const state = published(report) ? "ready" : sourceFailed ? "failed" : "unavailable"
           const issue = sourceFailed ? "sources" : !report.city.wikidataId ? "city" : !report.city.boundaryVerified ? "boundary" : "evidence"
           await writeJob({ state, updatedAt: iso(), venueCount: report.venues.length, scoreCount: report.scores.filter(s => s.value != null).length,
-            ...(state !== "ready" || sourceFailed ? { issue, failedSources: report.sources.filter(s => s.status === "error").map(s => s.name), retryAt: new Date(deps.now() + (sourceFailed ? ERROR_COOLDOWN_MS : DAY)).toISOString() } : {}) })
+            ...(state !== "ready" || sourceFailed ? { issue, sourceFailures, failedSources: report.sources.filter(s => s.status === "error").map(s => s.name), retryAt: new Date(sourceFailed ? retryAt : deps.now() + DAY).toISOString() } : {}) })
           console.info(`[nightlife] ${key}: ${report.outcome}; ${report.venues.length} venues${sourceFailed ? "; source refresh failed" : ""}`)
         } catch (error) {
           console.error(`[nightlife] ${key}: generation failed`, error instanceof Error ? error.message : "Unknown error")

@@ -3,8 +3,9 @@ import path from "node:path"
 import { distance, venueType } from "./venues"
 import { boundaryFromMembers } from "./boundary"
 import { fetchJson } from "./http"
-import { SourceUnavailable } from "./source-errors"
-import { entityIds, placeKind, selectCity, RESOLUTION_VERSION, type Entity } from "./city-resolution"
+import { SourceUnavailable, sourceFailure } from "./source-errors"
+import { RESOLUTION_VERSION } from "./city-resolution"
+import { lookupCity } from "./wikidata"
 export { fetchJson } from "./http"
 export { latestPopulation } from "./city-resolution"
 import { NIGHTLIFE_DIR, safeKey, writeJson } from "./store"
@@ -33,50 +34,12 @@ export async function cached<T>(key: string, id: SourceId, days: number, get: ()
     await writeJson(file, { fetchedAt, data, ...(identity ? { identity } : {}) })
     return { data, source: { id, ...SOURCE_INFO[id], fetchedAt, status: "ok", note: "Fetched successfully." } }
   } catch (e) {
-    if (previous) return { data: previous.data, source: { id, ...SOURCE_INFO[id], fetchedAt: previous.fetchedAt, status: "error", note: "Refresh failed; retained the last successful response and its original date." } }
+    if (previous) return { data: previous.data, source: { id, ...SOURCE_INFO[id], fetchedAt: previous.fetchedAt, status: "error", note: "Refresh failed; retained the last successful response and its original date.", failure: sourceFailure(e) } }
     throw e
   }
 }
-async function entities(ids: string[]): Promise<Record<string, Entity>> {
-  if (!ids.length) return {}
-  const result: Record<string, Entity> = {}
-  for (let i = 0; i < ids.length; i += 50) {
-    const params = new URLSearchParams({ action: "wbgetentities", ids: ids.slice(i, i + 50).join("|"), props: "claims|labels|aliases", languages: "en", format: "json", maxlag: "5" })
-    const raw = await fetchJson<{ entities: Record<string, Entity> }>(`https://www.wikidata.org/w/api.php?${params}`)
-    if (!raw.entities) throw new Error("Wikidata returned no entities")
-    Object.assign(result, raw.entities)
-  }
-  return result
-}
-export async function resolveCity(seed: City, force = false) {
-  return cached(seed.key, "wikidata", 180, async () => {
-    const params = new URLSearchParams({ action: "wbsearchentities", search: seed.city, language: "en", type: "item", limit: "12", format: "json", maxlag: "5" })
-    const search = await fetchJson<{ search: { id: string }[] }>(`https://www.wikidata.org/w/api.php?${params}`)
-    if (!Array.isArray(search.search)) throw new Error("Wikidata returned an invalid search response")
-    if (!search.search.length) throw new SourceUnavailable("No verified city match is available in Wikidata.")
-    const candidates = await entities(search.search.map(s => s.id))
-    const countryIds = [...new Set(Object.values(candidates).flatMap(e => entityIds(e, "P17")))]
-    const countries = await entities(countryIds)
-    const classes: Record<string, Entity> = {}
-    const ordered = search.search.flatMap(s => candidates[s.id] ? [candidates[s.id]] : [])
-    const direct = selectCity(seed, ordered, countries, classes)
-    // An exact, typed city with its own boundary is already verified. Looking
-    // up the class ancestry of unrelated search hits only adds failure points.
-    if (direct?.relationId && candidates[direct.wikidataId!]?.labels?.en?.value.localeCompare(seed.city, "en", { sensitivity: "base" }) === 0) return direct
-    let frontier = [...new Set(Object.values(candidates).flatMap(e => entityIds(e, "P31")))]
-    // Most cities directly name a known place class; country-specific classes
-    // (municipality of X, charter city, etc.) can inherit it via P279.
-    for (let depth = 0; depth < 4 && frontier.length; depth++) {
-      const unknown = frontier.filter(id => !classes[id] && !placeKind(id, classes)).slice(0, 50)
-      if (!unknown.length) break
-      const next = await entities(unknown)
-      Object.assign(classes, next)
-      frontier = [...new Set(Object.values(next).flatMap(e => entityIds(e, "P279")))]
-    }
-    const city = selectCity(seed, ordered, countries, classes)
-    if (!city) throw new SourceUnavailable("No city entity matches the name, country, location and settlement type.")
-    return city
-  }, force, `city-resolution-${RESOLUTION_VERSION}`)
+export async function resolveCity(seed: City, force = false, interactive = false) {
+  return cached(seed.key, "wikidata", 180, () => lookupCity(seed, interactive), force, `city-resolution-${RESOLUTION_VERSION}`)
 }
 interface OsmElement { type: "node" | "way" | "relation"; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string>; members?: { type: string; role: string; geometry?: { lat: number; lon: number }[] }[] }
 export async function fetchOsm(city: City, force = false) {

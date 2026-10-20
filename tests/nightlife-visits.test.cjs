@@ -17,8 +17,30 @@ async function setup(overrides={}){
  const jobs=createVisitJobs(deps)
  return{directory,deps,jobs,calls:()=>calls,stored:()=>stored,setStored:r=>stored=r,advance:ms=>now+=ms,now:()=>now}
 }
+test('visitor research uses interactive source requests',async()=>{
+ const x=await setup({build:async(_seed,_safety,options)=>{assert.equal(options.interactive,true);return report(Date.now())}})
+ await (await x.jobs.prepare(hit())).run()
+})
+test('upstream retry times longer than ten minutes survive job storage and polling',async()=>{
+ const retryAt=new Date(Date.now()+30*60000).toISOString()
+ const x=await setup({build:async()=>report(Date.now(),{outcome:'withheld',sources:[{id:'wikidata',name:'Wikidata',status:'error',failure:{kind:'rate_limit',status:429,retryAt}}]})})
+ await (await x.jobs.prepare(hit())).run()
+ const status=await x.jobs.inspect('xx_test');assert.equal(status.retryAt,retryAt);assert.ok(status.retryAfter>1700);assert.equal(status.sourceFailures[0].kind,'rate_limit')
+ x.advance(11*60000);assert.equal((await x.jobs.prepare(hit())).run,undefined)
+})
 test('cold visit claims work without blocking on the actual build',async()=>{
  const x=await setup(),job=await x.jobs.prepare(hit());assert.equal(job.status.state,'running');assert.equal(x.calls(),0);assert.equal((await x.jobs.inspect('xx_test')).phase,'resolve');await job.run();assert.equal(x.calls(),1);assert.equal((await x.jobs.inspect('xx_test')).state,'ready')
+})
+test('a required provider cooldown covers other cities and new processes without blocking saved pages',async()=>{
+ const retryAt=new Date(Date.now()+30*60000).toISOString()
+ const x=await setup({build:async()=>report(Date.now(),{outcome:'withheld',sources:[{id:'wikidata',name:'Wikidata',status:'error',failure:{kind:'rate_limit',status:429,retryAt}}]})})
+ await (await x.jobs.prepare(hit())).run()
+ const other=createVisitJobs(x.deps),blocked=await other.prepare(hit('xx_other'))
+ assert.equal(blocked.run,undefined);assert.equal(blocked.status.retryAt,retryAt);assert.equal(blocked.status.sourceFailures[0].status,429)
+ const budget=JSON.parse(await fs.readFile(path.join(x.directory,'jobs',`budget-${new Date(x.now()).toISOString().slice(0,10)}.json`)))
+ assert.equal(budget.attempts,1)
+ x.setStored(report(x.now()));assert.equal((await other.prepare(hit('xx_saved'))).status.state,'ready')
+ x.setStored(null);x.advance(31*60000);assert.ok((await other.prepare(hit('xx_other'))).run)
 })
 test('concurrent visitors and separate process instances share a single job',async()=>{
  const x=await setup(),other=createVisitJobs(x.deps)

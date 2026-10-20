@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { ArrowUpRight, Check, LoaderCircle, Moon, ShieldCheck } from "lucide-react"
 import type { BuildPhase, VisitStatus } from "@/lib/nightlife/visit-types"
 import { watchNightlife } from "@/lib/nightlife/watch"
+import { sourceStatus } from "@/lib/nightlife/source-status"
 const PHASES: { key: BuildPhase; label: string; detail: string }[] = [
   { key: "resolve", label: "Find the right city", detail: "Matching the city, its population and its boundaries." },
   { key: "venues", label: "Map the scene", detail: "Finding bars, clubs and live-music venues inside the city." },
@@ -44,7 +45,7 @@ export function OnDemandReport({ country, city, cityName, mode = "page" }: { cou
     : status.state === "failed" ? status.issue === "connection"
       ? "We lost the connection while checking progress. Your research can still finish in the background. Try reconnecting below."
       : status.issue === "service" ? "The research service couldn’t finish this check. Please try again shortly."
-        : `${status.failedSources?.length ? status.failedSources.join(" and ") : "A venue source"} couldn’t be reached. ${retrySeconds > 0 ? status.retryScheduled ? `This page will try again in ${retryLabel}.` : `Another check will be available in ${retryLabel}.` : "You can request another check below."}`
+        : `${sourceStatus(status)} ${retrySeconds > 0 ? status.retryScheduled ? `This page will try again in ${retryLabel}.` : `Another check will be available in ${retryLabel}.` : "You can request another check below."}`
     : status.state === "deferred" ? "New city checks resume tomorrow. Saved reports and this city’s safety report are available now."
     : status.state === "busy" ? "Another city is being checked. We’ll start this one automatically when the research slot opens."
     : "We’re finding venues, checking available sources and calculating the ratings. The first report usually takes a few minutes; saved reports open immediately."

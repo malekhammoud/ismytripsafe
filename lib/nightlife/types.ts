@@ -5,6 +5,7 @@ export type SourceId = "osm" | "foursquare" | "wikidata" | "ticketmaster" | "num
 export interface Source {
   id: SourceId; name: string; url: string; fetchedAt: string | null
   status: "ok" | "unavailable" | "error"; note: string; licence: string
+  failure?: import("./source-errors").SourceFailure
 }
 export interface Venue {
   id: string; name: string; lat: number; lon: number; type: VenueType
@@ -23,6 +24,7 @@ export interface City {
   wikidataId: string | null; population: number | null; populationDate: string | null
   relationId: number | null; boundaryVerified: boolean
   resolutionVersion?: number
+  resolutionMethod?: "search" | "linked-data"
 }
 export interface Score {
   key: ScoreKey; label: string; value: number | null; bullets: string[]
