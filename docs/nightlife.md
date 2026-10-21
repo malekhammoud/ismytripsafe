@@ -111,13 +111,63 @@ publication outcome. Density's initial cut-offs and Quality's cut-offs are
 **provisional**, not empirically calibrated. Do not claim this pilot has been
 calibrated until a live-source run has succeeded and been reviewed.
 
-The default Overpass endpoint is `https://overpass.private.coffee/api/interpreter`, whose listed policy permits use in any project. Public Overpass runs remain capped at 10 cities per invocation. Keep the single-worker limit and configure a dedicated endpoint before scaling. Larger jobs must
-configure `OVERPASS_URL` for a private/commercial endpoint or replace the
+The default Overpass endpoint is `https://overpass.private.coffee/api/interpreter`, whose listed policy permits use in any project. The beta pilot can fall back once to `https://overpass-api.de/api/interpreter` after a connection failure, request timeout, or generic HTTP 500/502/503. It never switches on 429, 504 resource-admission refusals, explicit `Retry-After`, query errors or partial data. The successful fallback remains selected for that city. An explicit `OVERPASS_URL` has no automatic public fallback; configure `OVERPASS_FALLBACK_URL` deliberately (an empty value disables it).
+
+Public Overpass runs remain capped at 10 cities per invocation and 10 on-demand attempts per day, including when a public endpoint is configured explicitly or used as a fallback. Keep the single-worker limit and configure a dedicated endpoint before scaling. Larger jobs must
+configure private/commercial `OVERPASS_URL` and optional `OVERPASS_FALLBACK_URL` endpoints or replace the
 adapter with a regional extract. The provided systemd service uses `flock`
 for one worker. The daily timer only checks due data: venues/ratings/mentions
 monthly, events weekly, population and prices every 180 days. Copy the two
 `deploy/ismytripsafe-nightlife-beta.*` units to systemd and enable the timer
 on the host only after a successful pilot. No timer is enabled by this code.
+
+### October 21 venue-fetch recovery
+
+The deployed Johannesburg job resolved Wikidata successfully but timed out
+twice fetching OSM. The collector previously requested full boundary geometry
+and venues together, then repeated that request on the same endpoint: two
+65-second timeouts plus a 30-second delay. Those logs cannot establish whether
+the underlying problem was connectivity, server load or query execution.
+
+Collection now uses a small boundary/area lookup (15-second query budget,
+35-second client deadline), followed by an exact-tag venue union (25/45
+seconds). Requests reserve 64 MiB rather than the default 512 MiB. The
+boundary must match the Wikidata item, and its generated Overpass area must
+exist. Venue output includes node coordinates and way/relation centers; the
+area marker and final per-type count must agree with the returned records.
+Missing areas, partial queries and truncated lists never become zero-venue
+ratings. Full boundary geometry is only requested for licensed Foursquare
+clipping and has its own 25-second budget; failure keeps the complete OSM
+list and limits Foursquare merging to matched OSM venues.
+
+The raw cache stores boundary, venue and optional geometry responses plus
+provider/operation/fetch timestamps. Cache identity and pipeline versions
+invalidate old collector results and failed-job cooldowns. Failure diagnostics
+include stage, safe provider hostname, duration and underlying network error
+code when available; request credentials are omitted. Explicit provider retry
+times still propagate to the shared cooldown.
+
+Contracts checked against the [operator's terms](https://overpass.private.coffee/),
+[Overpass resource/admission rules](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html),
+[area semantics](https://dev.overpass-api.de/overpass-doc/en/full_data/area.html)
+and [output formats](https://dev.overpass-api.de/overpass-doc/en/targets/formats.html).
+Public services are a small beta pilot dependency, not the scaling plan.
+
+Run a real browser-equivalent generation check after deployment:
+
+```sh
+npm run check:nightlife -- --generate --wait-for-deploy germany/berlin
+npm run check:nightlife -- --generate georgia/tbilisi
+```
+
+`--generate` is opt-in and restricted to beta (or beta/preview localhost ports).
+It waits for the expected `X-Nightlife-Pipeline` header, starts the existing
+visitor job, checks progress, then verifies report sections, noindex, export,
+safety crosslink and assets. It fails on source errors or withheld reports,
+including an old saved report served after a failed refresh. Without
+`--generate`, the check remains read-only. Passing unit fixtures/builds is
+not a substitute for this live check; do not report live recovery until it
+succeeds.
 
 ## Score contracts
 
@@ -272,7 +322,7 @@ Source failures cool down for ten minutes; genuinely insufficient evidence is re
 report with broken data.
 
 `NIGHTLIFE_ON_DEMAND_DAILY_LIMIT` controls new on-demand research attempts
-(default 10 with public Overpass, 100 with a configured provider, maximum 1000).
+(default and maximum 10 with public Overpass; default 100, maximum 1000 when all configured endpoints are private).
 Cached reports and status polling do not spend the budget. Capacity screens
 check again automatically while the browser is open. Licensing flags and
 credentials from the original adapters still apply; automatic generation does

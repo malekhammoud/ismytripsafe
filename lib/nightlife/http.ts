@@ -6,7 +6,7 @@ const deadline = new AsyncLocalStorage<AbortSignal>()
 export const withResearchDeadline = <T>(run: () => Promise<T>) => deadline.run(AbortSignal.timeout(240000), run)
 export const researchSignal = () => deadline.getStore()
 const USER_AGENT = "IsMyTripSafe-nightlife/1.1 (+https://ismytripsafe.com/about)"
-type Policy = { timeoutMs?: number; retryDelayMs?: number; operation?: string; fetch?: typeof fetch; sleep?: (ms: number, signal?: AbortSignal) => Promise<void> }
+type Policy = { timeoutMs?: number; retryDelayMs?: number; operation?: string; retries?: 0 | 1; fetch?: typeof fetch; sleep?: (ms: number, signal?: AbortSignal) => Promise<void> }
 
 function retryAfter(response: Response): number | null {
   const value = response.headers.get("retry-after")
@@ -65,7 +65,7 @@ export async function fetchJson<T>(url: string, options: RequestInit = {}, polic
       }
       return data as T
     } catch (error) {
-      if (attempt >= 1 || outer?.aborted || options.signal?.aborted) throw error
+      if (attempt >= (policy.retries ?? 1) || outer?.aborted || options.signal?.aborted) throw error
       if (error instanceof SourceHttpError && (!error.retryable || (error.retryAfter ?? 0) > 30)) throw error
       const wait = Math.max(policy.retryDelayMs ?? 1500, error instanceof SourceHttpError ? (error.retryAfter ?? 0) * 1000 : 0)
       await sleep(wait, outer ?? options.signal ?? undefined)

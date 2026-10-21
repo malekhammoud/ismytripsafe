@@ -1,6 +1,7 @@
 import { after } from "next/server"
 import { getCityReport } from "@/lib/reports"
 import { visitJobs } from "@/lib/nightlife/visits"
+import { PIPELINE_VERSION } from "@/lib/nightlife/version"
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -10,7 +11,7 @@ async function resolve({ params }: Context) {
   if (!/^[a-z0-9][a-z0-9-]{0,100}$/.test(country) || !/^[a-z0-9][a-z0-9-]{0,100}$/.test(city)) return null
   return getCityReport(country, city)
 }
-const headers = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex" }
+const headers = { "Cache-Control": "no-store", "X-Robots-Tag": "noindex", "X-Nightlife-Pipeline": PIPELINE_VERSION }
 export async function GET(_request: Request, context: Context) {
   const hit = await resolve(context)
   if (!hit) return Response.json({ error: "City not found" }, { status: 404, headers })

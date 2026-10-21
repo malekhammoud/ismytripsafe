@@ -12,6 +12,7 @@ visits.visitJobs.prepare=async()=>{prepareCalls++;return{status:{state:'running'
 const load=Module._load
 Module._load=function(name,...rest){return name==='next/server'?{after:callback=>scheduled.push(callback)}:load.call(this,name,...rest)}
 const {GET,POST}=require('../app/api/nightlife/[country]/[city]/route.ts')
+const {PIPELINE_VERSION}=require('../lib/nightlife/version.ts')
 Module._load=load
 const context=(country='example',city='city')=>({params:Promise.resolve({country,city})})
 const request=(headers={},method='POST')=>new Request('https://beta.ismytripsafe.com/api/nightlife/example/city',{method,headers})
@@ -21,3 +22,4 @@ test('unknown cities cannot create research jobs',async()=>{const before=prepare
 test('invalid slugs are rejected before looking up city data',async()=>{const before=lookupCalls;assert.equal((await GET(request({},'GET'),context('../private','x'))).status,404);assert.equal(lookupCalls,before)})
 test('cross-site posts cannot spend research capacity',async()=>{const before=prepareCalls;assert.equal((await POST(request({'sec-fetch-site':'cross-site'}),context())).status,403);assert.equal((await POST(request({origin:'https://unrelated.example'}),context())).status,403);assert.equal(prepareCalls,before)})
 test('malformed Origin headers return a controlled 403',async()=>{assert.equal((await POST(request({origin:'not a URL'}),context())).status,403)})
+test('status identifies the deployed pipeline for live verification',async()=>{assert.equal((await GET(request({},'GET'),context())).headers.get('x-nightlife-pipeline'),PIPELINE_VERSION)})

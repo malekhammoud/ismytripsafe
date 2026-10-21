@@ -7,6 +7,7 @@ import { buildNightlife } from "./build"
 import { FORMULA_VERSION } from "./scoring"
 import { PIPELINE_VERSION } from "./version"
 import { withResearchDeadline } from "./http"
+import { usesPublicOverpass } from "./overpass"
 import { NIGHTLIFE_DIR, readNightlife, safeKey, writeJson } from "./store"
 import type { City, NightlifeReport } from "./types"
 import type { BuildPhase, VisitStatus } from "./visit-types"
@@ -36,8 +37,9 @@ async function readJson<T>(file: string): Promise<T | null> {
   catch (e) { if (e instanceof SyntaxError || (e as NodeJS.ErrnoException).code === "ENOENT") return null; throw e }
 }
 export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
-  const configuredLimit = Number(process.env.NIGHTLIFE_ON_DEMAND_DAILY_LIMIT) || (process.env.OVERPASS_URL ? 100 : 10)
-  const deps: Dependencies = { directory: NIGHTLIFE_DIR, now: Date.now, read: readNightlife, build: buildNightlife, limit: Math.max(1, Math.min(1000, configuredLimit)), ...overrides }
+  const publicProvider = usesPublicOverpass()
+  const configuredLimit = Number(process.env.NIGHTLIFE_ON_DEMAND_DAILY_LIMIT) || (publicProvider ? 10 : 100)
+  const deps: Dependencies = { directory: NIGHTLIFE_DIR, now: Date.now, read: readNightlife, build: buildNightlife, limit: Math.max(1, Math.min(publicProvider ? 10 : 1000, configuredLimit)), ...overrides }
   const jobs = path.join(deps.directory, "jobs")
   const fileFor = (key: string) => path.join(jobs, `${safeKey(key)}.json`)
   const iso = () => new Date(deps.now()).toISOString()

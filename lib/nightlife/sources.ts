@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { distance, venueType } from "./venues"
 import { boundaryFromMembers } from "./boundary"
+import { collectOsm, verifiedArea, verifiedVenues } from "./overpass"
 import { fetchJson } from "./http"
 import { SourceUnavailable, sourceFailure } from "./source-errors"
 import { RESOLUTION_VERSION } from "./city-resolution"
@@ -41,27 +42,12 @@ export async function cached<T>(key: string, id: SourceId, days: number, get: ()
 export async function resolveCity(seed: City, force = false, interactive = false) {
   return cached(seed.key, "wikidata", 180, () => lookupCity(seed, interactive), force, `city-resolution-${RESOLUTION_VERSION}`)
 }
-interface OsmElement { type: "node" | "way" | "relation"; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string>; members?: { type: string; role: string; geometry?: { lat: number; lon: number }[] }[] }
 export async function fetchOsm(city: City, force = false) {
-  if (!city.wikidataId || !/^Q\d+$/.test(city.wikidataId)) throw new SourceUnavailable("A verified city identity is needed before mapping venues.")
-  const endpoint = process.env.OVERPASS_URL || "https://overpass.private.coffee/api/interpreter"
-  const selection = city.relationId ? `rel(${city.relationId});` : `rel[boundary=administrative][wikidata="${city.wikidataId}"];`
-  // The boundary and the venues share one query; map_to_area avoids assuming
-  // an unverified radius is equivalent to a city's population boundary.
-  const query = `[out:json][timeout:55];${selection}out geom;map_to_area->.city;(nwr(area.city)[amenity~"^(bar|pub|nightclub|biergarten|music_venue)$"];nwr(area.city)[amenity=restaurant][bar=yes];);out center tags;`
-  const verify = (raw: { elements: OsmElement[]; remark?: string }) => {
-    if (raw.remark || !Array.isArray(raw.elements)) throw new Error("Overpass returned an incomplete query")
-    const matches = raw.elements.filter(e => e.type === "relation" && e.tags?.boundary === "administrative" && e.tags.wikidata === city.wikidataId && (!city.relationId || e.id === city.relationId))
-    if (matches.length !== 1) throw new SourceUnavailable("A single matching city boundary is not available in OpenStreetMap.")
-    return matches[0]
-  }
-  const result = await cached(city.key, "osm", 30, async () => {
-    const raw = await fetchJson<{ elements: OsmElement[]; remark?: string }>(endpoint, { method: "POST", body: new URLSearchParams({ data: query }) }, { timeoutMs: 65000, retryDelayMs: 30000 })
-    verify(raw)
-    return raw
-  }, force, `osm-v2:${city.wikidataId}:${city.relationId ?? "discover"}`)
-  const boundary = verify(result.data)
-  const venues: Venue[] = result.data.elements.filter(e => e !== boundary).flatMap(e => {
+  const geometryNeeded = !!process.env.FOURSQUARE_API_KEY && process.env.FOURSQUARE_DURABLE_STORAGE_LICENSED === "1" && !!process.env.FOURSQUARE_CATEGORY_IDS
+  const result = await cached(city.key, "osm", 30, () => collectOsm(city, geometryNeeded), force, `osm-v3:${city.wikidataId}:${city.relationId ?? "discover"}:${geometryNeeded ? "geometry" : "venues"}`)
+  const { boundary, areaId } = verifiedArea(city, result.data.boundary)
+  const elements = verifiedVenues(result.data.venues, areaId)
+  const venues: Venue[] = elements.flatMap(e => {
     const t = e.tags ?? {}, loc = e.center ?? { lat: e.lat, lon: e.lon }
     if (!Number.isFinite(loc.lat) || !Number.isFinite(loc.lon) || !t.name || t.disused === "yes" || t.abandoned === "yes" || t.closed === "yes" || t.opening_hours === "closed" || t.opening_hours === "off") return []
     let hint = t.amenity
@@ -71,7 +57,7 @@ export async function fetchOsm(city: City, force = false) {
     if (t.lgbtq === "primary" || t["gay:men"] === "primary" || t["gay:women"] === "primary") hint = "lgbtq bar"
     return [{ id: `osm-${e.type}-${e.id}`, name: t.name, lat: loc.lat!, lon: loc.lon!, type: venueType(hint ?? ""), hours: t.opening_hours, neighborhood: t["addr:suburb"] ?? t["addr:district"], tags: t, sources: [{ id: "osm" as const, url: `https://www.openstreetmap.org/${e.type}/${e.id}` }] }]
   })
-  return { venues, relationId: boundary.id, boundary: boundaryFromMembers(boundary.members), source: { ...result.source, url: `https://www.openstreetmap.org/relation/${boundary.id}`, note: `${result.source.status === "error" ? "Refresh failed; showing the last successful boundary query. " : "Complete administrative-boundary query. "}Mapped venues are a lower bound, not a census.` } }
+  return { venues, relationId: boundary.id, boundary: boundaryFromMembers(result.data.geometry?.elements.find(e => e.type === "relation" && e.id === boundary.id)?.members), source: { ...result.source, url: `https://www.openstreetmap.org/relation/${boundary.id}`, note: `${result.source.status === "error" ? "Refresh failed; showing the last successful boundary query. " : "Complete administrative-boundary query. "}Mapped venues are a lower bound, not a census. ${result.data.geometryNote ?? ""}` } }
 }
 interface FsqPlace { fsq_place_id: string; name: string; latitude: number; longitude: number; date_closed?: string; categories?: { name: string }[]; rating?: number; popularity?: number; price?: number; stats?: { total_ratings?: number }; location?: { neighborhood?: string[] } }
 export async function fetchFoursquare(city: City, force = false) {

@@ -5,6 +5,7 @@ const { promises: fs } = require('node:fs')
 const path = require('node:path')
 const { CACHE_DIR } = require('../lib/cache.ts')
 const { buildNightlife } = require('../lib/nightlife/build.ts')
+const { usesPublicOverpass } = require('../lib/nightlife/overpass.ts')
 const { countrySlugFor } = require('../lib/reports.ts')
 const { slug } = require('../lib/cache.ts')
 const { listNightlife, NIGHTLIFE_DIR, writeJson } = require('../lib/nightlife/store.ts')
@@ -20,7 +21,7 @@ async function main() {
   const keys = args.includes('--refresh-due') ? due.map(r => r.city.key) : args.includes('--test-batch') ? BATCH : args.filter(a => !a.startsWith('--'))
   if (args.includes('--refresh-due') && !keys.length) { console.log('No nightlife reports are due for refresh'); return }
   if (!keys.length) throw new Error('Usage: npm run nightlife -- <cache-key> [...] | --test-batch | --audit | <key> --rescore | <key> --events-only')
-  if (keys.length > 10 && !process.env.OVERPASS_URL) throw new Error('Public Overpass pilot limited to 10 cities per run; configure a private OVERPASS_URL before scaling')
+  if (keys.length > 10 && usesPublicOverpass()) throw new Error('Public Overpass pilot limited to 10 cities per run; configure private OVERPASS_URL and OVERPASS_FALLBACK_URL before scaling')
   const failures = []
   const results = []
   for (const key of keys) {

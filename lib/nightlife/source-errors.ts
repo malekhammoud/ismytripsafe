@@ -12,13 +12,26 @@ export interface SourceFailure {
   code?: string
   operation?: string
   retryAt?: string
+  provider?: string
+  elapsedMs?: number
+}
+export class SourceOperationError extends Error {
+  readonly failure: SourceFailure
+  constructor(error: unknown, operation: string, provider: string, elapsedMs: number) {
+    const failure = { ...sourceFailure(error), operation, provider, elapsedMs }
+    super(`${operation}: ${failure.kind}${failure.status ? ` HTTP ${failure.status}` : ""}${failure.code ? ` (${failure.code})` : ""} after ${elapsedMs}ms via ${provider}`)
+    this.failure = failure
+  }
 }
 // Keep diagnostics useful without publishing response bodies or credential URLs.
 export function sourceFailure(error: unknown): SourceFailure {
+  if (error instanceof SourceOperationError) return error.failure
   if (error instanceof SourceHttpError) return {
     kind: error.code === "ratelimited" || error.status === 429 ? "rate_limit" : ["maxlag", "readonly"].includes(error.code ?? "") ? "busy" : error.status >= 500 ? "unavailable" : error.status === 408 ? "timeout" : "request",
     status: error.status, code: error.code, operation: error.operation,
     ...(error.retryAfter != null ? { retryAt: new Date(Date.now() + error.retryAfter * 1000).toISOString() } : {}),
   }
-  return { kind: error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name) ? "timeout" : error instanceof TypeError ? "connection" : "request" }
+  const code = (error as { cause?: { code?: unknown } })?.cause?.code
+  const networkCode = typeof code === "string" && /^[A-Z0-9_]{1,48}$/.test(code) ? code : undefined
+  return { kind: error instanceof Error && (["TimeoutError", "AbortError"].includes(error.name) || networkCode?.includes("TIMEOUT")) ? "timeout" : error instanceof TypeError ? "connection" : "request", ...(networkCode ? { code: networkCode } : {}) }
 }
