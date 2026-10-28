@@ -52,36 +52,6 @@ function finalScoreOf(report: CachedReport) {
   )
 }
 
-/** The 40–75-word dated answer capsule at the top of the page. */
-function buildCapsule(report: CachedReport): string {
-  const { geo } = report
-  const final = finalScoreOf(report)
-  const level = LEVELS[final.level]
-  const e = report.enrichment
-  const risks: string[] = []
-  if (e.pickpocket?.level && e.pickpocket.level !== "Low") {
-    risks.push(`pickpocketing (${e.pickpocket.level.toLowerCase()} risk)`)
-  }
-  if (e.robbery?.level && e.robbery.level !== "Low") {
-    risks.push(`robbery (${e.robbery.level.toLowerCase()} risk)`)
-  }
-  if (e.scams?.length && risks.length < 2) risks.push("tourist-targeted scams")
-  const riskSentence = risks.length
-    ? `The main risks for visitors are ${risks.join(" and ")}.`
-    : `Street crime against visitors is limited; take normal precautions.`
-  const advisory = report.bundle.safety.advisories.find(
-    (a) => a.sourceShort === "US" && a.level != null
-  )
-  const advSentence = advisory
-    ? ` The U.S. State Department rates it Level ${advisory.level} (${advisory.levelLabel}).`
-    : ""
-  return (
-    `As of ${monthYear(report.cachedAt)}, ${geo.city} scores ${final.index}/100 on the ` +
-    `IsMyTripSafe composite safety index — verdict: ${level.answer.toLowerCase()}. ` +
-    `${e.verdict} ${riskSentence}${advSentence}`
-  )
-}
-
 function metaDescription(report: CachedReport): string {
   const final = finalScoreOf(report)
   const { geo } = report
@@ -142,7 +112,6 @@ export default async function CityReportPage({
   const { report, meta } = hit
 
   const final = finalScoreOf(report)
-  const capsule = buildCapsule(report)
   const related = await getRelated(meta)
   const e = report.enrichment
   const mapHref = `/map?place=${encodeURIComponent(`${meta.city}, ${meta.country}`)}`
@@ -262,7 +231,7 @@ export default async function CityReportPage({
             </span>
           </Link>
 
-          {/* H1 + answer capsule — the self-contained, quotable verdict */}
+          {/* Shared by every saved report, regardless of its research date. */}
           <h1 className="font-display text-[clamp(1.7rem,5vw,2.3rem)] font-medium leading-tight tracking-tight text-[var(--ink)]">
             Is {meta.city} safe? {meta.flag}
           </h1>
@@ -270,7 +239,6 @@ export default async function CityReportPage({
             {meta.country} · Safety report last updated{" "}
             <time dateTime={report.cachedAt}>{humanDate(report.cachedAt)}</time>
           </p>
-          <p className="mt-4 text-[1rem] leading-[1.75] text-[var(--ink)]">{capsule}</p>
 
           {/* The full report card — sections 01–05 */}
           <div className="mt-7">

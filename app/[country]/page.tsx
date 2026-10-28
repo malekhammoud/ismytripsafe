@@ -133,7 +133,8 @@ export default async function CountryHubPage({
   const best = hub.cities[0]
   const worst = hub.cities.length > 1 ? hub.cities[hub.cities.length - 1] : null
 
-  const capsule =
+  // Metadata only; the visible report starts with its score card.
+  const articleDescription =
     `As of ${monthYear(hub.updatedAt)}, ${hub.country} ` +
     (headline
       ? `scores ${headline.score}/100 on the IsMyTripSafe safety index` +
@@ -156,7 +157,7 @@ export default async function CountryHubPage({
           reportArticleNode({
             meta: countryMeta,
             headline: `Is ${hub.country} Safe in ${new Date(hub.updatedAt).getFullYear()}? Travel Safety Report`,
-            description: capsule.slice(0, 300),
+            description: articleDescription.slice(0, 300),
             image: countryReport.images.hero,
           }),
           reportDatasetNode(countryMeta),
@@ -269,7 +270,6 @@ export default async function CountryHubPage({
           <p className="mt-1.5 text-[0.8rem] text-[var(--ink-faint)]">
             {hub.region} · Updated <time dateTime={hub.updatedAt}>{humanDate(hub.updatedAt)}</time>
           </p>
-          <p className="mt-4 text-[1rem] leading-[1.75] text-[var(--ink)]">{capsule}</p>
 
           {/* Country-level full report when one was generated */}
           {countryReport && (
