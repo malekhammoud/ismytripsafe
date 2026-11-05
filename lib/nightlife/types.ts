@@ -17,6 +17,7 @@ export interface Mention {
   id: string; group: string; source: "reddit" | "blogs" | "foursquare"
   url: string; publishedAt: string; sentiment: "positive" | "mixed" | "negative"
   themes: string[]; relevant: boolean
+  recommendedVenues?: string[] // Explicit positive recommendations, verified against source text
 }
 export interface City {
   key: string; city: string; country: string; countrySlug: string; citySlug: string
@@ -36,7 +37,7 @@ export interface SafetyInput {
   zones: { name: string; level: "safe" | "caution" | "avoid"; note: string; lat?: number; lon?: number; geojson?: unknown }[]
 }
 export interface NightEvent { id: string; name: string; date: string; venue: string; url: string }
-export interface BeerPrices { currency: string; domestic: number | null; imported: number | null; domesticUsd: number | null; importedUsd: number | null; updatedAt: string }
+export interface BeerPrices { meal?: number | null; taxiStart?: number | null; taxiPerKm?: number | null; currency: string; domestic: number | null; imported: number | null; domesticUsd: number | null; importedUsd: number | null; updatedAt: string }
 export interface Lateness { known: number; total: number; afterMidnight: number; after2: number; after4: number; note: string }
 export interface NightlifeReport {
   version: 1; formulaVersion: string; pipelineVersion?: string; city: City; updatedAt: string

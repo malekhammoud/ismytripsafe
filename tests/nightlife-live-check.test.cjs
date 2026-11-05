@@ -21,7 +21,7 @@ async function check({origin='https://beta.ismytripsafe.com',pipeline='fixture-v
   }
   if(url.pathname==='/nightlife')return new Response(meta+'nightlife-city-search')
   if(url.pathname==='/not-a-real-country/not-a-real-city/nightlife')return new Response('',{status:404})
-  if(url.pathname==='/germany/berlin/nightlife')return new Response(meta+sections)
+  if(url.pathname==='/germany/berlin/nightlife')return new Response(meta+sections.replace('<div id="sources"></div>','')+'How we score this')
   if(url.pathname==='/germany/berlin/nightlife/data.json')return Response.json({licence:'ODbL 1.0',venues:[{id:'osm-node-1'}]})
   if(url.pathname==='/germany/berlin')return new Response('/germany/berlin/nightlife')
   throw new Error('Unexpected URL '+url.pathname)

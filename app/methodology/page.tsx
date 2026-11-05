@@ -159,6 +159,7 @@ export default function MethodologyPage() {
           <a href="/destinations" className="font-medium text-[var(--accent-deep)] hover:underline">all destination reports</a>.
         </p>
 
+        <p className="mt-6 text-sm"><a href="/methodology/nightlife" className="underline">How we score nightlife ↗</a></p>
         <SeoFooter />
       </div>
     </main>

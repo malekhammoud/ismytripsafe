@@ -47,8 +47,10 @@ async function main(){
  await get('/not-a-real-country/not-a-real-city/nightlife',404)
  if(city){
   const route='/'+city+'/nightlife',html=await get(route)
-  for(const id of ['the-stars','venues','hotspots','late','travelers','night-safety','sources'])if(!html.includes(`id="${id}"`))throw new Error('Missing section '+id)
+  for(const id of ['the-stars','venues','hotspots'])if(!html.includes(`id="${id}"`))throw new Error('Missing section '+id)
   if(!/<meta[^>]+name="robots"[^>]+content="[^"]*noindex/.test(html))throw new Error('Beta city page is indexable')
+  if(!html.includes('How we score this'))throw new Error('Missing methodology link')
+  if(html.includes('id="sources"')||html.includes('id="events"'))throw new Error('Removed research sections still visible')
   const data=JSON.parse(await get(route+'/data.json'))
   if(data.licence!=='ODbL 1.0')throw new Error('Missing venue export licence')
   if(data.venues.some(v=>'rating'in v||'popularity'in v||'votes'in v))throw new Error('Proprietary data leaked in export')

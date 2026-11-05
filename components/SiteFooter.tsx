@@ -26,7 +26,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
  * print (dates, sourcing, "this is not advice"). `updatedAt` is passed on
  * report pages, where the date is about that report's data.
  */
-export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
+export function SiteFooter({ updatedAt, simplePunctuation = false }: { updatedAt?: string | null; simplePunctuation?: boolean }) {
   const year = new Date().getFullYear()
 
   return (
@@ -42,7 +42,7 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
           </Link>
           <p className="mt-3 text-[0.8rem] leading-relaxed text-[var(--ink-soft)]">
             One place, one click, one report. Up-to-date, personalised travel safety for
-            anywhere you&apos;re thinking of going — free, every time.
+            anywhere you&apos;re thinking of going{simplePunctuation ? ". Free, every time." : " — free, every time."}
           </p>
           <a
             href="mailto:malek@ismytripsafe.com"
@@ -83,7 +83,7 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
           </p>
         )}
         <p>
-          Every score is computed from named public sources — see{" "}
+          Every score is computed from named public sources{simplePunctuation ? ". See" : " — see"}{" "}
           <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
             how we score safety
           </Link>{" "}

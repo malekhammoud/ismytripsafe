@@ -87,7 +87,7 @@ export async function fetchEvents(city: City, force = false) {
     return { raw, events }
   }, force)
 }
-interface Prices { currency: string; monthLastUpdate?: number; yearLastUpdate?: number; prices: { item_id: number; average_price: number }[] }
+interface Prices { currency: string; monthLastUpdate?: number; yearLastUpdate?: number; prices: { item_id: number; item_name?: string; average_price: number }[] }
 export async function fetchBeer(city: City, force = false) {
   if (!process.env.NUMBEO_API_KEY || process.env.NUMBEO_STORAGE_LICENSED !== "1") return null
   return cached(city.key, "numbeo", 180, async () => {
@@ -97,7 +97,11 @@ export async function fetchBeer(city: City, force = false) {
     query.set("currency", "USD")
     const usd = await fetchJson<Prices>(`https://www.numbeo.com/api/city_prices?${query}`, options)
     const amount = (r: Prices, id: number) => { const n = r.prices?.find(p => p.item_id === id)?.average_price; return n != null && Number.isFinite(n) && n > 0 ? n : null }
-    const beer: BeerPrices = { currency: local.currency, domestic: amount(local, 4), imported: amount(local, 5), domesticUsd: amount(usd, 4), importedUsd: amount(usd, 5), updatedAt: local.yearLastUpdate && local.monthLastUpdate ? `${local.yearLastUpdate}-${String(local.monthLastUpdate).padStart(2, "0")}-01` : new Date().toISOString() }
+    const namedAmount = (pattern: RegExp) => {
+      const value = local.prices?.find(p => pattern.test(p.item_name ?? ""))?.average_price
+      return value != null && Number.isFinite(value) && value > 0 ? value : null
+    }
+    const beer: BeerPrices = { meal: amount(local, 1), taxiStart: namedAmount(/^Taxi Start \(Normal Tariff\)/i), taxiPerKm: namedAmount(/^Taxi 1km \(Normal Tariff\)/i), currency: local.currency, domestic: amount(local, 4), imported: amount(local, 5), domesticUsd: amount(usd, 4), importedUsd: amount(usd, 5), updatedAt: local.yearLastUpdate && local.monthLastUpdate ? `${local.yearLastUpdate}-${String(local.monthLastUpdate).padStart(2, "0")}-01` : new Date().toISOString() }
     return { local, usd, beer }
   }, force)
 }
@@ -120,6 +124,6 @@ export async function importedMentions(key: string): Promise<Mention[]> {
     const url = new URL(v.url), group = `${url.hostname.replace(/^www\./, "")}:${String(v.group)}`
     if (/reddit\.com$/.test(url.hostname) && v.source !== "reddit") return []
     ids.add(v.id)
-    return [{ id: v.id, group, url: v.url, source: v.source, publishedAt: v.publishedAt, sentiment: v.sentiment, themes: v.themes, relevant: true } as Mention]
+    return [{ id: v.id, group, url: v.url, source: v.source, publishedAt: v.publishedAt, sentiment: v.sentiment, themes: v.themes, relevant: true, recommendedVenues: v.sentiment === "positive" && Array.isArray(v.recommendedVenues) ? v.recommendedVenues.filter((name: unknown): name is string => typeof name === "string" && name.trim().length >= 3 && name.length <= 120).slice(0, 6) : [] } as Mention]
   })
 }

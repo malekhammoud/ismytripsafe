@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const hit = await getCityReport(country, city)
     return { title: hit ? `${hit.meta.city} Nightlife: Researching Bars, Clubs & Safety` : "Nightlife report not found", robots: { index: false, follow: false } }
   }
-  const title = `${r.city.city} Nightlife ${new Date(r.updatedAt).getUTCFullYear()}: Bars, Clubs & Safety`
+  const title = `${r.city.city} Nightlife Report ${new Date(r.updatedAt).getUTCFullYear()}`
   const description = `${r.city.city} nightlife: ${r.overall?.toFixed(1)}/5 from ${r.venues.length} mapped venues. Explore venue types, late opening, traveler sentiment and after-dark safety.${r.outcome === "limited" ? " Limited data; gaps are clearly marked." : ""}`
   return { title, description, robots: { index: NIGHTLIFE_INDEXABLE, follow: NIGHTLIFE_INDEXABLE }, alternates: { canonical: nightlifeUrl(nightlifePath(r)) }, openGraph: { title, description, url: nightlifeUrl(nightlifePath(r)), type: "article" } }
 }

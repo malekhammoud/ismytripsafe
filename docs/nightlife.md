@@ -347,3 +347,11 @@ cities have an Explore link without invented scores. Prefetch is disabled on
 these research links. The interface distinguishes saved reports from first
 visits, which may take a few minutes. No generic hero art or placeholder city
 photographs are used.
+
+## Compact city report layout (November 2026)
+
+City reports now show a city-night photograph (when curated), exact fractional overall stars, five compact rating cards, venue mix and map, a supported shortlist, known-hours percentages, available prices, safety, traveler themes and nearby cities. Empty data blocks, events, section numbers, kickers and source ledgers are omitted. Per-city provenance, score inputs, coverage, freshness and the ODbL download live at `/methodology/nightlife?country=...&city=...`. Mandatory map and photo attribution remains visible.
+
+Explicit positive venue recommendations are extracted from licensed first-hand accounts. Names must occur in the source text. Independent discussion groups rank above ratings; repeated mentions in one group do not inflate rank. Expired, negative and merely topical mentions do not create recommendations. Existing mention caches refresh under a new classifier version; no raw text is retained.
+
+Prices use licensed Numbeo observations only. The meal-plus-two-beers budget sums meal item 1 and twice beer item 4. A 5 km taxi estimate uses exact `Taxi Start (Normal Tariff)` and `Taxi 1km (Normal Tariff)` item names from the city response, avoiding guessed item IDs or mile/km conversions. Missing components hide an amount. Dollar signs represent domestic beer USD price, not an overall cost-of-living score. No live Uber quotes, estimated cover fees or invented prices are used.

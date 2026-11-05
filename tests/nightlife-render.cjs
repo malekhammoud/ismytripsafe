@@ -18,10 +18,10 @@ async function main(){
  for(const key of ['xx_preview','xx_limited']) {
   const report=JSON.parse(fs.readFileSync(`${root}/reports/${key}.json`,'utf8'))
   const html=render(React.createElement(NightlifeReportPage,{report,nearby:[]}))
-  for(const id of ['the-stars','venues','hotspots','late','events','beer','travelers','night-safety','sources'])assert.ok(html.includes(`id="${id}"`),id)
-  assert.ok(html.includes('Preview City'));assert.ok(html.includes('ODbL'))
-  assert.ok(html.includes('Ticketmaster'));assert.ok(html.includes('Numbeo'));assert.ok(html.includes('Download report data'))
-  if(key==='xx_limited'){assert.ok(html.includes('Limited data'));assert.ok(html.includes('Not enough data'))}
+  for(const id of ['the-stars','venues','hotspots','late','night-safety'])assert.ok(html.includes(`id="${id}"`),id)
+  assert.ok(html.includes('Preview City'));assert.ok(html.includes('How we score this'))
+  assert.ok(!html.includes('id="events"'));assert.ok(!html.includes('id="sources"'));assert.ok(!html.includes('nl-section-number'))
+  if(key==='xx_limited'){assert.ok(!html.includes('A useful picture')); assert.ok(html.includes('Not enough data'))}
   fs.writeFileSync(`/tmp/nightlife-${key}.html`,html)
   console.log(`PASS: ${key} server renders all report sections and evidence states (${html.length.toLocaleString()} bytes)`)
  }
