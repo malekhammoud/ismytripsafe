@@ -1,93 +1,73 @@
 @AGENTS.md
 
-# This checkout is BETA, not production
+# This checkout is production
 
-`/root/ismytripsafe-beta` is the **beta** branch, serving
-<https://beta.ismytripsafe.com> from `ismytripsafe-beta.service` on port
-**3002**. Production is a different directory (`/root/ismytripsafe`, `main`,
-port 3000) and is not affected by anything you do here.
+`/opt/ismytripsafe` is **production** (`main`, port **3000**,
+<https://ismytripsafe.com>, `ismytripsafe.service`). Beta is a separate
+checkout — `/opt/ismytripsafe-beta` (`origin/beta`, port **3002**,
+<https://beta.ismytripsafe.com>, `ismytripsafe-beta.service`).
 
-Deploying beta means `git commit` + `git push origin beta`: a GitHub webhook
-(`/hooks/deploy-ismytripsafe-beta`) runs
-`/usr/local/bin/ismytripsafe-beta-deploy.sh`, which does `git reset --hard
-origin/beta`, writes `.env.production.local`, `npm install`, `npm run build`
-and `systemctl restart ismytripsafe-beta`. Watch
-`/var/log/ismytripsafe-beta-deploy.log` for `beta deploy OK`.
+Both are live: whatever is in a checkout's `.next` is what that host serves,
+so **uncommitted work is destroyed by the next deploy** and **`next build`
+here breaks the running site's assets**. See AGENTS.md for the safe
+worktree build recipe.
 
-The same two consequences as production apply — **uncommitted work is
-destroyed by the next deploy**, and **never run `next dev` in this
-directory**, because the live beta site is served from this `.next`. Ports
-3000, 3001, 3002 and 3003 are taken; preview on 3005 from a copy.
+## Deploying
 
-## Beta is a separate origin, and must stay uncrawlable
+- **Prod:** `git push origin main` → webhook runs
+  `/usr/local/bin/ismytripsafe-deploy.sh` (`git reset --hard origin/main`,
+  `npm install`, `npm run build`, `systemctl restart ismytripsafe`).
+  Watch `/var/log/ismytripsafe-deploy.log` for `deploy OK`.
+- **Beta:** `git push origin main:beta` (or push the beta branch) → the same
+  pipeline against `origin/beta` in `/opt/ismytripsafe-beta`, restarting
+  `ismytripsafe-beta`; log at `/var/log/ismytripsafe-beta-deploy.log`.
 
-Beta serves the same 1,000+ reports on a second hostname. `NEXT_PUBLIC_IS_BETA=1`
-(set by the deploy script into `.env.production.local`, because `NEXT_PUBLIC_*`
-is inlined at build time and the systemd unit is too late for it) turns on:
+Ports: 3000 prod, 3002 beta, 3001 whatgradsmake. 3003–3005 are free for
+worktree previews. **Outley** (`/opt/outley`, ports 3200/3400/8200) is a
+different app on this host — leave its dirs, units, ports and vhosts alone.
 
-- `app/robots.ts` → `Disallow: /` for everything
-- `app/layout.tsx` → `noindex, nofollow` on every page
-- `components/beach/BetaRibbon.tsx` → the orange strip at the top
+Beta is currently a **public mirror** (the deploy script writes
+`NEXT_PUBLIC_IS_BETA=0`), so it is crawlable like production. Flip that env to
+`1` in the deploy script if it ever needs to be a noindex staging origin —
+`app/robots.ts`, `app/layout.tsx` and `components/beach/BetaRibbon.tsx`
+already honour it.
 
-If you ever merge beta into main, those three switch themselves off — but
-check `.env.production.local` is not committed and `NEXT_PUBLIC_SITE_URL`
-isn't pointing at the beta host.
+## Beta branch — nightlife reports
 
-## beta2 is the frozen backup
+`origin/beta` carries the Nightlife Report feature (not on prod): pages at
+`/{country}/{city}/nightlife`, pipeline in `lib/nightlife/*`, batch entry
+`scripts/nightlife.cjs`, worker under `workers/nightlife/`. Records live in
+`/var/lib/ismytripsafe/nightlife` (`NIGHTLIFE_CACHE_DIR`): `outcome: limited`
+publishes with a "Limited data" label, `withheld` publishes nothing.
+Promoting it to prod is a deliberate merge into `main`.
 
-`beta2.ismytripsafe.com` is a snapshot of this site, kept so a previous design
-stays visible while beta keeps moving. Separate checkout
-(`/root/ismytripsafe-beta2`) pinned to the **`beta2` branch**, its own unit
-(`ismytripsafe-beta2.service`, port **3003**), its own nginx vhost and cert.
+## Design system
 
-It is deliberately **not** wired to the deploy webhook — a backup that follows
-the thing it is backing up is not a backup. To move it forward, point the
-`beta2` branch at a new commit by hand and rebuild:
+The postcard theme lives in `app/globals.css`: same CSS variable *names* as
+ever, values re-skinned. Type is Instrument Serif (display) over Newsreader
+(reading) over Azeret Mono (every number, label and date), wired in
+`app/layout.tsx`; the tokens compose the `-src` variables next/font sets, so
+don't rename either half. The rule the split encodes: nothing that is a fact
+wears the same face as something that is a mood.
 
-```
-git branch -f beta2 <sha> && git push -f origin beta2
-cd /root/ismytripsafe-beta2 && git fetch && git reset --hard origin/beta2 \
-  && npm install && npm run build && systemctl restart ismytripsafe-beta2
-```
+Supplied artwork is AI-generated and labelled "Illustration"; the rule for
+where it may appear is the header comment in `lib/photos.ts`, processing in
+`scripts/build-supplied-photos.mjs`. Related-destination cards prefer each
+city's own report photo (Wikipedia → Wikivoyage → Wikimedia Commons), then its
+commissioned illustration, and otherwise show no photo — never a generic
+beach.
 
-It shares the production report cache like beta does, and carries
-`NEXT_PUBLIC_IS_BETA=1`, so it is noindex and `Disallow: /` too.
+**Location integrity** — `node scripts/check-locations.mjs` after changing
+`lib/data/geo.ts` or running a batch pregeneration.
 
-## What beta is currently testing
-
-1. **The globe** (`components/globe/GlobeExplorer.tsx`) replacing the
-   destinations list — WebGL, countries tinted by score, clickable city pins.
-2. **The postcard beach theme** — `app/globals.css` keeps production's CSS
-   variable *names* and only changes their values, so every page re-skins for
-   free. Type is Instrument Serif (display) over Newsreader (reading) over
-   Azeret Mono (every number, label and date), wired in `app/layout.tsx`; the
-   tokens in `globals.css` compose them from the `-src` variables next/font
-   sets, so don't rename either half. The rule the split encodes: nothing
-   that is a fact wears the same face as something that is a mood.
-3. **River's art direction on the home page** — the header band
-   (`components/home/HeaderBand.tsx`) is his comp
-   `WhatsAppChatRiver2/00000105` converted to elements, measured off the
-   original rather than eyeballed; the geometry lives in `app/globals.css`
-   under `.ith-*`. Its numbers are read live from the report store, so they
-   will not match the comp's invented 84 and should not be made to.
-   The imagery he supplied is AI-generated and is labelled "Illustration"
-   wherever it appears; see the header comment in `lib/photos.ts` for the
-   rule that governs where it may and may not be used, and
-   `scripts/build-supplied-photos.mjs` for how it is processed.
-4. **Location integrity** — `node scripts/check-locations.mjs` asks whether
-   every report is filed under the country it is actually in. Run it after
-   any change to `lib/data/geo.ts` or a batch of pregeneration.
-
-## Two traps this page has already hit — don't undo these
+## Traps this site has already hit — don't undo these
 
 - **Never set React state from `onZoom` unsnapped.** It fires every animation
   frame; a stream of default-priority updates starves React's transitions.
 - **globals.css is declared after Tailwind's layer**, so at equal specificity
-  a plain class in it beats a `lg:`/`sm:` utility in the markup. Three bugs so
-  far: a label that stayed orange serif on a dark panel, a hero band stuck at
-  its mobile height, and a desktop layout that collapsed into one enormous
-  postcard. Put responsive switches for `.ith-*`, `.pc-*` and friends in the
-  stylesheet's own media queries, not in `className`.
+  a plain class in it beats a `lg:`/`sm:` utility in the markup. Put
+  responsive switches for `.ith-*`, `.pc-*` and friends in the stylesheet's
+  own media queries, not in `className`.
 - **The globe pauses its render loop on any outbound link click** (the
   capture-phase handler in `GlobeExplorer`). Where WebGL is slow the frame
   loop eats the whole main thread — measured at 1 fps — and React never gets
