@@ -5,12 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/root/ismytripsafe-beta
+WorkingDirectory=/opt/ismytripsafe-beta
 Environment=NODE_ENV=production
-Environment=NIGHTLIFE_CACHE_DIR=/root/ismytripsafe-nightlife-data
+Environment=NIGHTLIFE_CACHE_DIR=/var/lib/ismytripsafe/nightlife
 EnvironmentFile=-/etc/ismytripsafe.env
-EnvironmentFile=-/root/ismytripsafe-beta/.env.nightlife
-ExecStartPre=/usr/bin/mkdir -p /root/ismytripsafe-nightlife-data
-ExecStart=/usr/bin/flock -n /root/ismytripsafe-nightlife-data/batch.lock /usr/bin/node scripts/nightlife.cjs --refresh-due
+EnvironmentFile=-/opt/ismytripsafe-beta/.env.nightlife
+ExecStartPre=/usr/bin/mkdir -p /var/lib/ismytripsafe/nightlife
+ExecStart=/usr/bin/flock -n /var/lib/ismytripsafe/nightlife/batch.lock /usr/bin/node scripts/nightlife.cjs --refresh-due
 TimeoutStartSec=7200
 Nice=10

@@ -3,7 +3,7 @@ import path from "node:path"
 import { randomUUID } from "node:crypto"
 import type { NightlifeReport } from "./types"
 // Separate from production's safety cache. Never use REPORT_CACHE_DIR here.
-export const NIGHTLIFE_DIR = process.env.NIGHTLIFE_CACHE_DIR || "/root/ismytripsafe-nightlife-data"
+export const NIGHTLIFE_DIR = process.env.NIGHTLIFE_CACHE_DIR || "/var/lib/ismytripsafe/nightlife"
 export type NightlifeSummary = Pick<NightlifeReport, "city" | "updatedAt" | "outcome" | "overall" | "reasons" | "refresh"> & { venueCount: number; scoreCount: number; density: number | null }
 export function safeKey(key: string) { if (!/^[a-z0-9][a-z0-9_-]{0,150}$/.test(key)) throw new Error("Invalid city key"); return key }
 export async function readNightlife(key: string): Promise<NightlifeReport | null> {
