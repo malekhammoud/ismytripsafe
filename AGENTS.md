@@ -10,12 +10,13 @@ Next.js 16.2.9 / React 19 / TypeScript strict / Tailwind v4 (App Router). No tes
 
 ## Deploy model — treat this checkout as live
 
-- `git push origin main` auto-deploys: a webhook on this host runs `git reset --hard origin/main`, `npm install`, `npm run build`, `systemctl restart` (see `/usr/local/bin/ismytripsafe-deploy.sh`, `/etc/webhook.conf`). **Uncommitted work is destroyed by the next push.** Commit (and expect an auto-deploy) before ending a session.
-- Never run `next dev` or `next start` in this checkout. Ports 3000–3004 are taken; use 3005 from a copy (`/root/ismytripsafe-preview`) instead.
-- **Never run `npm run build` in this checkout unless the working tree is exactly the code you intend the live site to serve.** `next build` wipes `.next/`, and the running production server serves `_next/static` *from disk* — a build here deletes the live site's JS/CSS assets mid-flight (HTTP 500 on every chunk until the service restarts), and a restart then serves whatever un-released code is on disk. To build and serve a different revision (e.g. a work-in-progress design), build in a `git worktree` at that commit and leave production's `.next` alone:
-  `git worktree add /tmp/prod-build <sha>` + `mount --bind <repo>/node_modules /tmp/prod-build/node_modules` (Turbopack refuses symlinked node_modules), build there, `cp -r` the fresh `.next` over this checkout's, then `systemctl restart ismytripsafe`. Verify a sample of `/_next/static/...` chunk URLs are 200 afterwards.
-- The deploy pipeline (build here → `systemctl restart ismytripsafe`) and the unit's `WorkingDirectory` are aligned on `/root/ismytripsafe` since 2026-09-02 — previously the unit pointed at `/root/ismytripsafe-beta` and every deploy served a stale build. If one checkout drifts again, verify with `systemctl cat ismytripsafe.service` and `ls -l /proc/<next-server-pid>/cwd`.
-- `.env*` are gitignored; `.env.local` (OPENROUTER_API_KEY) is machine-local, the deploy writes `.env.production.local`.
+- **Layout:** production `/opt/ismytripsafe` (port 3000, `ismytripsafe.service`), beta `/opt/ismytripsafe-beta` (port 3002, `ismytripsafe-beta.service`). Port 3001 is another site (whatgradsmake); 3003–3005 are free.
+- **Another app lives here too:** Outley at `/opt/outley` (frontend :3200, admin :3400, API :8200, scheduler) — never touch its directories, ports, units or nginx vhosts.
+- `git push origin beta` auto-deploys beta: the webhook (`/etc/webhook.conf` → `/usr/local/bin/ismytripsafe-beta-deploy.sh`) runs `git reset --hard origin/beta`, writes `.env.production.local`, `npm install`, `npm run build`, `systemctl restart ismytripsafe-beta`. Pushes to `main` deploy production separately from `/opt/ismytripsafe`. **Uncommitted work is destroyed by the next deploy of this branch.** Commit before ending a session.
+- Never run `next dev` or `next start` in either checkout. To preview, use a `git worktree` on a free port (3003–3005).
+- **Never run `npm run build` in a live checkout unless the tree is exactly what should be served.** `next build` wipes `.next/`, and the running server serves `_next/static` *from disk* — a build here 500s every chunk until the service restarts, and a restart then serves un-released code. Build in a worktree instead: `git worktree add /tmp/x <sha>` + `mount --bind <repo>/node_modules /tmp/x/node_modules` (Turbopack refuses symlinked node_modules), build there, then swap `.next` + restart only if intended (for beta: `ismytripsafe-beta`).
+- Verify what a service actually serves with `systemctl cat ismytripsafe-beta.service` and `ls -l /proc/<next-server-pid>/cwd`.
+- `.env*` are gitignored; `.env.local` is machine-local, the beta deploy script writes `.env.production.local` (`NEXT_PUBLIC_SITE_URL=https://ismytripsafe.com`, `NEXT_PUBLIC_IS_BETA=0`).
 
 ## Architecture
 
@@ -32,6 +33,6 @@ Next.js 16.2.9 / React 19 / TypeScript strict / Tailwind v4 (App Router). No tes
 - Run `node scripts/check-locations.mjs` after editing `lib/data/geo.ts` or a batch pregeneration — catches reports filed under the wrong country.
 - AI-generated "Illustration" imagery rules: see the header comment in `lib/photos.ts`.
 
-## Uncommitted WIP (as of 2026-08-13)
+## Beta branch — nightlife reports
 
-Search/resolve feature: `app/api/search`, `app/api/resolve`, `lib/search.ts`, `lib/ai-resolve.ts`, `lib/data/aliases.ts`, `scripts/bench-search.mts`, `bench-search.cjs`; `tsconfig.json` extended to include `**/*.mts`. These are not merged; build before relying on them.
+`origin/beta` carries the Nightlife Report feature (not on prod): pages at `/{country}/{city}/nightlife`, pipeline in `lib/nightlife/*`, batch entry `scripts/nightlife.cjs`, worker under `workers/nightlife/`. Records live in `/var/lib/ismytripsafe/nightlife` (`NIGHTLIFE_CACHE_DIR`): `outcome: limited` publishes with a "Limited data" label, `withheld` publishes nothing. Promoting it to prod is a deliberate merge into `main`.

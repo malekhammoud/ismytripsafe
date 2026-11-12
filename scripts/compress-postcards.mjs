@@ -2,8 +2,8 @@ import sharp from "sharp"
 import fs from "fs"
 import path from "path"
 
-const srcDir = "/root/ismytripsafe-beta/WhatsAppChatRiver2"
-const outDir = "/root/ismytripsafe-beta/public/photos/postcards"
+const srcDir = "/opt/ismytripsafe-beta/WhatsAppChatRiver2"
+const outDir = "/opt/ismytripsafe-beta/public/photos/postcards"
 
 const postcards = [
   "00000110-PHOTO-2026-08-04-23-38-18.jpg",

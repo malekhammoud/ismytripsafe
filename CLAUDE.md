@@ -2,56 +2,36 @@
 
 # This checkout is BETA, not production
 
-`/root/ismytripsafe-beta` is the **beta** branch, serving
+`/opt/ismytripsafe-beta` is the **beta** branch, serving
 <https://beta.ismytripsafe.com> from `ismytripsafe-beta.service` on port
-**3002**. Production is a different directory (`/root/ismytripsafe`, `main`,
-port 3000) and is not affected by anything you do here.
+**3002**. Production is `/opt/ismytripsafe` (`main`, port 3000,
+`ismytripsafe.service`) and is not affected by anything you do here.
 
-Deploying beta means `git commit` + `git push origin beta`: a GitHub webhook
-(`/hooks/deploy-ismytripsafe-beta`) runs
-`/usr/local/bin/ismytripsafe-beta-deploy.sh`, which does `git reset --hard
-origin/beta`, writes `.env.production.local`, `npm install`, `npm run build`
-and `systemctl restart ismytripsafe-beta`. Watch
-`/var/log/ismytripsafe-beta-deploy.log` for `beta deploy OK`.
+Both are live: whatever is in a checkout's `.next` is what that host serves,
+so **uncommitted work is destroyed by the next deploy** and **`next build`
+here breaks the running site's assets**. See AGENTS.md for the safe
+worktree build recipe.
 
-The same two consequences as production apply — **uncommitted work is
-destroyed by the next deploy**, and **never run `next dev` in this
-directory**, because the live beta site is served from this `.next`. Ports
-3000, 3001, 3002 and 3003 are taken; preview on 3005 from a copy.
+## Deploying
 
-## Beta is a separate origin, and must stay uncrawlable
+- **Beta:** `git push origin beta` (or `main:beta`) → webhook runs
+  `/usr/local/bin/ismytripsafe-beta-deploy.sh` (`git reset --hard origin/beta`,
+  writes `.env.production.local`, `npm install`, `npm run build`,
+  `systemctl restart ismytripsafe-beta`). Watch
+  `/var/log/ismytripsafe-beta-deploy.log` for `beta deploy OK`.
+- **Prod:** `git push origin main` deploys `/opt/ismytripsafe` through
+  `/usr/local/bin/ismytripsafe-deploy.sh`; log at
+  `/var/log/ismytripsafe-deploy.log`.
 
-Beta serves the same 1,000+ reports on a second hostname. `NEXT_PUBLIC_IS_BETA=1`
-(set by the deploy script into `.env.production.local`, because `NEXT_PUBLIC_*`
-is inlined at build time and the systemd unit is too late for it) turns on:
+Ports: 3000 prod, 3002 beta, 3001 whatgradsmake. 3003–3005 are free for
+worktree previews. **Outley** (`/opt/outley`, ports 3200/3400/8200) is a
+different app on this host — leave its dirs, units, ports and vhosts alone.
 
-- `app/robots.ts` → `Disallow: /` for everything
-- `app/layout.tsx` → `noindex, nofollow` on every page
-- `components/beach/BetaRibbon.tsx` → the orange strip at the top
-
-If you ever merge beta into main, those three switch themselves off — but
-check `.env.production.local` is not committed and `NEXT_PUBLIC_SITE_URL`
-isn't pointing at the beta host.
-
-## beta2 is the frozen backup
-
-`beta2.ismytripsafe.com` is a snapshot of this site, kept so a previous design
-stays visible while beta keeps moving. Separate checkout
-(`/root/ismytripsafe-beta2`) pinned to the **`beta2` branch**, its own unit
-(`ismytripsafe-beta2.service`, port **3003**), its own nginx vhost and cert.
-
-It is deliberately **not** wired to the deploy webhook — a backup that follows
-the thing it is backing up is not a backup. To move it forward, point the
-`beta2` branch at a new commit by hand and rebuild:
-
-```
-git branch -f beta2 <sha> && git push -f origin beta2
-cd /root/ismytripsafe-beta2 && git fetch && git reset --hard origin/beta2 \
-  && npm install && npm run build && systemctl restart ismytripsafe-beta2
-```
-
-It shares the production report cache like beta does, and carries
-`NEXT_PUBLIC_IS_BETA=1`, so it is noindex and `Disallow: /` too.
+Beta is currently a **public mirror** (the deploy script writes
+`NEXT_PUBLIC_IS_BETA=0`), so it is crawlable like production. Flip that env to
+`1` in the deploy script if it ever needs to be a noindex staging origin —
+`app/robots.ts`, `app/layout.tsx` and `components/beach/BetaRibbon.tsx`
+already honour it.
 
 ## What beta is currently testing
 

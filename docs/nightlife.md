@@ -1,8 +1,8 @@
 # Nightlife reports — beta release
 
-This feature belongs to `/root/ismytripsafe-beta`, served by
-`ismytripsafe-beta.service` on port 3002. Do not deploy to `main`, production,
-beta2, or beta3. The local feature branch targets `origin/beta`; use an explicit `HEAD:beta` push.
+This feature belongs to `/opt/ismytripsafe-beta`, served by
+`ismytripsafe-beta.service` on port 3002. Do not deploy it to `main` /
+production; the branch targets `origin/beta`. Use an explicit `HEAD:beta` push.
 
 ## Routes and design
 
@@ -28,7 +28,7 @@ with `NIGHTLIFE_SITE_URL`. Existing production metadata is unchanged.
 
 ## Storage and generation
 
-`NIGHTLIFE_CACHE_DIR` defaults to `/root/ismytripsafe-nightlife-data`. This is
+`NIGHTLIFE_CACHE_DIR` defaults to `/var/lib/ismytripsafe/nightlife`. This is
 separate from the shared safety report store. The worker reads safety reports;
 it never generates, refreshes, or writes them.
 
@@ -48,7 +48,7 @@ published report with a withheld one or reduce its score coverage.
 The root `npm install` now installs the pinned opening-hours worker automatically through `postinstall`, including during beta deployment. Its dependency scripts are disabled. For an existing install made with `--ignore-scripts`, install it explicitly before generating:
 
 ```sh
-cd /root/ismytripsafe-beta
+cd /opt/ismytripsafe-beta
 npm install --prefix workers/nightlife --no-audit --no-fund
 npm run nightlife -- --test-batch
 npm run nightlife -- --audit
