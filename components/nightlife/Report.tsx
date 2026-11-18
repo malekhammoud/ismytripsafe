@@ -42,6 +42,7 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
         </div>
       </header>
       <div className="nl-container nl-report-body">
+        <nav className="nl-report-breadcrumb" aria-label="Breadcrumb"><Link href="/nightlife">Nightlife reports</Link><span aria-hidden="true">/</span><Link href={c.safetyPath}>{c.city} safety report</Link></nav>
         <section id="the-stars" className="nl-ratings" aria-label="The five ratings">
           <div className="nl-score-grid">{r.scores.map(score => { const Icon = ICONS[score.key]; return <article key={score.key} className={`nl-score ${score.value == null ? "nl-score-missing" : ""}`}><Icon size={19}/><h2>{score.label}</h2><p className="nl-score-question">{DESCRIPTIONS[score.key]}</p><Stars value={score.value}/>{score.bullets.length > 0 && <ul className="nl-score-points">{score.bullets.slice(0, 2).map(bullet => <li key={bullet}>{plainCopy(bullet)}</li>)}</ul>}</article> })}</div>
         </section>

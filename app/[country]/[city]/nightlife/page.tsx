@@ -27,7 +27,13 @@ export default async function Page({ params }: Props) {
     return <div className="nl-page"><SiteHeader/><main className="nl-container"><OnDemandReport country={country} city={city} cityName={hit.meta.city}/><SiteFooter/></main></div>
   }
   const nearby = (await listNightlife()).filter(r => r.city.key !== report.city.key).sort((a, b) => distance(report.city, a.city) - distance(report.city, b.city)).slice(0, 3)
+  const canonical = nightlifeUrl(nightlifePath(report))
   // Editorial score is not passed off as a consumer AggregateRating.
-  const schema = { "@context": "https://schema.org", "@type": "Article", headline: `${report.city.city} Nightlife: Bars, Clubs & Safety`, dateModified: report.updatedAt, url: nightlifeUrl(nightlifePath(report)), author: { "@type": "Organization", name: "IsMyTripSafe", url: nightlifeUrl("/") }, about: { "@type": "City", name: report.city.city, containedInPlace: { "@type": "Country", name: report.city.country } }, citation: report.sources.filter(s => s.fetchedAt).map(s => s.url) }
-  return <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }}/><OnDemandReport country={country} city={city} cityName={report.city.city} mode="refresh"/><NightlifeReportPage report={report} nearby={nearby}/></>
+  const schema = { "@context": "https://schema.org", "@type": "Article", headline: `${report.city.city} Nightlife: Bars, Clubs & Safety`, dateModified: report.updatedAt, url: canonical, mainEntityOfPage: canonical, author: { "@type": "Organization", name: "IsMyTripSafe", url: nightlifeUrl("/") }, publisher: { "@type": "Organization", name: "IsMyTripSafe", url: nightlifeUrl("/") }, about: { "@type": "City", name: report.city.city, containedInPlace: { "@type": "Country", name: report.city.country } }, citation: report.sources.filter(s => s.fetchedAt).map(s => s.url) }
+  const breadcrumbs = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+    { "@type": "ListItem", position: 1, name: "IsMyTripSafe", item: nightlifeUrl("/") },
+    { "@type": "ListItem", position: 2, name: "Nightlife reports", item: nightlifeUrl("/nightlife") },
+    { "@type": "ListItem", position: 3, name: `${report.city.city} nightlife`, item: canonical },
+  ] }
+  return <><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema).replace(/</g, "\\u003c") }}/><script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbs).replace(/</g, "\\u003c") }}/><OnDemandReport country={country} city={city} cityName={report.city.city} mode="refresh"/><NightlifeReportPage report={report} nearby={nearby}/></>
 }

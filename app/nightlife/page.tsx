@@ -41,7 +41,7 @@ export default async function NightlifeIndex() {
       <header className="nld-intro">
         <Link href="/" className="nld-back">← IsMyTripSafe</Link>
         <div className="nld-intro-grid">
-          <div><h1>Nightlife, city by city.</h1><p className="nld-description">Bars, clubs, live music.<br/>And a clearer picture of safety after dark.</p></div>
+          <div><h1>Nightlife, city by city.</h1><p className="nld-description">Bars, clubs, live music.<br/>And a clearer picture of safety after dark.{nightlife.length > 0 && <><br/><span className="nld-count">{nightlife.length} researched city guides, built from mapped venues, opening hours and safety data.</span></>}</p></div>
           <aside className="nld-intro-note"><Link href="/destinations">City safety reports ↗</Link></aside>
         </div>
       </header>
