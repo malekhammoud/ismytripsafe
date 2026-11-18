@@ -79,6 +79,19 @@ test('a same-name municipality parent supplies Seville a boundary',async()=>{
   return Response.json({entities:{Q55893348:cityNoBoundary}})
  },async()=>{const found=await lookupCity(seville,true);assert.equal(found.wikidataId,'Q55893348');assert.equal(found.relationId,342563);assert.equal(found.population,700169)})
 })
+test('a large city-province can use its province boundary',async()=>{
+ const istanbul={key:'tr_istanbul',city:'Istanbul',country:'Republic of Türkiye',countryCode:'TR',countrySlug:'turkiye',citySlug:'istanbul',lat:41.01,lon:28.96}
+ const cityNoBoundary={id:'Q406',labels:{en:{value:'Istanbul'}},claims:{P31:[claim({id:'Q515'})],P17:[claim({id:'Q43'})],P625:[claim({latitude:41.01,longitude:28.96})],P1082:[{mainsnak:{datavalue:{value:{amount:'+15655924'}}},qualifiers:{P585:[{datavalue:{value:{time:'+2023-00-00T00:00:00Z',precision:9}}}]}}],P131:[claim({id:'Q534799'})]}}
+ const parent={id:'Q534799',labels:{en:{value:'Istanbul Province'}},claims:{P31:[claim({id:'Q48336'})],P402:[claim('223474')]}}
+ const turkey={id:'Q43',claims:{P297:[claim('TR')]}}
+ await mockFetch(async input=>{
+  const url=new URL(input)
+  if(url.searchParams.get('action')==='wbsearchentities')return Response.json({search:[{id:'Q406'}]})
+  if(url.searchParams.get('ids')==='Q534799')return Response.json({entities:{Q534799:parent}})
+  if(url.searchParams.get('ids')==='Q43')return Response.json({entities:{Q43:turkey}})
+  return Response.json({entities:{Q406:cityNoBoundary}})
+ },async()=>{const found=await lookupCity(istanbul,true);assert.equal(found.wikidataId,'Q406');assert.equal(found.relationId,223474)})
+})
 test('the fallback rejects a wrong country even when Wikipedia coordinates are nearby',async()=>{
   const wrong={...city,claims:{...city.claims,P17:[claim({id:'Q99'})]}}
   await mockFetch(async input=>{

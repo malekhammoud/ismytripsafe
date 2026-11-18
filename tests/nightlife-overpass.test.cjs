@@ -24,6 +24,10 @@ test('ceremonial and political city boundaries are valid venue areas',()=>{
  const londonArea={type:'area',id:3600065606,tags:{wikidata:'Q23306',boundary:'ceremonial'}}
  assert.deepEqual(verifiedArea(london,{elements:[ceremonial,londonArea]}),{boundary:ceremonial,areaId:londonArea.id})
  assert.match(collectionQuery(london),/rel\(65606\)->\.boundary;/)
+ const placeCity={...london,relationId:5750005,wikidataId:'Q3130'}
+ const placeBoundary={type:'relation',id:5750005,tags:{wikidata:'Q3130',boundary:'place',place:'city'}}
+ const placeArea={type:'area',id:3605750005,tags:{wikidata:'Q3130',boundary:'place',place:'city'}}
+ assert.deepEqual(verifiedArea(placeCity,{elements:[placeBoundary,placeArea]}),{boundary:placeBoundary,areaId:placeArea.id})
 })
 test('complete venue queries retain nodes, ways and relations',()=>{
  assert.equal(verifiedVenues(response(),area.id).length,3)

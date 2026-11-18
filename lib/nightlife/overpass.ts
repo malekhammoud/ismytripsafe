@@ -79,7 +79,7 @@ export function createOverpassClient(options: { primary?: string; fallback?: str
 const header = (seconds: number) => `[out:json][timeout:${seconds}][maxsize:67108864];`
 // Greater London is a ceremonial county, not an administrative boundary. The
 // city-level relation is still the correct area for a nightlife count.
-const BOUNDARY_KINDS = new Set(["administrative", "ceremonial", "political", "statistical"])
+const BOUNDARY_KINDS = new Set(["administrative", "ceremonial", "political", "statistical", "place"])
 const BOUNDARY_FILTER = `[boundary~"^(${[...BOUNDARY_KINDS].join("|")})$"]`
 export function boundaryQuery(city: City) {
   if (!city.wikidataId || !/^Q\d+$/.test(city.wikidataId)) throw new SourceUnavailable("A verified city identity is needed before mapping venues.")

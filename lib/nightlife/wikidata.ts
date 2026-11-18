@@ -37,7 +37,12 @@ async function parentBoundary(city: City, candidates: Record<string, Entity>, lo
   for (const id of parents) {
     const parent = loaded[id]
     const parentName = parent?.labels?.en?.value ?? ""
-    const municipal = MUNICIPAL_NAME.test(parentName) || plainName(parentName) === plainName(city.city)
+    // Istanbul is a city-province: the province boundary is the city boundary.
+    // Only use a province/region for a genuinely large city, never for a small
+    // town that happens to sit inside one.
+    const provinceName = new RegExp(`^${city.city.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+(province|region|prefecture)$`, "i")
+    const cityProvince = (city.population ?? 0) >= 2_000_000 && provinceName.test(parentName)
+    const municipal = MUNICIPAL_NAME.test(parentName) || plainName(parentName) === plainName(city.city) || cityProvince
       || entityIds(parent ?? { id, claims: {} }, "P31").some(kind => MUNICIPAL_CLASSES.has(kind))
     if (!parent || !municipal) continue
     const relation = activeClaims(parent, "P402").sort((a, b) => Number(b.rank === "preferred") - Number(a.rank === "preferred"))
