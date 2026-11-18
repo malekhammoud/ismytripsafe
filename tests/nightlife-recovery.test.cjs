@@ -34,6 +34,12 @@ test('settlement wrappers match New York without turning Kansas City into Kansas
  const kansas={...ny,id:'Q1',labels:{en:{value:'Kansas'}},aliases:{en:[]},claims:{...ny.claims,P402:[]}}
  assert.equal(selectCity({key:'us_kansas-city',city:'Kansas City',country:'United States',countryCode:'US',lat:39.0997,lon:-94.5786},[kansas],us,{}),null)
 })
+test('a deprecated ISO code still verifies the country',()=>{
+ const nl={Q55:{id:'Q55',labels:{en:{value:'Netherlands'}},claims:{P297:[{rank:'deprecated',mainsnak:{datavalue:{value:'NL'}}}]}}}
+ const amsterdam={id:'Q727',labels:{en:{value:'Amsterdam'}},claims:{P31:[claim({id:'Q515'})],P17:[claim({id:'Q55'})],P625:[claim({latitude:52.37,longitude:4.89})],P402:[claim('271110')]}}
+ const match=selectCity({key:'nl_amsterdam',city:'Amsterdam',country:'The Netherlands',countryCode:'NL',lat:52.37,lon:4.89},[amsterdam],nl,{})
+ assert.equal(match.wikidataId,'Q727');assert.equal(match.relationId,271110)
+})
 test('same-name landmarks and cities in a different country are rejected',()=>{
   assert.equal(selectCity(seed,[entity('Q1','Tbilisi','Q55488')],countries,{}),null)
   assert.equal(selectCity({...seed,countryCode:'US'},[entity('Q994','Tbilisi','Q515')],countries,{}),null)

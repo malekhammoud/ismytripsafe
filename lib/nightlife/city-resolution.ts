@@ -75,7 +75,20 @@ export function selectCity(seed: City, candidates: Entity[], countries: Record<s
     const label = e.labels?.en?.value
     const exact = !!label && sameCityName(label, name)
     const alias = (e.aliases?.en ?? []).some(a => sameCityName(a.value, name))
-    const countryOk = entityIds(e, "P17").some(id => countries[id] && activeClaims(countries[id], "P297").some(c => claimValue(c) === seed.countryCode.toUpperCase()))
+    const countryOk = entityIds(e, "P17").some(id => {
+      const country = countries[id]
+      if (!country) return false
+      const code = seed.countryCode.toUpperCase()
+      const activeCodes = activeClaims(country, "P297").map(claimValue)
+      // Some countries have their ISO code marked deprecated even though it is
+      // still the correct current code (the Netherlands is one). Use the
+      // deprecated value only when there is no active alternative.
+      const fallbackCodes = (country.claims?.P297 ?? []).map(claimValue)
+      if (activeCodes.includes(code) || (!activeCodes.length && fallbackCodes.includes(code))) return true
+      const target = normalize((seed.country ?? "").replace(/^the\s+/i, ""))
+      return [country.labels?.en?.value, ...(country.aliases?.en ?? []).map(a => a.value)].filter((name): name is string => !!name)
+        .some(name => normalize(name.replace(/^the\s+/i, "")) === target)
+    })
     const coords = activeClaims(e, "P625").sort((a, b) => Number(b.rank === "preferred") - Number(a.rank === "preferred")).map(claimValue)
       .find(v => { const c = v as { latitude?: number; longitude?: number; globe?: string }; return Number.isFinite(c?.latitude) && Number.isFinite(c?.longitude) && Math.abs(c.latitude!) <= 90 && Math.abs(c.longitude!) <= 180 && (!c.globe || c.globe.endsWith("/Q2")) }) as { latitude: number; longitude: number } | undefined
     if (!kind || (!exact && !alias) || !countryOk || !coords || distance(seed, { lat: coords.latitude, lon: coords.longitude }) > 25000) return []

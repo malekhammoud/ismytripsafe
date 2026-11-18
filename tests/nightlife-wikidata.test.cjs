@@ -53,6 +53,32 @@ test('a city without its own boundary reuses a verified municipality relation',a
   return Response.json({entities:{Q34647:cityNoBoundary}})
  },async()=>{const found=await lookupCity(joburg,true);assert.equal(found.wikidataId,'Q34647');assert.equal(found.relationId,594508)})
 })
+test('a country-specific municipality parent supplies Stockholm its boundary',async()=>{
+ const stockholm={key:'se_stockholm',city:'Stockholm',country:'Sweden',countryCode:'SE',countrySlug:'sweden',citySlug:'stockholm',lat:59.3293,lon:18.0686}
+ const cityNoBoundary={id:'Q1754',labels:{en:{value:'Stockholm'}},claims:{P31:[claim({id:'Q515'})],P17:[claim({id:'Q34'})],P625:[claim({latitude:59.3293,longitude:18.0686})],P131:[claim({id:'Q506250'})]}}
+ const parent={id:'Q506250',labels:{en:{value:'Stockholm Municipality'}},claims:{P31:[claim({id:'Q127448'})],P402:[claim('398021')]}}
+ const sweden={id:'Q34',claims:{P297:[claim('SE')]}}
+ await mockFetch(async input=>{
+  const url=new URL(input)
+  if(url.searchParams.get('action')==='wbsearchentities')return Response.json({search:[{id:'Q1754'}]})
+  if(url.searchParams.get('ids')==='Q506250')return Response.json({entities:{Q506250:parent}})
+  if(url.searchParams.get('ids')==='Q34')return Response.json({entities:{Q34:sweden}})
+  return Response.json({entities:{Q1754:cityNoBoundary}})
+ },async()=>{const found=await lookupCity(stockholm,true);assert.equal(found.wikidataId,'Q1754');assert.equal(found.relationId,398021)})
+})
+test('a same-name municipality parent supplies Seville a boundary',async()=>{
+ const seville={key:'es_seville',city:'Seville',country:'Spain',countryCode:'ES',countrySlug:'spain',citySlug:'seville',lat:37.3828,lon:-5.9731}
+ const cityNoBoundary={id:'Q55893348',labels:{en:{value:'Seville city'}},aliases:{en:[{value:'Seville'}]},claims:{P31:[claim({id:'Q515'})],P17:[claim({id:'Q29'})],P625:[claim({latitude:37.3828,longitude:-5.9731})],P131:[claim({id:'Q8717'})]}}
+ const parent={id:'Q8717',labels:{en:{value:'Seville'}},claims:{P31:[claim({id:'Q2074737'})],P402:[claim('342563')],P1082:[{mainsnak:{datavalue:{value:{amount:'+700169'}}},qualifiers:{P585:[{datavalue:{value:{time:'+2013-01-01T00:00:00Z',precision:11}}}]}}]}}
+ const spain={id:'Q29',claims:{P297:[claim('ES')]}}
+ await mockFetch(async input=>{
+  const url=new URL(input)
+  if(url.searchParams.get('action')==='wbsearchentities')return Response.json({search:[{id:'Q55893348'}]})
+  if(url.searchParams.get('ids')==='Q8717')return Response.json({entities:{Q8717:parent}})
+  if(url.searchParams.get('ids')==='Q29')return Response.json({entities:{Q29:spain}})
+  return Response.json({entities:{Q55893348:cityNoBoundary}})
+ },async()=>{const found=await lookupCity(seville,true);assert.equal(found.wikidataId,'Q55893348');assert.equal(found.relationId,342563);assert.equal(found.population,700169)})
+})
 test('the fallback rejects a wrong country even when Wikipedia coordinates are nearby',async()=>{
   const wrong={...city,claims:{...city.claims,P17:[claim({id:'Q99'})]}}
   await mockFetch(async input=>{

@@ -1,6 +1,6 @@
 import { fetchJson, researchSignal } from "./http"
 import { SourceHttpError, SourceUnavailable } from "./source-errors"
-import { activeClaims, claimValue, entityIds, placeKind, selectCity, type Entity } from "./city-resolution"
+import { activeClaims, claimValue, entityIds, latestPopulation, placeKind, selectCity, type Entity } from "./city-resolution"
 import { distance } from "./venues"
 import type { City } from "./types"
 
@@ -24,7 +24,9 @@ async function entities(ids: string[], interactive: boolean): Promise<Record<str
 // A city such as Johannesburg has no P402 boundary of its own; its
 // metropolitan municipality does. Use that parent only when it is actually a
 // municipality or city, never a province or a state.
-const MUNICIPAL_CLASSES = new Set(["Q15284", "Q1530824", "Q515", "Q3957"])
+const MUNICIPAL_CLASSES = new Set(["Q15284", "Q1530824", "Q515", "Q3957", "Q127448", "Q2074737"])
+const MUNICIPAL_NAME = /\b(municipality|city|kommune|gemeente|commune|municipio|comune)\b/i
+const plainName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()
 async function parentBoundary(city: City, candidates: Record<string, Entity>, load: LoadEntities): Promise<City> {
   if (city.relationId || !city.wikidataId) return city
   const entity = candidates[city.wikidataId]
@@ -34,10 +36,18 @@ async function parentBoundary(city: City, candidates: Record<string, Entity>, lo
   const loaded = await load(parents)
   for (const id of parents) {
     const parent = loaded[id]
-    if (!parent || !entityIds(parent, "P31").some(kind => MUNICIPAL_CLASSES.has(kind))) continue
+    const parentName = parent?.labels?.en?.value ?? ""
+    const municipal = MUNICIPAL_NAME.test(parentName) || plainName(parentName) === plainName(city.city)
+      || entityIds(parent ?? { id, claims: {} }, "P31").some(kind => MUNICIPAL_CLASSES.has(kind))
+    if (!parent || !municipal) continue
     const relation = activeClaims(parent, "P402").sort((a, b) => Number(b.rank === "preferred") - Number(a.rank === "preferred"))
       .map(claim => Number(claimValue(claim))).find(n => Number.isSafeInteger(n) && n > 0)
-    if (relation) return { ...city, relationId: relation }
+    if (relation) {
+      // The boundary belongs to the parent, so a parent population is the
+      // honest denominator when the city item has none (Seville is a case).
+      const population = city.population ? null : latestPopulation(parent.claims.P1082 ?? [])
+      return { ...city, relationId: relation, ...(population ? { population: population.population, populationDate: population.date } : {}) }
+    }
   }
   return city
 }
