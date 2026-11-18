@@ -25,3 +25,26 @@
 @media(max-width:700px){.nl-report .nl-container{padding-left:20px;padding-right:20px}.nl-report-hero{min-height:260px}.nl-hero-content{padding-top:40px;padding-bottom:60px}.nl-report-hero h1{font-size:39px}.nl-hero-rating .nl-stars-large{font-size:35px}.nl-hero-rating{gap:15px}.nl-ratings{margin-top:-24px;margin-right:-20px;padding-right:20px;overflow-x:auto;padding-bottom:8px}.nl-report .nl-score-grid{grid-template-columns:repeat(5,minmax(125px,1fr));min-width:625px}.nl-report .nl-score{padding:17px 13px;min-height:162px}.nl-report .nl-section{padding:22px 0}.nl-report .nl-scene-grid{grid-template-columns:1fr;gap:22px}.nl-report .nl-venue-total{display:grid;grid-template-columns:auto 1fr;gap:0 18px;align-items:center;padding:18px 22px}.nl-report .nl-venue-total>svg{display:none}.nl-report .nl-venue-total>strong{grid-row:span 2;font-size:68px;margin:0}.nl-report .nl-venue-total h2{font-size:24px}.nl-report .nl-map{height:330px}.nl-report .nl-breakdown{gap:15px 20px}.nl-shortlist{grid-template-columns:1fr}.nl-report .nl-late-grid{grid-template-columns:repeat(3,1fr)}.nl-report .nl-late-card{padding:22px 14px}.nl-report .nl-late-card>svg{display:none}.nl-report .nl-late-card h3{font-size:12px}.nl-report .nl-late-card>strong{font-size:42px}.nl-clock{font-size:11px}.nl-report .nl-late-card{border-right:1px solid #ffffff22}.nl-report .nl-late-card:last-child{border-right:0}.nl-prices{padding:22px;gap:20px}.nl-price-band{font-size:43px}.nl-price-amounts{min-width:180px}.nl-price-amounts small{display:block;margin:0;font-size:10px}.nl-price-amounts strong{font-size:24px}.nl-report .nl-safety-summary{gap:20px;padding:22px}.nl-report-notes{gap:12px 18px}.nl-report-notes>span:last-child{margin-left:0}}
 .nl-price-notes{display:flex;flex-direction:column;gap:8px;font-size:12px;color:#4c6846}.nl-price-notes a{text-decoration:underline}
 .nl-report .nl-score:last-child{grid-column:auto;display:flex}.nl-report .nl-venue-total>strong{position:static}.nl-report .nl-venue-total{min-height:0}
+.nl-brief-lede{font-size:16px;line-height:1.75;max-width:820px;color:#3d4741;margin:0 0 18px}
+.nl-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.nl-stat-card{display:flex;flex-direction:column;gap:5px;padding:18px 19px;background:#fffcf4;border:1px solid #e4e3d8;border-radius:7px;min-height:112px}
+.nl-stat-card>svg{color:#667b62;margin-bottom:5px}
+.nl-stat-card>strong{font:400 29px/1.1 var(--font-display);letter-spacing:-.02em;overflow-wrap:anywhere}
+.nl-stat-card>strong small{font:400 11px var(--font-mono);color:var(--nl-muted);margin-left:3px}
+.nl-stat-card>span{font:400 10px/1.5 var(--font-mono);color:var(--nl-muted);text-transform:uppercase;letter-spacing:.05em}
+.nl-trait-row{display:flex;flex-wrap:wrap;gap:9px 18px;margin-top:16px;font-size:11px;color:#4f5c50}
+.nl-trait-row>span{display:inline-flex;align-items:center;gap:6px}
+.nl-trait-row svg{color:#7d8e72}
+.nl-report .nl-score-points{margin:13px 0 0;padding:11px 0 0;border-top:1px solid #e8e4da;list-style:none;font-size:10px;line-height:1.6;color:#66706a}
+.nl-report .nl-score-points li+li{margin-top:5px}
+.nl-area-breakdown{grid-template-columns:1fr 1fr;gap:18px 38px}
+.nl-area-level{font-style:normal;font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:.04em;margin-left:8px;white-space:nowrap}
+.nl-data-notes>p{font-size:13px;line-height:1.8;color:#4b554f;max-width:860px}
+.nl-data-notes .nl-data-gaps{margin-top:11px;color:#5e665f}
+.nl-data-notes ul{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:17px}
+.nl-data-notes li{display:flex;align-items:baseline;gap:9px;font-size:11px}
+.nl-data-notes li a{text-decoration:underline;color:#47613f}
+.nl-data-notes li span{font-family:var(--font-mono);font-size:8px;color:#8b9389}
+.nl-map-note{font-size:10px;line-height:1.7;color:var(--nl-muted);padding:11px 2px 0}.nl-map-note a{text-decoration:underline;color:#47613f}
+@media(max-width:1000px){.nl-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.nl-area-breakdown{grid-template-columns:1fr}}
+@media(max-width:700px){.nl-brief-lede{font-size:14px}.nl-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.nl-stat-card{padding:14px;min-height:96px}.nl-stat-card>strong{font-size:23px}.nl-stat-card>span{font-size:8px}.nl-trait-row{font-size:10px}.nl-report .nl-score-points{font-size:9px}}

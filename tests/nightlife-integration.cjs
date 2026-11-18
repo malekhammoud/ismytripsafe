@@ -25,18 +25,23 @@ async function run() {
    else if(ids==='Q999')data={entities:{Q999:{id:'Q999',claims:{P297:[{mainsnak:{datavalue:{value:'XX'}}}]}}}}
    else data={entities:{Q123:{id:'Q123',labels:{en:{value:'Preview City'}},claims:{P31:[{mainsnak:{datavalue:{value:{id:'Q515'}}}}],P625:[{rank:'normal',mainsnak:{datavalue:{value:{latitude:42,longitude:10}}}}],P17:[{mainsnak:{datavalue:{value:{id:'Q999'}}}}],P1082:[{rank:'normal',mainsnak:{datavalue:{value:{amount:'+100000'}}},qualifiers:{P585:[{datavalue:{value:{time:'+2024-01-01T00:00:00Z'}}}]}}],P402:[{rank:'normal',mainsnak:{datavalue:{value:'123'}}}]}}}}
   } else if(url.hostname==='en.wikipedia.org')data={type:'standard',wikibase_item:'Q123',coordinates:{lat:42,lon:10}}
-  else if(['overpass.private.coffee','overpass-api.de'].includes(url.hostname)) {
+  else if(['overpass.openstreetmap.fr','overpass.private.coffee','overpass-api.de'].includes(url.hostname)) {
    const query=new URLSearchParams(init.body).get('data')
    const boundary={type:'relation',id:123,tags:{wikidata:'Q123',boundary:'administrative'}}
    const area={type:'area',id:3600000123,tags:{wikidata:'Q123',boundary:'administrative'}}
-   if(overpassDown && url.hostname==='overpass.private.coffee') throw new DOMException('Fixture timeout','TimeoutError')
+   const venues=Array.from({length:count},(_,i)=>({type:'node',id:1000+i,lat:42+i*.001,lon:10+(i%4)*.001,tags:{name:`Venue ${i}`,amenity:['pub','bar','nightclub','music_venue'][i%4],opening_hours:'Mo-Su 18:00-03:00','addr:suburb':'Old Town'}}))
+   const total={type:'count',id:0,tags:{nodes:String(count),ways:'0',relations:'0',total:String(count)}}
+   if(overpassDown && url.hostname==='overpass.openstreetmap.fr') throw new DOMException('Fixture timeout','TimeoutError')
    if(query.includes('out geom')) {
     if(geometryDown)throw new DOMException('Fixture geometry timeout','TimeoutError')
     data={elements:[{...boundary,members:[{type:'way',role:'outer',geometry:[{lat:41,lon:9},{lat:41,lon:11},{lat:43,lon:11},{lat:43,lon:9},{lat:41,lon:9}]}]}]}
-   } else if(query.includes('map_to_area'))data={elements:[boundary,area]}
+   } else if(query.includes('map_to_area') && query.includes('out count')) {
+    assert.ok(query.includes('out tags center qt;out count;'),'Combined query must include coordinates and a completion count')
+    data={elements:[boundary,area,...venues,total]}
+   } else if(query.includes('map_to_area')) data={elements:[boundary,area]}
    else {
     assert.ok(query.includes('out body center qt;out count;'),'Venue query must include coordinates and a completion count')
-    data={elements:[area,...Array.from({length:count},(_,i)=>({type:'node',id:1000+i,lat:42+i*.001,lon:10+(i%4)*.001,tags:{name:`Venue ${i}`,amenity:['pub','bar','nightclub','music_venue'][i%4],opening_hours:'Mo-Su 18:00-03:00','addr:suburb':'Old Town'}})),{type:'count',id:0,tags:{nodes:String(count),ways:'0',relations:'0',total:String(count)}}]}
+    data={elements:[area,...venues,total]}
    }
   }
   else if(url.hostname==='places-api.foursquare.com')data={results:fsq?Array.from({length:12},(_,i)=>({fsq_place_id:`f${i}`,name:`Venue ${i}`,latitude:42+i*.001,longitude:10+(i%4)*.001,categories:[{name:['Pub','Cocktail Bar','Nightclub','Jazz Club'][i%4]}],rating:7.5+i*.1,popularity:.9-i*.01,stats:{total_ratings:40+i},location:{neighborhood:['Old Town']}})).concat([{fsq_place_id:'inside-extra',name:'Extra live music',latitude:42.02,longitude:10.02,categories:[{name:'Jazz Club'}],rating:8,popularity:.8,stats:{total_ratings:30}},{fsq_place_id:'outside-extra',name:'Wrong city club',latitude:50,longitude:20,categories:[{name:'Nightclub'}],rating:9,popularity:.9,stats:{total_ratings:100}}]):[]}
@@ -64,8 +69,8 @@ async function run() {
  const callsBefore=calls.length
  const publicOnly=await buildNightlife({...base,key:'xx_public',citySlug:'public'},safety,{force:true})
  assert.equal(publicOnly.outcome,'limited');assert.equal(publicOnly.venues.length,24);assert.equal(publicOnly.scores.filter(s=>s.value!=null).length,3)
- const publicQueries=calls.slice(callsBefore).filter(c=>c.url.hostname==='overpass.private.coffee')
- assert.equal(publicQueries.length,2);assert.ok(publicQueries.every(c=>!new URLSearchParams(c.init.body).get('data').includes('out geom')))
+ const publicQueries=calls.slice(callsBefore).filter(c=>['overpass.openstreetmap.fr','overpass.private.coffee'].includes(c.url.hostname))
+ assert.equal(publicQueries.length,1);assert.ok(publicQueries.every(c=>!new URLSearchParams(c.init.body).get('data').includes('out geom')))
  process.env.FOURSQUARE_API_KEY=fsqKey
  const raw=await fs.readFile(path.join(root,'raw','xx_preview','foursquare.json'),'utf8');assert.ok(!raw.includes('secret-'));assert.ok(JSON.parse(raw).data.results.length)
  const exported=await GET(new Request('http://localhost/example/preview/nightlife/data.json'),{params:Promise.resolve({country:'example',city:'preview'})});const payload=await exported.json();assert.equal(payload.venues.length,24);assert.equal(payload.venues[0].rating,undefined);assert.equal(payload.venues[0].popularity,undefined);assert.equal(payload.licence,'ODbL 1.0')

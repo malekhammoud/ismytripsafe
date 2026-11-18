@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowUpRight, AudioLines, Beer, Clock3, MapPin, Moon, ShieldCheck, Sparkles } from "lucide-react"
+import { ArrowUpRight, AudioLines, Beer, Building2, CalendarDays, Clock3, Info, MapPin, Moon, ShieldCheck, Sparkles } from "lucide-react"
 import { SiteHeader } from "@/components/SiteHeader"
 import { SiteFooter } from "@/components/SiteFooter"
 import { Stars } from "./Stars"
@@ -8,7 +8,7 @@ import { SafetyMap } from "./SafetyMap"
 import { nightlifePath, type NightlifeSummary } from "@/lib/nightlife/store"
 import { distance } from "@/lib/nightlife/venues"
 import { VENUE_TYPES, type NightlifeReport, type ScoreKey } from "@/lib/nightlife/types"
-import { NIGHT_PHOTOS, plainCopy, priceBand, recentMentions, venueShortlist, venueSource } from "@/lib/nightlife/presentation"
+import { NIGHT_PHOTOS, documentedVenues, nightlifeClusters, plainCopy, priceBand, recentMentions, sceneSummary, venueMapSample, venueShortlist, venueSource, venueTraits } from "@/lib/nightlife/presentation"
 import "./nightlife.css"
 const ICONS = { density: MapPin, quality: Sparkles, variety: AudioLines, vibe: Moon, safety: ShieldCheck }
 const DESCRIPTIONS: Record<ScoreKey, string> = { density: "How much there is", quality: "How good the venues are", variety: "How much choice you have", vibe: "How travelers felt", safety: "How safe a night out feels" }
@@ -17,6 +17,9 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
   const c = r.city, year = new Date(r.updatedAt).getUTCFullYear(), photo = NIGHT_PHOTOS[c.key]
   const counts = VENUE_TYPES.map(type => ({ type, count: r.venues.filter(v => v.type === type).length })).filter(t => t.count > 0).sort((a, b) => b.count - a.count)
   const ranked = venueShortlist(r), mentions = recentMentions(r.mentions)
+  const traits = venueTraits(r), clusterInfo = nightlifeClusters(r), clusters = clusterInfo.items, clusterKind = clusterInfo.kind, clusterPublished = clusterInfo.published
+  const summary = sceneSummary(r), documented = ranked.length ? [] : documentedVenues(r), reasons = r.reasons ?? [], mapVenues = venueMapSample(r.venues)
+  const areaLevel = (level: "safe" | "caution" | "avoid" | null) => level === "safe" ? "Safer" : level === "avoid" ? "Avoid" : level === "caution" ? "Caution" : null
   const themeCounts = new Map<string, typeof mentions>()
   for (const m of mentions) for (const theme of m.themes) themeCounts.set(theme, [...(themeCounts.get(theme) ?? []), m])
   const themes = [...themeCounts].sort((a, b) => b[1].length - a[1].length).slice(0, 4)
@@ -40,16 +43,49 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
       </header>
       <div className="nl-container nl-report-body">
         <section id="the-stars" className="nl-ratings" aria-label="The five ratings">
-          <div className="nl-score-grid">{r.scores.map(score => { const Icon = ICONS[score.key]; return <article key={score.key} className={`nl-score ${score.value == null ? "nl-score-missing" : ""}`}><Icon size={19}/><h2>{score.label}</h2><p className="nl-score-question">{DESCRIPTIONS[score.key]}</p><Stars value={score.value}/></article> })}</div>
+          <div className="nl-score-grid">{r.scores.map(score => { const Icon = ICONS[score.key]; return <article key={score.key} className={`nl-score ${score.value == null ? "nl-score-missing" : ""}`}><Icon size={19}/><h2>{score.label}</h2><p className="nl-score-question">{DESCRIPTIONS[score.key]}</p><Stars value={score.value}/>{score.bullets.length > 0 && <ul className="nl-score-points">{score.bullets.slice(0, 2).map(bullet => <li key={bullet}>{plainCopy(bullet)}</li>)}</ul>}</article> })}</div>
+        </section>
+        <section id="scene-brief" className="nl-section nl-brief" aria-label="Nightlife at a glance">
+          <h2>{c.city} at a glance</h2>
+          {summary.length > 0 && <p className="nl-brief-lede">{summary.join(" ")}</p>}
+          <div className="nl-stat-grid">
+            <div className="nl-stat-card"><MapPin size={18}/><strong>{r.venues.length.toLocaleString("en")}</strong><span>mapped venues</span></div>
+            {traits.lateAfter2 != null && <div className="nl-stat-card"><Clock3 size={18}/><strong>{traits.lateAfter2}%</strong><span>open past 2am*</span></div>}
+            {clusters[0] && <div className="nl-stat-card"><Building2 size={18}/><strong>{plainCopy(clusters[0].name)}</strong><span>busiest mapped area</span></div>}
+            {r.safety && <div className="nl-stat-card"><ShieldCheck size={18}/><strong>{Math.round(r.safety.index)}<small>/100</small></strong><span>after-dark safety</span></div>}
+          </div>
+          {(traits.outdoor > 0 || traits.wheelchair > 0 || traits.smokeFree > 0) && <div className="nl-trait-row">
+            {traits.outdoor > 0 && <span><Beer size={14}/>{traits.percent(traits.outdoor)}% list outdoor seating</span>}
+            {traits.wheelchair > 0 && <span><Info size={14}/>{traits.percent(traits.wheelchair)}% list step-free access</span>}
+            {traits.smokeFree > 0 && <span><Info size={14}/>{traits.percent(traits.smokeFree)}% list a smoke-free policy</span>}
+          </div>}
+          {traits.lateAfter2 != null && <p className="nl-count-note">*Share of venues with interpretable opening hours, not every venue in the city.</p>}
         </section>
         {r.venues.length > 0 && <section id="venues" className="nl-section nl-scene" aria-label="Venue mix">
           <div className="nl-scene-grid"><div className="nl-venue-total"><Beer size={26}/><strong>{r.venues.length.toLocaleString()}</strong><h2>places to start the evening</h2></div><div className="nl-breakdown">{counts.map(({ type, count }) => <div key={type} className="nl-bar-row"><div><span>{type}</span><strong>{count}</strong></div><div className="nl-bar-track"><span style={{ width: `${count / r.venues.length * 100}%` }}/></div></div>)}</div></div>
           <p className="nl-count-note">This only includes mapped locations within the city border. The real number is often higher.</p>
-          <div id="hotspots" className="nl-scene-map"><VenueMap venues={r.venues} city={c.city} lat={c.lat} lon={c.lon}/></div>
+          <div id="hotspots" className="nl-scene-map"><VenueMap venues={mapVenues} total={r.venues.length} fullListUrl={`${nightlifePath(r)}/data.json`} city={c.city} lat={c.lat} lon={c.lon}/></div>
+        </section>}
+        {clusters.length >= 3 && <section id="neighbourhoods" className="nl-section nl-areas">
+          <h2>Where the nightlife clusters</h2>
+          <p className="nl-count-note">Ranked from venues that publish a {clusterKind} ({clusterPublished.toLocaleString("en")} of {r.venues.length.toLocaleString("en")}). Safety labels come from the city safety report.</p>
+          <div className="nl-breakdown nl-area-breakdown">{clusters.map(area => <div key={area.name} className="nl-bar-row">
+            <div><span>{plainCopy(area.name)}{area.level && <em className={`nl-area-level nl-zone-${area.level}`}>{areaLevel(area.level)}</em>}</span><strong>{area.count.toLocaleString("en")}</strong></div>
+            <div className="nl-bar-track"><span style={{ width: `${area.count / clusters[0].count * 100}%` }}/></div>
+          </div>)}</div>
         </section>}
         {ranked.length > 0 && <section className="nl-section" id="top-venues"><h2>Worth a stop</h2><ol className="nl-shortlist">{ranked.map(({venue: v, evidence, groups, rated}, i) => <li key={v.id}>
           <span className="nl-shortlist-rank">{i + 1}</span><div><h3><a href={venueSource(v)} target="_blank" rel="noopener noreferrer">{plainCopy(v.name)} <ArrowUpRight size={15}/></a></h3><p>{v.type}{v.neighborhood ? ` · ${plainCopy(v.neighborhood)}` : ""}</p>{groups > 0 && <p className="nl-shortlist-reason">{groups > 1 ? "Recommended across independent traveler accounts." : "Recommended in a traveler account."}</p>}<div className="nl-recommendation-links">{evidence.filter((m, index, all) => all.findIndex(other => other.group === m.group) === index).slice(0, 3).map(m => <a key={m.id} href={m.url} target="_blank" rel="noopener noreferrer">{m.source === "blogs" ? "Travel guide" : m.source === "reddit" ? "Reddit" : "Traveler tip"} ↗</a>)}</div></div>{rated && <div className="nl-venue-rating"><strong>{v.rating!.toFixed(1)}</strong><small>/10</small></div>}
         </li>)}</ol></section>}
+        {documented.length > 0 && <section className="nl-section" id="starting-points"><h2>Well-documented starting points</h2>
+          <p className="nl-count-note">Not a quality ranking. These listings carry the most complete published details: opening hours, contact information and a neighbourhood.</p>
+          <ol className="nl-shortlist">{documented.map(({ venue: v }, i) => <li key={v.id}>
+            <span className="nl-shortlist-rank">{String(i + 1).padStart(2, "0")}</span><div><h3><a href={venueSource(v)} target="_blank" rel="noopener noreferrer">{plainCopy(v.name)} <ArrowUpRight size={15}/></a></h3><p>{v.type}{v.neighborhood ? ` · ${plainCopy(v.neighborhood)}` : ""}</p>{v.hours && <p className="nl-shortlist-reason">{plainCopy(v.hours)}</p>}</div>
+          </li>)}</ol>
+        </section>}
+        {r.events.length > 0 && <section className="nl-section" id="whats-on"><h2>What&rsquo;s on</h2>
+          <ul className="nl-events">{r.events.slice(0, 8).map(event => <li key={event.id}><time dateTime={event.date}>{new Date(event.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}</time><div><a href={event.url} target="_blank" rel="noopener noreferrer">{plainCopy(event.name)} ↗</a><p>{plainCopy(event.venue)}</p></div></li>)}</ul>
+        </section>}
         {r.lateness.known > 0 && <section id="late" className="nl-section"><h2>How Late Does {c.city} Keep Partying?</h2>
           <div className="nl-late-grid">{[["00:00", "Past midnight", r.lateness.afterMidnight], ["02:00", "Past 2 am", r.lateness.after2], ["04:00", "Past 4 am", r.lateness.after4]].map(([time, label, count]) => <div className="nl-late-card" key={time}><Clock3 size={18}/><span className="nl-clock">{time}</span><h3>{label}</h3><strong>{Math.round(Number(count) / r.lateness.known * 100)}%</strong><div className="nl-late-meter"><span style={{width:`${Number(count) / r.lateness.known * 100}%`}}/></div></div>)}</div>
         </section>}
@@ -59,6 +95,12 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
           {r.safety.zones.length > 0 && <><SafetyMap safety={r.safety} city={c.city} lat={c.lat} lon={c.lon}/><div className="nl-zones">{r.safety.zones.map(z => <article key={z.name}><span className={`nl-zone-label nl-zone-${z.level}`}>{z.level === "safe" ? "Safer" : z.level === "avoid" ? "Avoid" : "Use caution"}</span><h3>{plainCopy(z.name)}</h3><p>{plainCopy(z.note)}</p></article>)}</div></>}
         </section>}
         {themes.length > 0 && <section id="travelers" className="nl-section"><h2>What travelers say</h2><div className="nl-themes">{themes.map(([theme, items]) => <article key={theme}><h3>{plainCopy(theme)}</h3><div>{items.filter((m, i, all) => all.findIndex(other => other.url === m.url) === i).slice(0, 2).map(m => <a key={m.id} href={m.url} target="_blank" rel="noopener noreferrer">{m.source === "blogs" ? "Travel write-up" : m.source === "reddit" ? "Reddit discussion" : "Foursquare tip"} ↗</a>)}</div></article>)}</div></section>}
+        <section id="data-notes" className="nl-section nl-data-notes" aria-label="About this report">
+          <h2>About this report</h2>
+          <p>{r.venues.length.toLocaleString("en")} venues are mapped inside the verified {c.city} boundary. Mapped places are a lower bound, not a census, and opening hours can change. The operator or venue should be checked before a late trip.</p>
+          {reasons.length > 0 && <p className="nl-data-gaps"><strong>Not scored:</strong> {reasons.map(plainCopy).join(" ")}</p>}
+          <ul>{r.sources.filter(s => s.status === "ok" && s.fetchedAt).map(s => <li key={s.id}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.name} ↗</a><span>{dateLabel(s.fetchedAt)}</span></li>)}</ul>
+        </section>
         {nearby.length > 0 && <section className="nl-section"><h2>Nearby cities</h2><div className="nl-nearby">{nearby.map(n => <Link href={nightlifePath(n)} key={n.city.key}><span>{n.city.country}</span><h3>{n.city.city} <ArrowUpRight size={18}/></h3><Stars value={n.overall}/><small>{Math.round(distance(c, n.city) / 1000).toLocaleString()} km away</small></Link>)}</div></section>}
         <footer className="nl-report-notes"><Link href={`/methodology/nightlife?country=${c.countrySlug}&city=${c.citySlug}`}>How we score this ↗</Link><span>Updated <time dateTime={r.updatedAt}>{dateLabel(r.updatedAt)}</time></span><span>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a></span>{photo && <span>Photo: <a href={photo.authorUrl ?? photo.source}>{photo.author}</a> · <a href={photo.licence}>CC BY-SA 3.0</a> · cropped and darkened</span>}</footer>
         <SiteFooter simplePunctuation/>

@@ -27,15 +27,18 @@ export async function cached<T>(key: string, id: SourceId, days: number, get: ()
   const file = path.join(NIGHTLIFE_DIR, "raw", safeKey(key), `${id}.json`)
   let previous: { fetchedAt: string; data: T; identity?: string } | null = null
   try { previous = JSON.parse(await fs.readFile(file, "utf8")) } catch (e) { if (!(e instanceof SyntaxError) && (e as NodeJS.ErrnoException).code !== "ENOENT") throw e }
-  if (previous && (previous.identity !== identity || !Number.isFinite(Date.parse(previous.fetchedAt)))) previous = null
-  if (previous && !force && Date.now() - Date.parse(previous.fetchedAt) < days * DAY) return { data: previous.data, source: { id, ...SOURCE_INFO[id], fetchedAt: previous.fetchedAt, status: "ok", note: "Stored source response." } }
+  const valid = previous && Number.isFinite(Date.parse(previous.fetchedAt)) ? previous : null
+  const current = valid && valid.identity === identity ? valid : null
+  if (current && !force && Date.now() - Date.parse(current.fetchedAt) < days * DAY) return { data: current.data, source: { id, ...SOURCE_INFO[id], fetchedAt: current.fetchedAt, status: "ok", note: "Stored source response." } }
   try {
     const data = await get(), fetchedAt = new Date().toISOString()
     // Never save URLs containing API keys or authentication headers.
     await writeJson(file, { fetchedAt, data, ...(identity ? { identity } : {}) })
     return { data, source: { id, ...SOURCE_INFO[id], fetchedAt, status: "ok", note: "Fetched successfully." } }
   } catch (e) {
-    if (previous) return { data: previous.data, source: { id, ...SOURCE_INFO[id], fetchedAt: previous.fetchedAt, status: "error", note: "Refresh failed; retained the last successful response and its original date.", failure: sourceFailure(e) } }
+    // Keep the last good response even when its collection format changed. A
+    // deploy must not make an existing report unbuildable during an outage.
+    if (valid) return { data: valid.data, source: { id, ...SOURCE_INFO[id], fetchedAt: valid.fetchedAt, status: "error", note: "Refresh failed; retained the last successful response and its original date.", failure: sourceFailure(e) } }
     throw e
   }
 }
@@ -44,20 +47,22 @@ export async function resolveCity(seed: City, force = false, interactive = false
 }
 export async function fetchOsm(city: City, force = false) {
   const geometryNeeded = !!process.env.FOURSQUARE_API_KEY && process.env.FOURSQUARE_DURABLE_STORAGE_LICENSED === "1" && !!process.env.FOURSQUARE_CATEGORY_IDS
-  const result = await cached(city.key, "osm", 30, () => collectOsm(city, geometryNeeded), force, `osm-v3:${city.wikidataId}:${city.relationId ?? "discover"}:${geometryNeeded ? "geometry" : "venues"}`)
+  const result = await cached(city.key, "osm", 30, () => collectOsm(city, geometryNeeded), force, `osm-v5:${city.wikidataId}:${city.relationId ?? "discover"}:${geometryNeeded ? "geometry" : "venues"}`)
   const { boundary, areaId } = verifiedArea(city, result.data.boundary)
   const elements = verifiedVenues(result.data.venues, areaId)
   const venues: Venue[] = elements.flatMap(e => {
     const t = e.tags ?? {}, loc = e.center ?? { lat: e.lat, lon: e.lon }
     if (!Number.isFinite(loc.lat) || !Number.isFinite(loc.lon) || !t.name || t.disused === "yes" || t.abandoned === "yes" || t.closed === "yes" || t.opening_hours === "closed" || t.opening_hours === "off") return []
-    let hint = t.amenity
+    // Restaurants tagged with a bar count as nightlife venues; previously they
+    // all fell into "Other" because "restaurant" matches no type rule.
+    let hint = t.amenity === "restaurant" && t.bar === "yes" ? "restaurant bar" : t.amenity
     if (t["bar:type"]) hint = t["bar:type"]
     if (t.microbrewery === "yes" || t.brewery === "yes") hint = "brewery"
     if (t.live_music === "yes" || (t.music && /live|jazz/.test(t.music))) hint = "live music"
     if (t.lgbtq === "primary" || t["gay:men"] === "primary" || t["gay:women"] === "primary") hint = "lgbtq bar"
     return [{ id: `osm-${e.type}-${e.id}`, name: t.name, lat: loc.lat!, lon: loc.lon!, type: venueType(hint ?? ""), hours: t.opening_hours, neighborhood: t["addr:suburb"] ?? t["addr:district"], tags: t, sources: [{ id: "osm" as const, url: `https://www.openstreetmap.org/${e.type}/${e.id}` }] }]
   })
-  return { venues, relationId: boundary.id, boundary: boundaryFromMembers(result.data.geometry?.elements.find(e => e.type === "relation" && e.id === boundary.id)?.members), source: { ...result.source, url: `https://www.openstreetmap.org/relation/${boundary.id}`, note: `${result.source.status === "error" ? "Refresh failed; showing the last successful boundary query. " : "Complete administrative-boundary query. "}Mapped venues are a lower bound, not a census. ${result.data.geometryNote ?? ""}` } }
+  return { venues, relationId: boundary.id, boundary: boundaryFromMembers(result.data.geometry?.elements.find(e => e.type === "relation" && e.id === boundary.id)?.members), source: { ...result.source, url: `https://www.openstreetmap.org/relation/${boundary.id}`, note: `${result.source.status === "error" ? "Refresh failed; showing the last successful city query. " : "Complete city-boundary and venue query. "}Mapped venues are a lower bound, not a census. ${result.data.geometryNote ?? ""}` } }
 }
 interface FsqPlace { fsq_place_id: string; name: string; latitude: number; longitude: number; date_closed?: string; categories?: { name: string }[]; rating?: number; popularity?: number; price?: number; stats?: { total_ratings?: number }; location?: { neighborhood?: string[] } }
 export async function fetchFoursquare(city: City, force = false) {

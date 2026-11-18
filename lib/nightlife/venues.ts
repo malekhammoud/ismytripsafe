@@ -4,7 +4,7 @@ export const TYPE_RULES: [RegExp, VenueType][] = [
   [/lgbt|gay bar|lesbian/, "LGBTQ+ bar"], [/karaoke/, "Karaoke"], [/cocktail/, "Cocktail bar"],
   [/wine bar/, "Wine bar"], [/sports bar/, "Sports bar"], [/beer garden|biergarten/, "Beer garden"],
   [/brewery|beer bar|taproom|brewpub/, "Beer bar / brewery"], [/nightclub|night club|dance club|disco/, "Nightclub"],
-  [/live music|music venue|jazz|rock club/, "Live music"], [/\bpub\b|irish pub/, "Pub"], [/dive|casual|\bbar\b/, "Dive / casual bar"],
+  [/live music|music venue|jazz|rock club/, "Live music"], [/\bpub\b|irish pub/, "Pub"], [/restaurant bar|restaurant/, "Restaurant bar"], [/dive|casual|\bbar\b/, "Dive / casual bar"],
 ]
 export function venueType(text: string): VenueType { return TYPE_RULES.find(([r]) => r.test(text.toLowerCase().replace(/_/g, " ")))?.[1] ?? "Other" }
 export function normalizeName(s: string) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\b(the|bar)\b/g, "").replace(/[^\p{L}\p{N}]/gu, "") }

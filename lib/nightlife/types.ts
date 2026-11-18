@@ -1,4 +1,4 @@
-export const VENUE_TYPES = ["Cocktail bar", "Pub", "Dive / casual bar", "Wine bar", "Beer bar / brewery", "Sports bar", "Nightclub", "Live music", "Karaoke", "LGBTQ+ bar", "Beer garden", "Other"] as const
+export const VENUE_TYPES = ["Cocktail bar", "Pub", "Restaurant bar", "Dive / casual bar", "Wine bar", "Beer bar / brewery", "Sports bar", "Nightclub", "Live music", "Karaoke", "LGBTQ+ bar", "Beer garden", "Other"] as const
 export type VenueType = typeof VENUE_TYPES[number]
 export type ScoreKey = "density" | "quality" | "variety" | "vibe" | "safety"
 export type SourceId = "osm" | "foursquare" | "wikidata" | "ticketmaster" | "numbeo" | "reddit" | "blogs" | "safety"

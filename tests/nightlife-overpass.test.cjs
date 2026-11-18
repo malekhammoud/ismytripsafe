@@ -1,7 +1,7 @@
 require('../scripts/typescript-worker.cjs')
 const {test}=require('node:test')
 const assert=require('node:assert/strict')
-const {createOverpassClient,boundaryQuery,venueQuery,verifiedArea,verifiedVenues,usesPublicOverpass}=require('../lib/nightlife/overpass.ts')
+const {createOverpassClient,boundaryQuery,venueQuery,collectionQuery,verifiedArea,verifiedVenues,verifiedCollection,usesPublicOverpass}=require('../lib/nightlife/overpass.ts')
 const {SourceHttpError,SourceOperationError,SourceUnavailable,sourceFailure}=require('../lib/nightlife/source-errors.ts')
 const {fetchJson}=require('../lib/nightlife/http.ts')
 const city={wikidataId:'Q994',relationId:1996871}
@@ -13,9 +13,17 @@ const response=()=>({elements:[area,...structuredClone(elements),structuredClone
 test('OSM boundary is verified before querying its searchable area',()=>{
  assert.deepEqual(verifiedArea(city,{elements:[boundary,area]}),{boundary,areaId:area.id})
  assert.throws(()=>verifiedArea(city,{elements:[boundary]}),SourceUnavailable)
- assert.throws(()=>verifiedArea({...city,wikidataId:'Q1'},{elements:[boundary,area]}),SourceUnavailable)
+ assert.throws(()=>verifiedArea({...city,wikidataId:'Q1',relationId:null},{elements:[boundary,area]}),SourceUnavailable)
+ assert.deepEqual(verifiedArea({...city,wikidataId:'Q1'},{elements:[boundary,area]}),{boundary,areaId:area.id})
  assert.throws(()=>verifiedArea({...city,relationId:null},{elements:[boundary,area,{...boundary,id:99}]}),SourceUnavailable)
  assert.throws(()=>boundaryQuery({...city,relationId:NaN}),SourceUnavailable)
+})
+test('ceremonial and political city boundaries are valid venue areas',()=>{
+ const london={...city,relationId:65606,wikidataId:'Q84'}
+ const ceremonial={type:'relation',id:65606,tags:{wikidata:'Q23306',boundary:'ceremonial'}}
+ const londonArea={type:'area',id:3600065606,tags:{wikidata:'Q23306',boundary:'ceremonial'}}
+ assert.deepEqual(verifiedArea(london,{elements:[ceremonial,londonArea]}),{boundary:ceremonial,areaId:londonArea.id})
+ assert.match(collectionQuery(london),/rel\(65606\)->\.boundary;/)
 })
 test('complete venue queries retain nodes, ways and relations',()=>{
  assert.equal(verifiedVenues(response(),area.id).length,3)
@@ -28,6 +36,17 @@ test('zero venues is accepted only with a matching area and explicit zero count'
  const zero={elements:[area,{type:'count',id:0,tags:{nodes:'0',ways:'0',relations:'0',total:'0'}}]}
  assert.deepEqual(verifiedVenues(zero,area.id),[])
  assert.throws(()=>verifiedVenues({elements:[]},area.id),SourceUnavailable)
+})
+test('one combined query verifies the boundary, area and complete venue union',()=>{
+ const raw={elements:[boundary,area,...structuredClone(elements),structuredClone(count)]}
+ const result=verifiedCollection(city,raw)
+ assert.equal(result.boundary.id,boundary.id);assert.equal(result.areaId,area.id);assert.equal(result.venues.length,3)
+ assert.match(collectionQuery(city),/rel\(1996871\)->\.boundary;/)
+ assert.match(collectionQuery(city),/map_to_area->\.area/)
+ assert.match(collectionQuery(city),/out tags center qt;out count;/)
+ assert.doesNotMatch(collectionQuery(city),/out body center qt/)
+ const noBoundary={elements:[area,...structuredClone(elements),structuredClone(count)]};assert.throws(()=>verifiedCollection(city,noBoundary),SourceUnavailable)
+ const wrongCount={elements:[boundary,area,...structuredClone(elements),{type:'count',id:0,tags:{nodes:'1',ways:'1',relations:'1',total:'4'}}]};assert.throws(()=>verifiedCollection(city,wrongCount),/completeness/)
 })
 test('truncated, partial, duplicated and wrong-area responses cannot become low ratings',()=>{
  const missing=response();missing.elements.pop()
@@ -84,5 +103,6 @@ test('public primary or fallback endpoints retain the public pilot budget',()=>{
   process.env.OVERPASS_URL='https://private.example/api';delete process.env.OVERPASS_FALLBACK_URL;assert.equal(usesPublicOverpass(),false)
   process.env.OVERPASS_FALLBACK_URL='https://overpass-api.de/api/interpreter';assert.equal(usesPublicOverpass(),true)
   process.env.OVERPASS_URL='https://overpass.private.coffee/api/interpreter';process.env.OVERPASS_FALLBACK_URL='';assert.equal(usesPublicOverpass(),true)
+  process.env.OVERPASS_URL='https://overpass.openstreetmap.fr/api/interpreter';assert.equal(usesPublicOverpass(),true)
  }finally{for(const [i,name]of ['OVERPASS_URL','OVERPASS_FALLBACK_URL'].entries()){if(before[i]===undefined)delete process.env[name];else process.env[name]=before[i]}}
 })

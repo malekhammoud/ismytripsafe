@@ -1,6 +1,6 @@
 import { fetchJson, researchSignal } from "./http"
 import { SourceHttpError, SourceUnavailable } from "./source-errors"
-import { entityIds, placeKind, selectCity, type Entity } from "./city-resolution"
+import { activeClaims, claimValue, entityIds, placeKind, selectCity, type Entity } from "./city-resolution"
 import { distance } from "./venues"
 import type { City } from "./types"
 
@@ -21,13 +21,33 @@ async function entities(ids: string[], interactive: boolean): Promise<Record<str
   }
   return result
 }
+// A city such as Johannesburg has no P402 boundary of its own; its
+// metropolitan municipality does. Use that parent only when it is actually a
+// municipality or city, never a province or a state.
+const MUNICIPAL_CLASSES = new Set(["Q15284", "Q1530824", "Q515", "Q3957"])
+async function parentBoundary(city: City, candidates: Record<string, Entity>, load: LoadEntities): Promise<City> {
+  if (city.relationId || !city.wikidataId) return city
+  const entity = candidates[city.wikidataId]
+  if (!entity) return city
+  const parents = entityIds(entity, "P131").slice(0, 8)
+  if (!parents.length) return city
+  const loaded = await load(parents)
+  for (const id of parents) {
+    const parent = loaded[id]
+    if (!parent || !entityIds(parent, "P31").some(kind => MUNICIPAL_CLASSES.has(kind))) continue
+    const relation = activeClaims(parent, "P402").sort((a, b) => Number(b.rank === "preferred") - Number(a.rank === "preferred"))
+      .map(claim => Number(claimValue(claim))).find(n => Number.isSafeInteger(n) && n > 0)
+    if (relation) return { ...city, relationId: relation }
+  }
+  return city
+}
 async function matchCity(seed: City, ids: string[], load: LoadEntities): Promise<City> {
   const candidates = await load(validIds(ids))
   const countries = await load(validIds(Object.values(candidates).flatMap(e => entityIds(e, "P17"))))
   const classes: Record<string, Entity> = {}
   const ordered = ids.flatMap(id => candidates[id] ? [candidates[id]] : [])
   const direct = selectCity(seed, ordered, countries, classes)
-  if (direct && (ids.length === 1 || (direct.relationId && candidates[direct.wikidataId!]?.labels?.en?.value.localeCompare(seed.city, "en", { sensitivity: "base" }) === 0))) return direct
+  if (direct && (ids.length === 1 || direct.relationId)) return parentBoundary(direct, candidates, load)
   let frontier = validIds(Object.values(candidates).flatMap(e => entityIds(e, "P31")))
   for (let depth = 0; depth < 4 && frontier.length; depth++) {
     const unknown = frontier.filter(id => !classes[id] && !placeKind(id, classes)).slice(0, 50)
@@ -38,7 +58,7 @@ async function matchCity(seed: City, ids: string[], load: LoadEntities): Promise
   }
   const city = selectCity(seed, ordered, countries, classes)
   if (!city) throw new SourceUnavailable("No city entity matches the name, country, location and settlement type.")
-  return city
+  return parentBoundary(city, candidates, load)
 }
 function canUseLinkedData(error: unknown) {
   if (researchSignal()?.aborted) return false

@@ -14,14 +14,19 @@ export interface OsmCollection {
   geometryNote?: string
   requests: { operation: string; provider: string; fetchedAt: string; elapsedMs: number }[]
 }
-export const DEFAULT_OVERPASS = "https://overpass.private.coffee/api/interpreter"
-export const PILOT_FALLBACK = "https://overpass-api.de/api/interpreter"
+// The public French instance is the default because it is reachable from the
+// application host and answers the boundary/venue workload in seconds. The
+// previous defaults (private.coffee + overpass-api.de) both fail from here, so
+// every cold report paid a 35-second timeout before giving up.
+export const DEFAULT_OVERPASS = "https://overpass.openstreetmap.fr/api/interpreter"
+export const PILOT_FALLBACK = "https://overpass.private.coffee/api/interpreter"
+const endpoints = (value: string | undefined) => (value ?? "").split(",").map(s => s.trim()).filter(Boolean)
 export function overpassEndpoints(primary = process.env.OVERPASS_URL || DEFAULT_OVERPASS, fallback = process.env.OVERPASS_FALLBACK_URL ?? (primary === DEFAULT_OVERPASS ? PILOT_FALLBACK : "")) {
-  return [...new Set([primary, fallback].filter(Boolean))]
+  return [...new Set([...endpoints(primary), ...endpoints(fallback)])]
 }
 export function usesPublicOverpass() {
   return overpassEndpoints().some(endpoint => {
-    try { return /(^|\.)(overpass-api\.de|overpass\.private\.coffee|overpass\.kumi\.systems)$/.test(new URL(endpoint).hostname) }
+    try { return /(^|\.)(overpass-api\.de|overpass\.private\.coffee|overpass\.kumi\.systems|overpass\.openstreetmap\.fr|overpass\.osm\.ch)$/.test(new URL(endpoint).hostname) }
     catch { return true }
   })
 }
@@ -33,6 +38,9 @@ function mayFailOver(error: unknown) {
   // providers. Only transport failures and generic service outages do.
   return error instanceof TypeError || (error instanceof Error && error.name === "TimeoutError")
 }
+// Remember which endpoint worked for ten minutes so a dead primary is not
+// retried (and made to time out) for every cold city.
+let preferredEndpoint = 0, preferredAt = 0
 export function createOverpassClient(options: { primary?: string; fallback?: string; request?: typeof fetchJson } = {}) {
   const primary = options.primary ?? process.env.OVERPASS_URL ?? DEFAULT_OVERPASS
   // An explicitly configured provider is never silently sent to a public one.
@@ -40,7 +48,10 @@ export function createOverpassClient(options: { primary?: string; fallback?: str
   const endpoints = overpassEndpoints(primary, fallback)
   const request = options.request ?? fetchJson
   const requests: OsmCollection["requests"] = []
-  let selected = 0
+  const explicit = options.primary != null || options.fallback != null
+  let selected = explicit ? 0 : Math.max(0, Math.min(preferredEndpoint, endpoints.length - 1))
+  if (!explicit && Date.now() - preferredAt > 600000) selected = 0
+  const tried = new Set<number>()
   async function query(body: string, operation: string, timeoutMs: number, signal?: AbortSignal): Promise<OsmResponse> {
     for (;;) {
       const endpoint = endpoints[selected], provider = new URL(endpoint).hostname, start = Date.now()
@@ -49,31 +60,43 @@ export function createOverpassClient(options: { primary?: string; fallback?: str
         if (raw.remark || !Array.isArray(raw.elements)) throw new Error("Overpass query did not complete; partial results rejected", { cause: { code: /timed?\s*out/i.test(raw.remark ?? "") ? "OVERPASS_QUERY_TIMEOUT" : "OVERPASS_INCOMPLETE" } })
         const entry = { operation, provider, fetchedAt: new Date().toISOString(), elapsedMs: Date.now() - start }
         requests.push(entry)
+        if (!explicit) { preferredEndpoint = selected; preferredAt = Date.now() }
         console.info(`[nightlife] ${operation}: ${raw.elements.length} elements in ${entry.elapsedMs}ms via ${provider}`)
         return raw
       } catch (error) {
         const detailed = new SourceOperationError(error, operation, provider, Date.now() - start)
         console.warn(`[nightlife] ${detailed.message}`)
-        if (signal?.aborted || selected + 1 >= endpoints.length || !mayFailOver(error)) throw detailed
-        selected++ // Sticky for the rest of this city; never return to a failing host.
+        tried.add(selected)
+        if (signal?.aborted || tried.size >= endpoints.length || !mayFailOver(error)) throw detailed
+        // Move to the next untried endpoint, wrapping so a remembered fallback
+        // can still fall back to the original primary.
+        do { selected = (selected + 1) % endpoints.length } while (tried.has(selected))
       }
     }
   }
   return { query, requests }
 }
 const header = (seconds: number) => `[out:json][timeout:${seconds}][maxsize:67108864];`
+// Greater London is a ceremonial county, not an administrative boundary. The
+// city-level relation is still the correct area for a nightlife count.
+const BOUNDARY_KINDS = new Set(["administrative", "ceremonial", "political", "statistical"])
+const BOUNDARY_FILTER = `[boundary~"^(${[...BOUNDARY_KINDS].join("|")})$"]`
 export function boundaryQuery(city: City) {
   if (!city.wikidataId || !/^Q\d+$/.test(city.wikidataId)) throw new SourceUnavailable("A verified city identity is needed before mapping venues.")
   if (city.relationId != null && (!Number.isSafeInteger(city.relationId) || city.relationId <= 0)) throw new SourceUnavailable("Invalid city boundary identifier.")
-  const selection = city.relationId ? `rel(${city.relationId});` : `rel[wikidata="${city.wikidataId}"][boundary=administrative];`
+  const selection = city.relationId ? `rel(${city.relationId});` : `rel[wikidata="${city.wikidataId}"]${BOUNDARY_FILTER};`
   return `${header(15)}${selection}out tags;map_to_area;out tags;`
 }
 export function verifiedArea(city: City, raw: OsmResponse) {
   if (raw.remark || !Array.isArray(raw.elements)) throw new Error("Overpass returned an incomplete boundary lookup")
-  const boundaries = raw.elements.filter(e => e.type === "relation" && e.tags?.boundary === "administrative" && e.tags.wikidata === city.wikidataId && (!city.relationId || city.relationId === e.id))
+  // A verified Wikidata relation ID is authoritative, even when the boundary
+  // belongs to the city's parent municipality (Johannesburg is the common
+  // case). Without an ID, the wikidata tag must match the city itself.
+  const boundaries = raw.elements.filter(e => e.type === "relation" && BOUNDARY_KINDS.has(e.tags?.boundary ?? "")
+    && (city.relationId ? e.id === city.relationId : e.tags?.wikidata === city.wikidataId))
   if (boundaries.length !== 1) throw new SourceUnavailable("A single matching city boundary is not available in OpenStreetMap.")
   const boundary = boundaries[0]
-  const areas = raw.elements.filter(e => e.type === "area" && e.id === 3600000000 + boundary.id && e.tags?.wikidata === city.wikidataId)
+  const areas = raw.elements.filter(e => e.type === "area" && e.id === 3600000000 + boundary.id && (!!city.relationId || e.tags?.wikidata === city.wikidataId))
   if (areas.length !== 1) throw new SourceUnavailable("OpenStreetMap has the city boundary but its searchable area is not available yet.")
   return { boundary, areaId: areas[0].id }
 }
@@ -84,6 +107,34 @@ export function venueQuery(areaId: number) {
   // Print the area to distinguish unavailable area data from a genuine zero.
   // A final count proves the entire union was returned, including ways/relations.
   return `${header(25)}area(${areaId})->.city;.city out ids;(${filters}nwr(area.city)[amenity=restaurant][bar=yes];);out body center qt;out count;`
+}
+// One round trip resolves the boundary, its searchable area and every venue.
+// The old pipeline made two sequential Overpass calls; this returns the same
+// verified data in roughly half the wall-clock time.
+export function collectionQuery(city: City) {
+  if (!city.wikidataId || !/^Q\d+$/.test(city.wikidataId)) throw new SourceUnavailable("A verified city identity is needed before mapping venues.")
+  if (city.relationId != null && (!Number.isSafeInteger(city.relationId) || city.relationId <= 0)) throw new SourceUnavailable("Invalid city boundary identifier.")
+  const selection = city.relationId ? `rel(${city.relationId})` : `rel[wikidata="${city.wikidataId}"]${BOUNDARY_FILTER}`
+  const amenities = ["bar", "pub", "nightclub", "biergarten", "music_venue"]
+  const filters = amenities.map(a => `nwr(area.area)[amenity=${a}];`).join("")
+  return `${header(45)}${selection}->.boundary;.boundary out tags;.boundary map_to_area->.area;.area out tags;(${filters}nwr(area.area)[amenity=restaurant][bar=yes];);out tags center qt;out count;`
+}
+export function verifiedCollection(city: City, raw: OsmResponse) {
+  if (raw.remark || !Array.isArray(raw.elements)) throw new Error("Overpass returned an incomplete city query")
+  const boundaries = raw.elements.filter(e => e.type === "relation" && BOUNDARY_KINDS.has(e.tags?.boundary ?? "")
+    && (city.relationId ? e.id === city.relationId : e.tags?.wikidata === city.wikidataId))
+  if (boundaries.length !== 1) throw new SourceUnavailable("A single matching city boundary is not available in OpenStreetMap.")
+  const boundary = boundaries[0], areaId = 3600000000 + boundary.id
+  const areas = raw.elements.filter(e => e.type === "area" && e.id === areaId && (!!city.relationId || e.tags?.wikidata === city.wikidataId))
+  if (areas.length !== 1) throw new SourceUnavailable("OpenStreetMap has the city boundary but its searchable area is not available yet.")
+  const counts = raw.elements.filter(e => e.type === "count")
+  // The boundary relation is part of the response and must never be counted as
+  // a venue. The area element is also excluded from the venue count.
+  const venues = raw.elements.filter(e => ["node", "way", "relation"].includes(e.type) && e.id !== boundary.id)
+  const countsOk = counts.length === 1 && raw.elements.at(-1) === counts[0] && /^\d+$/.test(counts[0].tags?.total ?? "") && Number(counts[0].tags!.total) === venues.length
+    && ["node", "way", "relation"].every(type => /^\d+$/.test(counts[0].tags?.[`${type}s`] ?? "") && Number(counts[0].tags![`${type}s`]) === venues.filter(e => e.type === type).length)
+  if (!countsOk || new Set(venues.map(e => `${e.type}/${e.id}`)).size !== venues.length) throw new Error("Overpass venue response failed completeness checks")
+  return { boundary, area: areas[0], areaId, venues }
 }
 export function verifiedVenues(raw: OsmResponse, areaId: number): OsmElement[] {
   if (raw.remark || !Array.isArray(raw.elements)) throw new Error("Overpass returned an incomplete venue query")
@@ -97,18 +148,21 @@ export function verifiedVenues(raw: OsmResponse, areaId: number): OsmElement[] {
 }
 export async function collectOsm(city: City, geometry = false): Promise<OsmCollection> {
   const client = createOverpassClient()
-  const boundary = await client.query(boundaryQuery(city), "OpenStreetMap boundary lookup", 35000)
-  const { boundary: relation, areaId } = verifiedArea(city, boundary)
-  const venues = await client.query(venueQuery(areaId), "OpenStreetMap venue lookup", 45000)
-  verifiedVenues(venues, areaId)
+  const raw = await client.query(collectionQuery(city), "OpenStreetMap city and venue lookup", 50000)
+  const verified = verifiedCollection(city, raw)
+  const count = raw.elements.find(e => e.type === "count")!
+  // Keep the cached shape the rest of the pipeline expects: a verified
+  // boundary response and a verified venue response with a trailing count.
+  const boundary: OsmResponse = { elements: [verified.boundary, verified.area], osm3s: raw.osm3s }
+  const venues: OsmResponse = { elements: [verified.area, ...verified.venues, count], osm3s: raw.osm3s }
   const result: OsmCollection = { boundary, venues, requests: client.requests }
   // Detailed geometry only helps clip unmatched Foursquare venues. Its failure
   // must not discard a complete, boundary-scoped OSM venue list.
   if (geometry) {
     try {
-      const raw = await client.query(`${header(10)}rel(${relation.id});out geom;`, "OpenStreetMap optional geometry", 25000, AbortSignal.timeout(25000))
-      if (!raw.elements.some(e => e.type === "relation" && e.id === relation.id && e.tags?.wikidata === city.wikidataId)) throw new Error("Geometry belongs to a different city")
-      result.geometry = raw
+      const geom = await client.query(`${header(10)}rel(${verified.boundary.id});out geom;`, "OpenStreetMap optional geometry", 20000, AbortSignal.timeout(20000))
+      if (!geom.elements.some(e => e.type === "relation" && e.id === verified.boundary.id && BOUNDARY_KINDS.has(e.tags?.boundary ?? ""))) throw new Error("Geometry belongs to a different city")
+      result.geometry = geom
     } catch { result.geometryNote = "Boundary geometry unavailable; only matched Foursquare venues can join the OSM count." }
   }
   return result

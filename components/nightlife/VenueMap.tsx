@@ -5,7 +5,7 @@ import "leaflet/dist/leaflet.css"
 import { VENUE_TYPES, type Venue, type VenueType } from "@/lib/nightlife/types"
 const plain = (text: string) => text.replace(/\s*[—–]\s*/g, ", ")
 const COLORS: Record<string, string> = { Nightclub: "#9375e6", "Live music": "#e4856b", Pub: "#6d9d91", "Cocktail bar": "#b8cf73" }
-export function VenueMap({ venues, city, lat, lon }: { venues: Venue[]; city: string; lat: number; lon: number }) {
+export function VenueMap({ venues, total, fullListUrl, city, lat, lon }: { venues: Venue[]; total: number; fullListUrl: string; city: string; lat: number; lon: number }) {
   const ref = useRef<HTMLDivElement>(null), map = useRef<LeafletMap | null>(null), layer = useRef<LayerGroup | null>(null)
   const [type, setType] = useState<VenueType | "All">("All"), [error, setError] = useState(false)
   const filtered = type === "All" ? venues : venues.filter(v => v.type === type)
@@ -34,8 +34,9 @@ export function VenueMap({ venues, city, lat, lon }: { venues: Venue[]; city: st
   }, [type, venues, city, lat, lon])
   useEffect(() => () => { map.current?.remove(); map.current = null; layer.current = null }, [])
   return <div>
-    <div className="nl-map-toolbar"><label htmlFor="nightlife-map-filter">Explore by type</label><select id="nightlife-map-filter" value={type} onChange={e => setType(e.target.value as VenueType | "All")}><option>All</option>{VENUE_TYPES.filter(t => venues.some(v => v.type === t)).map(t => <option key={t}>{t}</option>)}</select><span>{filtered.length} venues</span></div>
-    {error ? <p className="nl-empty">The interactive map could not load. All venue locations remain available in the list below.</p> : <div ref={ref} className="nl-map" role="region" aria-label={`${city} nightlife venue map`} />}
+    <div className="nl-map-toolbar"><label htmlFor="nightlife-map-filter">Explore by type</label><select id="nightlife-map-filter" value={type} onChange={e => setType(e.target.value as VenueType | "All")}><option>All</option>{VENUE_TYPES.filter(t => venues.some(v => v.type === t)).map(t => <option key={t}>{t}</option>)}</select><span>{filtered.length}{total > venues.length ? ` of ${total.toLocaleString("en")}` : ""} venues</span></div>
+    {error ? <p className="nl-empty">The interactive map could not load. Venue locations remain available in the list below.</p> : <div ref={ref} className="nl-map" role="region" aria-label={`${city} nightlife venue map`} />}
     <details className="nl-map-list"><summary>Browse {filtered.length} mapped venues as a list</summary><ul>{filtered.map(v => <li key={v.id}><a href={v.sources[0].url} target="_blank" rel="noopener noreferrer">{plain(v.name)} ↗</a><span>{v.type}{v.neighborhood ? ` · ${plain(v.neighborhood)}` : ""}</span></li>)}</ul></details>
+    {total > venues.length && <p className="nl-map-note">The map shows a representative sample of {total.toLocaleString("en")} mapped venues. <a href={fullListUrl}>Open the full OSM venue list ↗</a></p>}
   </div>
 }

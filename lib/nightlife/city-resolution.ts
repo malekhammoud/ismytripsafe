@@ -1,7 +1,7 @@
 import type { City } from "./types"
 import { distance } from "./venues"
 
-export const RESOLUTION_VERSION = 2
+export const RESOLUTION_VERSION = 3
 export interface Claim {
   rank?: string
   mainsnak: { datavalue?: { value: unknown } }
@@ -16,7 +16,20 @@ export interface Entity {
 export const activeClaims = (e: Entity, property: string) => (e.claims?.[property] ?? []).filter(c => c.rank !== "deprecated")
 export const claimValue = (c: Claim) => c.mainsnak.datavalue?.value
 export const entityIds = (e: Entity, property: string) => activeClaims(e, property).map(c => (claimValue(c) as { id?: string })?.id).filter((id): id is string => !!id && /^Q\d+$/.test(id))
-const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()
+const normalize = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  .replace(/\bst\b/g, "saint").replace(/\bmt\b/g, "mount").replace(/\bft\b/g, "fort")
+  .replace(/[^\p{L}\p{N}]+/gu, " ").trim()
+// Safety reports say "New York"; Wikidata says "New York City". Accept a
+// small set of settlement wrappers without turning "Kansas City" into Kansas.
+const SETTLEMENT_WORDS = new Set(["city", "town", "municipality", "metropolitan", "capital", "urban", "area", "district"])
+const nameVariants = (value: string) => {
+  const base = normalize(value), variants = new Set([base])
+  variants.add(base.replace(/^(city|municipality|town) of /, ""))
+  const words = base.split(" ")
+  while (words.length > 1 && SETTLEMENT_WORDS.has(words[words.length - 1])) { words.pop(); variants.add(words.join(" ")) }
+  return variants
+}
+const sameCityName = (value: string, name: string) => nameVariants(value).has(name)
 
 // Wikidata dates can deliberately use 00 for an unknown month/day. Preserve
 // their actual precision instead of rejecting year-only population observations.
@@ -60,8 +73,8 @@ export function selectCity(seed: City, candidates: Entity[], countries: Record<s
   const matches = candidates.flatMap((e, order) => {
     const kind = Math.max(0, ...entityIds(e, "P31").map(id => placeKind(id, classes)))
     const label = e.labels?.en?.value
-    const exact = !!label && normalize(label) === name
-    const alias = (e.aliases?.en ?? []).some(a => normalize(a.value) === name)
+    const exact = !!label && sameCityName(label, name)
+    const alias = (e.aliases?.en ?? []).some(a => sameCityName(a.value, name))
     const countryOk = entityIds(e, "P17").some(id => countries[id] && activeClaims(countries[id], "P297").some(c => claimValue(c) === seed.countryCode.toUpperCase()))
     const coords = activeClaims(e, "P625").sort((a, b) => Number(b.rank === "preferred") - Number(a.rank === "preferred")).map(claimValue)
       .find(v => { const c = v as { latitude?: number; longitude?: number; globe?: string }; return Number.isFinite(c?.latitude) && Number.isFinite(c?.longitude) && Math.abs(c.latitude!) <= 90 && Math.abs(c.longitude!) <= 180 && (!c.globe || c.globe.endsWith("/Q2")) }) as { latitude: number; longitude: number } | undefined

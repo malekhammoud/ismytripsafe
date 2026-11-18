@@ -14,7 +14,10 @@ export function lateness(venues: Venue[], city: City, now = new Date(), provided
   const reference = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   let known = 0, afterMidnight = 0, after2 = 0, after4 = 0
   for (const venue of venues) {
-    if (!venue.hours) continue
+    // Holiday-only rules need country holiday data that the worker does not
+    // ship; attempting them makes the parser log a stack trace per venue and
+    // cannot produce a trustworthy late-night share anyway.
+    if (!venue.hours || /\b(PH|SH)\b/i.test(venue.hours)) continue
     try {
       const oh = new ParserClass(venue.hours, { lat: city.lat, lon: city.lon, address: { country_code: city.countryCode.toLowerCase() } }, { mode: 0 })
       const results: boolean[][] = [[], [], []]
@@ -31,5 +34,5 @@ export function lateness(venues: Venue[], city: City, now = new Date(), provided
       if (results[2].some(Boolean)) after4++
     } catch { /* Invalid/conditional schedules stay out of the denominator. */ }
   }
-  return { known, total: venues.length, afterMidnight, after2, after4, note: "Share of venues with interpretable hours open after each time on at least one night in the reference week. Seasonal hours can change; check the venue before going. Unknown hours are excluded, never treated as closed." }
+  return { known, total: venues.length, afterMidnight, after2, after4, note: "Share of venues with interpretable hours open after each time on at least one night in the reference week. Seasonal and holiday-only schedules can change; check the venue before going. Unknown or holiday-dependent hours are excluded, never treated as closed." }
 }

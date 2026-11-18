@@ -40,6 +40,19 @@ test('a search or entity service outage recovers through Wikipedia and verified 
     assert.equal(calls.filter(u=>u.pathname.includes('EntityData')).length,2)
   }
 })
+test('a city without its own boundary reuses a verified municipality relation',async()=>{
+ const joburg={key:'za_johannesburg',city:'Johannesburg',country:'South Africa',countryCode:'ZA',countrySlug:'south-africa',citySlug:'johannesburg',lat:-26.204,lon:28.042}
+ const cityNoBoundary={id:'Q34647',labels:{en:{value:'Johannesburg'}},claims:{P31:[claim({id:'Q515'})],P17:[claim({id:'Q258'})],P625:[claim({latitude:-26.204,longitude:28.042})],P131:[claim({id:'Q2346838'})]}}
+ const parent={id:'Q2346838',labels:{en:{value:'City of Johannesburg Metropolitan Municipality'}},claims:{P31:[claim({id:'Q1530824'})],P402:[claim('594508')]}}
+ const countryZA={id:'Q258',claims:{P297:[claim('ZA')]}}
+ await mockFetch(async input=>{
+  const url=new URL(input)
+  if(url.searchParams.get('action')==='wbsearchentities')return Response.json({search:[{id:'Q34647'}]})
+  if(url.searchParams.get('ids')==='Q2346838')return Response.json({entities:{Q2346838:parent}})
+  if(url.searchParams.get('ids')==='Q258')return Response.json({entities:{Q258:countryZA}})
+  return Response.json({entities:{Q34647:cityNoBoundary}})
+ },async()=>{const found=await lookupCity(joburg,true);assert.equal(found.wikidataId,'Q34647');assert.equal(found.relationId,594508)})
+})
 test('the fallback rejects a wrong country even when Wikipedia coordinates are nearby',async()=>{
   const wrong={...city,claims:{...city.claims,P17:[claim({id:'Q99'})]}}
   await mockFetch(async input=>{

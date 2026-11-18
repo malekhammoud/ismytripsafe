@@ -28,7 +28,10 @@ export function cityFromSafety({ meta }: CitySafety): City {
 }
 export function needsNightlifeRefresh(r: NightlifeReport, now = Date.now()) {
   const older = (date: string, days: number) => !date || !Number.isFinite(Date.parse(date)) || now - Date.parse(date) >= days * DAY
-  return r.sources.some(s => s.status === "error") || r.pipelineVersion !== PIPELINE_VERSION || r.formulaVersion !== FORMULA_VERSION || older(r.refresh.venues || r.updatedAt, 30) || older(r.refresh.population || r.updatedAt, 180) || older(r.updatedAt, 30)
+  // A retained stale source is already disclosed on the report. Rebuilding on
+  // every visit because that source errored turned one upstream outage into a
+  // permanent queue of slow jobs. The data-age rules below are the retry clock.
+  return r.pipelineVersion !== PIPELINE_VERSION || r.formulaVersion !== FORMULA_VERSION || older(r.refresh.venues || r.updatedAt, 30) || older(r.refresh.population || r.updatedAt, 180) || older(r.updatedAt, 30)
     || (!!process.env.TICKETMASTER_API_KEY && older(r.refresh.events, 7))
     || (!!process.env.NUMBEO_API_KEY && process.env.NUMBEO_STORAGE_LICENSED === "1" && older(r.refresh.beer, 180))
 }
@@ -38,8 +41,10 @@ async function readJson<T>(file: string): Promise<T | null> {
 }
 export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
   const publicProvider = usesPublicOverpass()
-  const configuredLimit = Number(process.env.NIGHTLIFE_ON_DEMAND_DAILY_LIMIT) || (publicProvider ? 10 : 100)
-  const deps: Dependencies = { directory: NIGHTLIFE_DIR, now: Date.now, read: readNightlife, build: buildNightlife, limit: Math.max(1, Math.min(publicProvider ? 10 : 1000, configuredLimit)), ...overrides }
+  // Public Overpass is a shared resource, so keep a daily ceiling; the old
+  // ten-build limit made normal browsing hit "capacity full" almost at once.
+  const configuredLimit = Number(process.env.NIGHTLIFE_ON_DEMAND_DAILY_LIMIT) || (publicProvider ? 50 : 500)
+  const deps: Dependencies = { directory: NIGHTLIFE_DIR, now: Date.now, read: readNightlife, build: buildNightlife, limit: Math.max(1, Math.min(publicProvider ? 100 : 2000, configuredLimit)), ...overrides }
   const jobs = path.join(deps.directory, "jobs")
   const fileFor = (key: string) => path.join(jobs, `${safeKey(key)}.json`)
   const iso = () => new Date(deps.now()).toISOString()
@@ -121,7 +126,12 @@ export function createVisitJobs(overrides: Partial<Dependencies> = {}) {
           const report = await withResearchDeadline(() => deps.build(cityFromSafety(hit), hit.report, { onProgress, interactive: true }))
           const sourceFailed = report.sources.some(s => s.status === "error")
           const sourceFailures = report.sources.filter(s => s.status === "error" && s.failure).map(s => ({ name: s.name, ...s.failure! }))
-          const requiredCooldowns = report.sources.filter(s => ["wikidata", "osm"].includes(s.id) && s.status === "error" && Date.parse(s.failure?.retryAt ?? "") > deps.now()).map(s => ({ name: s.name, ...s.failure! }))
+          // Provider-level failures apply to every city. A city-specific query
+          // error (kind "request") must not stop other destinations for ten
+          // minutes, but a timeout, refusal or rate limit should.
+          const requiredCooldowns = report.sources.filter(s => ["wikidata", "osm"].includes(s.id) && s.status === "error" && s.failure)
+            .filter(s => ["timeout", "connection", "unavailable", "busy", "rate_limit"].includes(s.failure!.kind))
+            .map(s => ({ name: s.name, ...s.failure!, retryAt: s.failure!.retryAt ?? new Date(deps.now() + ERROR_COOLDOWN_MS).toISOString() }))
           if (requiredCooldowns.length) await writeJson(sourceCooldown, { state: "failed", available: false, issue: "sources", failedSources: requiredCooldowns.map(s => s.name), sourceFailures: requiredCooldowns, retryAt: new Date(Math.max(...requiredCooldowns.map(s => Date.parse(s.retryAt!)))).toISOString() })
           const retryAt = Math.max(deps.now() + ERROR_COOLDOWN_MS, ...sourceFailures.map(f => Date.parse(f.retryAt ?? "")).filter(Number.isFinite))
           const state = published(report) ? "ready" : sourceFailed ? "failed" : "unavailable"

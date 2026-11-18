@@ -9,8 +9,32 @@ const { usesPublicOverpass } = require('../lib/nightlife/overpass.ts')
 const { countrySlugFor } = require('../lib/reports.ts')
 const { slug } = require('../lib/cache.ts')
 const { listNightlife, NIGHTLIFE_DIR, writeJson } = require('../lib/nightlife/store.ts')
-const args = process.argv.slice(2)
+const rawArgs = process.argv.slice(2)
+const limitArg = rawArgs.find(arg => arg.startsWith('--limit='))
+const LIMIT = limitArg ? Math.max(1, Number(limitArg.split('=')[1]) || 0) : null
+const args = rawArgs.filter(arg => !arg.startsWith('--limit='))
 const BATCH = ['hu_budapest', 'gb_london', 'ge_tbilisi', 'al_shkoder', 'pl_gdansk', 'la_luang-prabang']
+// Best nightlife coverage first: TIER1 destinations that have a safety report
+// but no published nightlife report yet.
+async function tier1Keys(allFiles) {
+  const { TIER1 } = await import('./destinations.mjs')
+  const byPlace = new Map(), byCity = new Map()
+  for (const file of allFiles) {
+    try {
+      const r = JSON.parse(await fs.readFile(path.join(CACHE_DIR, file), 'utf8')), key = file.slice(0, -5)
+      byPlace.set(`${r.geo.city}, ${r.geo.country}`.toLowerCase(), key)
+      const list = byCity.get(r.geo.city.toLowerCase()) ?? []
+      list.push(key); byCity.set(r.geo.city.toLowerCase(), list)
+    } catch { /* Ignore a corrupt safety cache entry; the next file may match. */ }
+  }
+  const published = new Set((await listNightlife(true)).filter(r => r.outcome !== 'withheld').map(r => r.city.key))
+  const keys = []
+  for (const place of TIER1) {
+    const key = byPlace.get(place.toLowerCase()) ?? (byCity.get(place.split(',')[0].trim().toLowerCase())?.length === 1 ? byCity.get(place.split(',')[0].trim().toLowerCase())[0] : null)
+    if (key && !published.has(key)) keys.push(key)
+  }
+  return keys
+}
 async function main() {
   if (args.includes('--audit')) {
     const all = await listNightlife(true)
@@ -18,10 +42,11 @@ async function main() {
   }
   const allFiles = (await fs.readdir(CACHE_DIR)).filter(f => f.endsWith('.json') && !f.includes('.tmp'))
   const due = args.includes('--refresh-due') ? (await listNightlife(true)).filter(r => !r.refresh.venues || Date.now() - Date.parse(r.refresh.venues) > 30 * 86400000 || (!!process.env.TICKETMASTER_API_KEY && (!r.refresh.events || Date.now() - Date.parse(r.refresh.events) > 7 * 86400000))) : []
-  const keys = args.includes('--refresh-due') ? due.map(r => r.city.key) : args.includes('--test-batch') ? BATCH : args.filter(a => !a.startsWith('--'))
-  if (args.includes('--refresh-due') && !keys.length) { console.log('No nightlife reports are due for refresh'); return }
-  if (!keys.length) throw new Error('Usage: npm run nightlife -- <cache-key> [...] | --test-batch | --audit | <key> --rescore | <key> --events-only')
-  if (keys.length > 10 && usesPublicOverpass()) throw new Error('Public Overpass pilot limited to 10 cities per run; configure private OVERPASS_URL and OVERPASS_FALLBACK_URL before scaling')
+  const selected = args.includes('--refresh-due') ? due.map(r => r.city.key) : args.includes('--tier1') ? await tier1Keys(allFiles) : args.includes('--test-batch') ? BATCH : args.filter(a => !a.startsWith('--'))
+  const keys = LIMIT ? selected.slice(0, LIMIT) : selected
+  if ((args.includes('--refresh-due') || args.includes('--tier1')) && !keys.length) { console.log(args.includes('--tier1') ? 'No TIER1 nightlife reports are missing' : 'No nightlife reports are due for refresh'); return }
+  if (!keys.length) throw new Error('Usage: npm run nightlife -- <cache-key> [...] | --tier1 [--limit=N] | --refresh-due | --test-batch | --audit | <key> --rescore | <key> --events-only')
+  if (keys.length > 25 && usesPublicOverpass()) throw new Error('Public Overpass batch limited to 25 cities per run; use --limit=25 or configure a private OVERPASS_URL before scaling')
   const failures = []
   const results = []
   for (const key of keys) {

@@ -111,17 +111,25 @@ publication outcome. Density's initial cut-offs and Quality's cut-offs are
 **provisional**, not empirically calibrated. Do not claim this pilot has been
 calibrated until a live-source run has succeeded and been reviewed.
 
-The default Overpass endpoint is `https://overpass.private.coffee/api/interpreter`, whose listed policy permits use in any project. The beta pilot can fall back once to `https://overpass-api.de/api/interpreter` after a connection failure, request timeout, or generic HTTP 500/502/503. It never switches on 429, 504 resource-admission refusals, explicit `Retry-After`, query errors or partial data. The successful fallback remains selected for that city. An explicit `OVERPASS_URL` has no automatic public fallback; configure `OVERPASS_FALLBACK_URL` deliberately (an empty value disables it).
+The default Overpass endpoint is now `https://overpass.openstreetmap.fr/api/interpreter`. The previous defaults, `overpass.private.coffee` and `overpass-api.de`, were both unreachable from the application host: the first consumed a 35-second timeout on every cold city, the second refused the connection, and every report in that window failed. The French instance answers the same city query in roughly 3-25 seconds. The client can fall back once to `https://overpass.private.coffee/api/interpreter` after a connection failure, request timeout, or generic HTTP 500/502/503. It never switches on 429, 504 resource-admission refusals, explicit `Retry-After`, query errors or partial data. The successful endpoint is remembered for ten minutes so a dead primary is not retried for every city. An explicit `OVERPASS_URL` has no automatic public fallback; configure `OVERPASS_FALLBACK_URL` deliberately (an empty value disables it). Both variables accept comma-separated endpoint lists.
 
-Public Overpass runs remain capped at 10 cities per invocation and 10 on-demand attempts per day, including when a public endpoint is configured explicitly or used as a fallback. Keep the single-worker limit and configure a dedicated endpoint before scaling. Larger jobs must
-configure private/commercial `OVERPASS_URL` and optional `OVERPASS_FALLBACK_URL` endpoints or replace the
-adapter with a regional extract. The provided systemd service uses `flock`
-for one worker. The daily timer only checks due data: venues/ratings/mentions
-monthly, events weekly, population and prices every 180 days. Copy the two
-`deploy/ismytripsafe-nightlife-beta.*` units to systemd and enable the timer
-on the host only after a successful pilot. No timer is enabled by this code.
+Public Overpass runs are capped at 25 cities per batch invocation and 50 on-demand attempts per day, including when a public endpoint is configured explicitly or used as a fallback. Keep the single-worker limit and configure a dedicated endpoint before scaling. Larger jobs must configure private/commercial `OVERPASS_URL` and optional `OVERPASS_FALLBACK_URL` endpoints or replace the adapter with a regional extract. The provided systemd service uses `flock` for one worker. The daily timer only checks due data: venues/ratings/mentions monthly, events weekly, population and prices every 180 days. Copy the two `deploy/ismytripsafe-nightlife-beta.*` units to systemd and enable the timer on the host only after a successful pilot. No timer is enabled by this code.
 
-### October 21 venue-fetch recovery
+### November 18 reliability and latency pass
+
+Cold reports used to make two sequential Overpass requests (boundary, then venues) and could spend 35 seconds timing out against the dead default before falling back. Collection now makes one combined request: verify the boundary relation, map it to a searchable area, fetch the exact venue union, and require the final per-type count to match. The complete Berlin report went from a timeout/withheld outcome to about 15 seconds end to end; Gdansk, Belgrade, London, New York, Johannesburg, Paris, Tokyo and Bangkok were also exercised live.
+
+Boundary matching now understands `ceremonial`, `political` and `statistical` city relations (Greater London is a ceremonial county) and can use a verified parent municipality relation when a city such as Johannesburg has no P402 of its own. Name matching accepts settlement wrappers such as "New York City" for the seed "New York" without turning "Kansas City" into Kansas. Cities with no verifiable boundary still withhold rather than inventing one.
+
+Optional sources now start in parallel with Wikidata/OSM, and the interactive research deadline is 90 seconds. The map receives a capped, tag-free sample of at most 600 venues; the full ODbL list stays in `/{country}/{city}/nightlife/data.json`. A retained source error is disclosed on the saved report but no longer forces a rebuild on every visit; the normal data-age schedule is the retry clock.
+
+`node scripts/nightlife.cjs --tier1 --limit=25` warms missing TIER1 destinations that have a safety report. `--refresh-due` remains the nightly refresh entry point.
+
+### October 21 venue-fetch recovery (superseded by the combined query above)
+
+The two-request design below is retained as history. The November 18 pass
+replaced it with one combined request because the sequential boundary/venue
+lookups doubled the exposure to a slow Overpass server.
 
 The deployed Johannesburg job resolved Wikidata successfully but timed out
 twice fetching OSM. The collector previously requested full boundary geometry

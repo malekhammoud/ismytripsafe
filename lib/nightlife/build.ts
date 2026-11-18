@@ -35,6 +35,7 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
     if (result) { previous.events = result.data.events; previous.sources = previous.sources.map(s => s.id === "ticketmaster" ? result.source : s); previous.refresh.events = result.source.fetchedAt!; await saveNightlife(previous) }
     return previous
   }
+  const startedAt = Date.now()
   const sources: Source[] = []
   const collect = async <T>(id: SourceId, run: () => Promise<T>) => {
     try { return await run() } catch (e) {
@@ -44,19 +45,25 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
       return null
     }
   }
+  // These only need the seed's coordinates and name, so they run alongside the
+  // slower Wikidata/OSM work instead of waiting for it.
+  const peersTask = listNightlife()
+  const independent = Promise.all([
+    collect("foursquare", () => fetchFoursquare(seed, options.force)), collect("ticketmaster", () => fetchEvents(seed, options.force)),
+    collect("numbeo", () => fetchBeer(seed, options.force)), importedMentions(seed.key),
+  ])
   await options.onProgress?.("resolve")
   const resolved = await collect("wikidata", () => resolveCity(seed, options.force, options.interactive))
   let city: City = resolved?.data ?? { ...seed, population: null, populationDate: null, boundaryVerified: false }
   if (resolved) sources.push({ ...resolved.source, url: `https://www.wikidata.org/wiki/${city.wikidataId}`, note: `${resolved.source.status === "error" ? "Refresh failed; using the last verified city match. " : ""}${city.resolutionMethod === "linked-data" ? "Verified through Wikipedia’s linked item and Wikidata entity JSON. " : ""}Matched settlement type, name, country and coordinates. ${city.population ? "Latest dated population for this city." : "No dated population is available."}` })
   await options.onProgress?.("venues")
+  const zonesTask = safety ? resolveSafetyZones(city, safety).catch(() => safety!) : Promise.resolve(null)
   const osm = await collect("osm", () => fetchOsm(city, options.force))
   if (osm) { sources.push(osm.source); city = { ...city, relationId: osm.relationId, boundaryVerified: true } }
-  if (safety && city.boundaryVerified) safety = await resolveSafetyZones(city, safety).catch(() => safety!)
+  const zoned = await zonesTask
+  if (zoned) safety = zoned
   await options.onProgress?.("details")
-  const [fsq, tm, prices, imported] = await Promise.all([
-    collect("foursquare", () => fetchFoursquare(city, options.force)), collect("ticketmaster", () => fetchEvents(city, options.force)),
-    collect("numbeo", () => fetchBeer(city, options.force)), importedMentions(seed.key),
-  ])
+  const [fsq, tm, prices, imported] = await independent
   const collected = await collect("blogs", () => collectMentions(city, fsq?.venues ?? [], options.force))
   if (collected?.errors.length && !sources.some(s => s.id === "blogs")) sources.push({ ...unavailable("blogs", collected.errors.join("; ")), status: "error" })
   const uniqueMentions = new Map([...(collected?.mentions ?? []), ...imported].map(m => [m.id, { ...m, group: canonicalGroup(m.source, m.url) }]))
@@ -77,7 +84,7 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   // incomplete, only confidently matched boundary-scoped OSM venues qualify.
   const inBoundary = (fsq?.venues ?? []).filter(f => osm?.boundary ? withinBoundary(f, osm.boundary) : (osm?.venues ?? []).some(o => distance(o, f) <= 50 && normalizeName(o.name) === normalizeName(f.name)))
   const venues: Venue[] = mergeVenues(osm?.venues ?? [], inBoundary)
-  const peers = (await listNightlife()).flatMap(r => { const d = r.density; return r.city.population && typeof d === "number" ? [{ key: r.city.key, population: r.city.population, density: d }] : [] })
+  const peers = (await peersTask).flatMap(r => { const d = r.density; return r.city.population && typeof d === "number" ? [{ key: r.city.key, population: r.city.population, density: d }] : [] })
   await options.onProgress?.("score")
   const scores = scoreReport(city, venues, mentions, safety, new Date(), peers)
   const dateFor = (id: SourceId) => sources.find(s => s.id === id)?.fetchedAt ?? ""
@@ -85,5 +92,6 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   // Never replace a published report with an upstream-outage artifact.
   if (previous && previous.outcome !== "withheld" && sources.some(s => s.status === "error") && (next.outcome === "withheld" || next.scores.filter(s => s.value != null).length < previous.scores.filter(s => s.value != null).length)) throw new Error("Refresh failed publication checks after a source error; kept the previous published report")
   await saveNightlife(next)
+  console.info(`[nightlife] ${seed.key}: built in ${Date.now() - startedAt}ms; ${venues.length} venues; ${next.outcome}`)
   return next
 }

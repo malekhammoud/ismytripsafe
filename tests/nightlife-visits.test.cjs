@@ -71,7 +71,12 @@ test('events are refreshed weekly only when that optional source is connected',(
  const now=Date.now(),r=report(now,{refresh:{venues:new Date(now).toISOString(),population:new Date(now).toISOString(),events:new Date(now-8*DAY).toISOString(),beer:''}})
  try{assert.equal(needsNightlifeRefresh(r,now),false);process.env.TICKETMASTER_API_KEY='fixture';assert.equal(needsNightlifeRefresh(r,now),true)}finally{if(old===undefined)delete process.env.TICKETMASTER_API_KEY;else process.env.TICKETMASTER_API_KEY=old}
 })
-test('failed sources and formula changes request another check even with recent venues',()=>{const now=Date.now();assert.equal(needsNightlifeRefresh(report(now,{sources:[{status:'error'}]}),now),true);assert.equal(needsNightlifeRefresh(report(now,{formulaVersion:'old'}),now),true)})
+test('a retained source error does not rebuild on every visit; versions and data age do',()=>{
+ const now=Date.now()
+ assert.equal(needsNightlifeRefresh(report(now,{sources:[{status:'error'}]}),now),false)
+ assert.equal(needsNightlifeRefresh(report(now,{formulaVersion:'old'}),now),true)
+ assert.equal(needsNightlifeRefresh(report(now,{refresh:{venues:new Date(now-31*DAY).toISOString(),population:new Date(now).toISOString(),events:'',beer:''}}),now),true)
+})
 test('job paths reject traversal',async()=>{const x=await setup();await assert.rejects(()=>x.jobs.inspect('../secret'),/Invalid city key/)})
 test('an optional source outage does not fail a publishable report',async()=>{
  const x=await setup();x.deps.build=async()=>{const r=report(x.now(),{sources:[{id:'ticketmaster',name:'Ticketmaster',status:'error'}]});x.setStored(r);return r}

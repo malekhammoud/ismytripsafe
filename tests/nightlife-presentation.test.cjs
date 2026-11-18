@@ -1,13 +1,13 @@
 require('../scripts/typescript-worker.cjs')
 require.extensions['.css']=()=>{}
 const {test}=require('node:test'),assert=require('node:assert/strict')
-const {venueShortlist,priceBand}=require('../lib/nightlife/presentation.ts')
+const {venueShortlist,priceBand,venueMapSample}=require('../lib/nightlife/presentation.ts')
 const React=require('react'),{renderToStaticMarkup}=require('react-dom/server')
 const {NightlifeReportPage}=require('../components/nightlife/Report.tsx')
 const {Stars}=require('../components/nightlife/Stars.tsx')
 const v=(id,name,rating)=>({id,name,type:'Pub',lat:41,lon:-8,sources:[{id:'osm',url:'https://www.openstreetmap.org/node/1'}],...(rating?{rating,votes:20}:{})})
 const m=(id,group,names,sentiment='positive')=>({id,group,recommendedVenues:names,sentiment,relevant:true,publishedAt:new Date().toISOString(),themes:['Great live music'],source:'blogs',url:'https://example.org/'+group})
-const base={city:{key:'pt_porto',city:'Porto',country:'Portugal',safetyPath:'/portugal/porto',countrySlug:'portugal',citySlug:'porto',lat:41,lon:-8},updatedAt:'2026-10-21',overall:4.2,scores:['density','quality','variety','vibe','safety'].map(key=>({key,label:key,value:key==='quality'?null:4,bullets:['Should never be shown'],inputs:{}})),venues:[v('a','Bonaparte'),v('b','Live Club',9)],mentions:[],beer:null,events:[],sources:[],lateness:{known:0},safety:null,refresh:{}}
+const base={city:{key:'pt_porto',city:'Porto',country:'Portugal',safetyPath:'/portugal/porto',countrySlug:'portugal',citySlug:'porto',lat:41,lon:-8},updatedAt:'2026-10-21',overall:4.2,scores:['density','quality','variety','vibe','safety'].map(key=>({key,label:key,value:key==='quality'?null:4,bullets:['Mapped from the verified city boundary.'],inputs:{}})),venues:[v('a','Bonaparte'),v('b','Live Club',9)],mentions:[],beer:null,events:[],sources:[],lateness:{known:0},safety:null,refresh:{}}
 test('independent recommendations rank above ratings; repeat threads and negative mentions cannot inflate recommendations',()=>{
  const r={...base,mentions:[m('1','article1',['Bonaparte']),m('2','article1',['Bonaparte']),m('3','article2',['Bonaparte']),m('4','article3',['Live Club'],'negative')]}
  const list=venueShortlist(r);assert.equal(list[0].venue.name,'Bonaparte');assert.equal(list[0].groups,2);assert.equal(list[1].groups,0)
@@ -24,7 +24,13 @@ test('empty blocks are hidden and Porto has a sourced night hero without researc
  const html=renderToStaticMarkup(React.createElement(NightlifeReportPage,{report:{...base,venues:[v('a','Bonaparte')]},nearby:[]}))
  for(const id of ['top-venues','late','prices','night-safety','travelers','sources','events'])assert.ok(!html.includes(`id="${id}"`),id)
  assert.ok(html.includes('Porto Nightlife Report 2026'));assert.ok(html.includes('Effeietsanders'));assert.ok(html.includes('Not enough data'));assert.ok(html.includes('/methodology/nightlife?'))
- for(const copy of ['—','THE AFTER-DARK','Should never be shown','nl-section-number','Based on','Limited data'])assert.ok(!html.includes(copy),copy)
+ for(const copy of ['—','THE AFTER-DARK','nl-section-number','Based on','Limited data'])assert.ok(!html.includes(copy),copy)
+})
+test('large venue maps ship a capped sample without raw OSM tag bags',()=>{
+ const many=Array.from({length:3000},(_,i)=>({...v('x'+i,'Venue '+i),lat:41+(i%50)*0.004,lon:-8+(i%40)*0.004,tags:{name:'Venue '+i,website:'https://example.org/'+i}}))
+ const sample=venueMapSample(many)
+ assert.ok(sample.length<=600);assert.ok(sample.length>0);assert.ok(sample.every(venue=>!venue.tags))
+ assert.deepEqual(venueMapSample([v('a','Bonaparte')]),[v('a','Bonaparte')])
 })
 test('available blocks appear in the requested order with linked evidence and no invented taxi prices',()=>{
  const report={...base,mentions:[m('a','guide',['Bonaparte'])],beer:{currency:'EUR',domestic:2.5,imported:null,domesticUsd:2.7,updatedAt:'2026-10-01'},lateness:{known:10,afterMidnight:8,after2:5,after4:1},safety:{index:89,summary:'Yes — Porto is safe.',zones:[],signals:[]}}

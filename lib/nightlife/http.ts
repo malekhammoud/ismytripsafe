@@ -3,7 +3,10 @@ import { AsyncLocalStorage } from "node:async_hooks"
 import { SourceHttpError } from "./source-errors"
 
 const deadline = new AsyncLocalStorage<AbortSignal>()
-export const withResearchDeadline = <T>(run: () => Promise<T>) => deadline.run(AbortSignal.timeout(240000), run)
+// Interactive visits must finish inside the browser's five-minute watch. A
+// 90-second ceiling leaves room for the fallback path without letting one
+// upstream hang hold the research lock for four minutes.
+export const withResearchDeadline = <T>(run: () => Promise<T>) => deadline.run(AbortSignal.timeout(90000), run)
 export const researchSignal = () => deadline.getStore()
 const USER_AGENT = "IsMyTripSafe-nightlife/1.1 (+https://ismytripsafe.com/about)"
 type Policy = { timeoutMs?: number; retryDelayMs?: number; operation?: string; retries?: 0 | 1; fetch?: typeof fetch; sleep?: (ms: number, signal?: AbortSignal) => Promise<void> }

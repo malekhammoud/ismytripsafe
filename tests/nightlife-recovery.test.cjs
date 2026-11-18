@@ -26,6 +26,14 @@ test('Tbilisi resolves to the city, never the closer station with a Tbilisi alia
   assert.equal(match.wikidataId,'Q994');assert.equal(match.relationId,1996871)
   assert.equal(match.populationDate,'2025');assert.equal(match.resolutionVersion,RESOLUTION_VERSION)
 })
+test('settlement wrappers match New York without turning Kansas City into Kansas',()=>{
+ const us={Q30:{id:'Q30',claims:{P297:[claim('US')]}}}
+ const ny={id:'Q60',labels:{en:{value:'New York City'}},aliases:{en:[{value:'City of New York'}]},claims:{P31:[claim({id:'Q515'})],P17:[claim({id:'Q30'})],P625:[claim({latitude:40.7128,longitude:-74.006})],P402:[claim('175905')]}}
+ const seen=selectCity({key:'us_new-york',city:'New York',country:'United States',countryCode:'US',lat:40.7128,lon:-74.006},[ny],us,{})
+ assert.equal(seen.wikidataId,'Q60');assert.equal(seen.relationId,175905)
+ const kansas={...ny,id:'Q1',labels:{en:{value:'Kansas'}},aliases:{en:[]},claims:{...ny.claims,P402:[]}}
+ assert.equal(selectCity({key:'us_kansas-city',city:'Kansas City',country:'United States',countryCode:'US',lat:39.0997,lon:-94.5786},[kansas],us,{}),null)
+})
 test('same-name landmarks and cities in a different country are rejected',()=>{
   assert.equal(selectCity(seed,[entity('Q1','Tbilisi','Q55488')],countries,{}),null)
   assert.equal(selectCity({...seed,countryCode:'US'},[entity('Q994','Tbilisi','Q515')],countries,{}),null)
