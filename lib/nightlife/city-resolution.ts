@@ -1,7 +1,7 @@
 import type { City } from "./types"
 import { distance } from "./venues"
 
-export const RESOLUTION_VERSION = 3
+export const RESOLUTION_VERSION = 4
 export interface Claim {
   rank?: string
   mainsnak: { datavalue?: { value: unknown } }
