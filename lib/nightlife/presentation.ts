@@ -23,10 +23,10 @@ export function venueTraits(report: NightlifeReport) {
   const total = report.venues.length
   const count = (test: (venue: Venue) => boolean) => report.venues.filter(test).length
   const percent = (n: number) => total ? Math.round(n / total * 100) : 0
-  const withHours = count(v => !!v.hours)
-  const lateAfter2 = report.lateness.known ? Math.round(report.lateness.after2 / report.lateness.known * 100) : null
+  const withHours = count(v => !!v.hours), knownHours = report.lateness.known
+  const lateAfter2 = knownHours ? Math.round(report.lateness.after2 / knownHours * 100) : null
   return {
-    total, withHours, lateAfter2, percent,
+    total, withHours, knownHours, lateAfter2, percent,
     outdoor: count(v => v.tags?.outdoor_seating === "yes"),
     wheelchair: count(v => v.tags?.wheelchair === "yes"),
     smokeFree: count(v => v.tags?.smoking === "no"),
@@ -88,7 +88,7 @@ export function sceneSummary(report: NightlifeReport) {
   if (traits.total) lines.push(`${traits.total.toLocaleString("en")} mapped bars, clubs and late-night venues sit inside the verified city boundary.`)
   if (traits.withHours) lines.push(traits.lateAfter2 == null
     ? `${traits.withHours.toLocaleString("en")} publish opening hours; their late-night schedules are not machine-readable yet, so check the venue's current hours.`
-    : `${traits.withHours.toLocaleString("en")} publish opening hours; ${traits.lateAfter2}% of those stay open past 2am on at least one night of the week.`)
+    : `${traits.withHours.toLocaleString("en")} publish opening hours; of the ${traits.knownHours.toLocaleString("en")} with interpretable schedules, ${traits.lateAfter2}% stay open past 2am on at least one night of the week.`)
   if (clusters[0] && clusters[0].share >= 0.04) lines.push(`${clusters[0].name} has the densest cluster, with ${clusters[0].count.toLocaleString("en")} mapped venues.`)
   if (traits.outdoor) lines.push(`${traits.outdoor.toLocaleString("en")} list outdoor seating (${traits.percent(traits.outdoor)}%), useful for a warm-weather start.`)
   if (report.safety) lines.push(`The after-dark safety score is ${Math.round(report.safety.index)}/100, based on the city safety report rather than district-level crime counts.`)
