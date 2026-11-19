@@ -101,9 +101,14 @@ async function main() {
       const onlyEvents = prior && prior.refresh.venues && Date.now() - Date.parse(prior.refresh.venues) < 30 * 86400000
       const report = await buildNightlife(city, r, { force: args.includes('--force'), rescore: args.includes('--rescore') || rescoreAll, eventsOnly: args.includes('--events-only') || !!onlyEvents, testimonialsOnly: testimonialsOnly || testimonialsAll })
       // Mark the ask complete with whatever answer the pipeline reached:
-      // published, small-scene, or withheld. A withheld city must not be
-      // retried every night on the strength of one request.
-      if (pendingRequests.some(request => request.key === city.key)) await completeNightlifeRequest(city.key, report.outcome)
+      // published, small-scene, or a genuine withheld verdict. A withheld
+      // report that still carries a source error is an outage, not a verdict;
+      // leave it pending so the next run tries again.
+      const requestSourceFailed = report.sources.some(source => source.status === 'error')
+      if (pendingRequests.some(request => request.key === city.key)
+        && (report.outcome !== 'withheld' || !requestSourceFailed)) {
+        await completeNightlifeRequest(city.key, report.outcome)
+      }
       const summary = { city: report.city.city, outcome: report.outcome, overall: report.overall, venues: report.venues.length, reasons: report.reasons, sources: report.sources.map(s => ({ id: s.id, status: s.status })) }
       results.push(summary)
       if (report.sources.some(s => s.status === 'error')) failures.push({ key, error: report.sources.filter(s => s.status === 'error').map(s => s.name + ': ' + s.note).join('; ') })

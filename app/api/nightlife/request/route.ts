@@ -91,9 +91,12 @@ export async function POST(request: Request) {
 
   // A withheld report is a considered answer ("we looked and could not find
   // enough"), not a missing one. Queueing it again every night would be a
-  // silent promise we know we cannot keep.
+  // silent promise we know we cannot keep. A withheld report that still
+  // carries a source error is different: that is an outage, not a verdict,
+  // so the ask is allowed back into the queue.
   const checked = await readNightlife(meta.key)
-  if (checked && checked.outcome === "withheld") {
+  const checkedHadSourceError = !!checked?.sources.some((source) => source.status === "error")
+  if (checked && checked.outcome === "withheld" && !checkedHadSourceError) {
     return json({
       ok: false,
       status: "unavailable",
@@ -145,8 +148,18 @@ export async function POST(request: Request) {
   if (job.run) {
     after(async () => {
       await job.run!()
+      const status = await visitJobs.inspect(meta.key)
       const report = await readNightlife(meta.key)
-      if (report) await completeNightlifeRequest(meta.key, report.outcome)
+      if (!report) return // the build threw; leave the ask pending
+      const sourceFailed = report.sources.some((source) => source.status === "error")
+      if (status.state === "ready") {
+        // full or limited: published, so the ask is answered.
+        await completeNightlifeRequest(meta.key, report.outcome)
+      } else if (status.state === "unavailable" && !sourceFailed) {
+        // a real "not enough evidence" verdict, not an outage.
+        await completeNightlifeRequest(meta.key, "withheld")
+      }
+      // A failed source leaves the request pending for the nightly retry.
     })
   }
 
