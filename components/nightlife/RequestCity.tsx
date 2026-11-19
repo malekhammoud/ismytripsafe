@@ -23,7 +23,7 @@ import type { DirectoryCity } from "./Directory"
 type Status =
   | { kind: "idle" }
   | { kind: "pending" }
-  | { kind: "ok"; message: string; href?: string }
+  | { kind: "ok"; message: string; href?: string; hrefLabel?: string }
   | { kind: "error"; message: string }
 
 const normalize = (text: string) =>
@@ -85,6 +85,7 @@ export function RequestCity({ cities }: { cities: DirectoryCity[] }) {
         kind: "ok",
         message: `We already have a nightlife guide for ${match.label}.`,
         href: `${match.path}/nightlife`,
+        hrefLabel: "Open the guide",
       })
       return
     }
@@ -113,6 +114,7 @@ export function RequestCity({ cities }: { cities: DirectoryCity[] }) {
           kind: "ok",
           message: `We already have a nightlife guide for ${data.city ?? match.city}.`,
           href: data.href,
+          hrefLabel: "Open the guide",
         })
         return
       }
@@ -126,6 +128,7 @@ export function RequestCity({ cities }: { cities: DirectoryCity[] }) {
               ? `${match.label} is already in the queue — your request moves it up.`
               : `Request received. ${match.label} is in the research queue; guides are built in nightly batches.`,
           href: data.href,
+          hrefLabel: "Follow progress",
         })
         setQuery("")
         return
@@ -210,7 +213,7 @@ export function RequestCity({ cities }: { cities: DirectoryCity[] }) {
               <Check size={14} aria-hidden /> {status.message}
               {status.href && (
                 <Link href={status.href} prefetch={false}>
-                  Follow progress <ArrowUpRight size={12} aria-hidden />
+                  {status.hrefLabel ?? "Follow progress"} <ArrowUpRight size={12} aria-hidden />
                 </Link>
               )}
             </p>
