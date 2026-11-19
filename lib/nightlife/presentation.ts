@@ -116,13 +116,16 @@ export function sceneNumbers(report: NightlifeReport) {
 }
 export function nightPlan(report: NightlifeReport) {
   const active = report.venues.filter(venue => !venue.closed), used = new Set<string>()
+  const clusters = nightlifeClusters(report), cluster = clusters.items[0]
+  const inCluster = cluster ? active.filter(venue => clusters.kind === "neighbourhood" ? venue.neighborhood === cluster.name : venue.tags?.["addr:street"] === cluster.name) : []
+  const pool = inCluster.length >= 3 ? inCluster : active
   const pick = (test: (venue: Venue) => boolean) => {
-    const venue = active.find(candidate => !used.has(candidate.id) && test(candidate))
+    const venue = pool.find(candidate => !used.has(candidate.id) && test(candidate))
     if (venue) used.add(venue.id)
     return venue
   }
   const early = pick(venue => (venue.tags?.outdoor_seating === "yes" || ["Pub", "Beer garden", "Wine bar"].includes(venue.type)) && !!venue.hours)
-    ?? documentedVenues(report)[0]?.venue ?? pick(() => true)
+    ?? pick(venue => !!venue.hours) ?? pick(() => true)
   const late = pick(venue => ["Nightclub", "Live music", "Cocktail bar"].includes(venue.type)) ?? pick(() => true)
   const after = pick(venue => venue.type === "Nightclub") ?? pick(() => true)
   return [
