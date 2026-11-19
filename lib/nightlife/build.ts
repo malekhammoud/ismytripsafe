@@ -27,7 +27,7 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   if ((options.rescore || options.eventsOnly) && !previous) throw new Error("No stored report to refresh")
   if (options.rescore && previous) {
     const peers = (await listNightlife()).flatMap(r => { const d = r.density; return r.city.population && typeof d === "number" ? [{ key: r.city.key, population: r.city.population, density: d }] : [] })
-    const next = { ...previous, ...scoreReport(previous.city, previous.venues, previous.mentions, safety, new Date(), peers), safety, formulaVersion: FORMULA_VERSION }
+    const next = { ...previous, ...scoreReport(previous.city, previous.venues, previous.mentions, safety, new Date(), peers, previous.lateness), safety, formulaVersion: FORMULA_VERSION, pipelineVersion: PIPELINE_VERSION, updatedAt: new Date().toISOString() }
     await saveNightlife(next); return next
   }
   if (options.eventsOnly && previous) {
@@ -87,9 +87,10 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   const venues: Venue[] = mergeVenues(osm?.venues ?? [], inBoundary)
   const peers = (await peersTask).flatMap(r => { const d = r.density; return r.city.population && typeof d === "number" ? [{ key: r.city.key, population: r.city.population, density: d }] : [] })
   await options.onProgress?.("score")
-  const scores = scoreReport(city, venues, mentions, safety, new Date(), peers)
+  const latenessData = lateness(venues, city)
+  const scores = scoreReport(city, venues, mentions, safety, new Date(), peers, latenessData)
   const dateFor = (id: SourceId) => sources.find(s => s.id === id)?.fetchedAt ?? ""
-  const next: NightlifeReport = { version: 1, formulaVersion: FORMULA_VERSION, pipelineVersion: PIPELINE_VERSION, city, updatedAt: new Date().toISOString(), ...scores, venues, mentions, events: tm?.data.events ?? [], beer: prices?.data.beer ?? null, safety, lateness: lateness(venues, city), sources, refresh: { venues: dateFor("osm"), events: dateFor("ticketmaster"), population: dateFor("wikidata"), beer: dateFor("numbeo") } }
+  const next: NightlifeReport = { version: 1, formulaVersion: FORMULA_VERSION, pipelineVersion: PIPELINE_VERSION, city, updatedAt: new Date().toISOString(), ...scores, venues, mentions, events: tm?.data.events ?? [], beer: prices?.data.beer ?? null, safety, lateness: latenessData, sources, refresh: { venues: dateFor("osm"), events: dateFor("ticketmaster"), population: dateFor("wikidata"), beer: dateFor("numbeo") } }
   // Never replace a published report with an upstream-outage artifact.
   if (previous && previous.outcome !== "withheld" && sources.some(s => s.status === "error") && (next.outcome === "withheld" || next.scores.filter(s => s.value != null).length < previous.scores.filter(s => s.value != null).length)) throw new Error("Refresh failed publication checks after a source error; kept the previous published report")
   await saveNightlife(next)

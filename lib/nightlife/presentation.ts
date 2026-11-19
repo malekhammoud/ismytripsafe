@@ -94,6 +94,70 @@ export function sceneSummary(report: NightlifeReport) {
   if (report.safety) lines.push(`The after-dark safety score is ${Math.round(report.safety.index)}/100, based on the city safety report rather than district-level crime counts.`)
   return lines.slice(0, 4)
 }
+export function sceneNumbers(report: NightlifeReport) {
+  const traits = venueTraits(report)
+  const density = report.scores.find(score => score.key === "density")?.inputs.density
+  const count = (n: number) => n.toLocaleString("en")
+  return [
+    { label: "Mapped venues", value: count(report.venues.length), note: "lower bound, not a census" },
+    { label: "Venue types", value: count(new Set(report.venues.map(venue => venue.type)).size), note: "including Other" },
+    { label: "Opening hours", value: `${count(traits.withHours)} (${traits.percent(traits.withHours)}%)`, note: "published on the map" },
+    { label: "Past midnight", value: report.lateness.known ? `${Math.round(report.lateness.afterMidnight / report.lateness.known * 100)}%` : "n/a", note: `${count(report.lateness.known)} interpretable schedules` },
+    { label: "Past 2am", value: report.lateness.known ? `${Math.round(report.lateness.after2 / report.lateness.known * 100)}%` : "n/a", note: "of interpretable schedules" },
+    { label: "Past 4am", value: report.lateness.known ? `${Math.round(report.lateness.after4 / report.lateness.known * 100)}%` : "n/a", note: "of interpretable schedules" },
+    { label: "Outdoor seating", value: `${traits.percent(traits.outdoor)}%`, note: `${count(traits.outdoor)} venues` },
+    { label: "Step-free access", value: `${traits.percent(traits.wheelchair)}%`, note: `${count(traits.wheelchair)} venues` },
+    { label: "Smoke-free policy", value: `${traits.percent(traits.smokeFree)}%`, note: `${count(traits.smokeFree)} venues` },
+    { label: "Website listed", value: `${count(traits.websites)}`, note: `${traits.percent(traits.websites)}% of venues` },
+    { label: "Population", value: report.city.population ? count(report.city.population) : "n/a", note: report.city.populationDate ? `dated ${report.city.populationDate}` : "city safety report" },
+    { label: "Venues per 100k", value: typeof density === "number" ? density.toFixed(1) : "n/a", note: "within verified boundary" },
+    { label: "After-dark safety", value: report.safety ? `${Math.round(report.safety.index)}/100` : "n/a", note: "city-level estimate" },
+  ]
+}
+export function nightPlan(report: NightlifeReport) {
+  const active = report.venues.filter(venue => !venue.closed), used = new Set<string>()
+  const pick = (test: (venue: Venue) => boolean) => {
+    const venue = active.find(candidate => !used.has(candidate.id) && test(candidate))
+    if (venue) used.add(venue.id)
+    return venue
+  }
+  const early = pick(venue => (venue.tags?.outdoor_seating === "yes" || ["Pub", "Beer garden", "Wine bar"].includes(venue.type)) && !!venue.hours)
+    ?? documentedVenues(report)[0]?.venue ?? pick(() => true)
+  const late = pick(venue => ["Nightclub", "Live music", "Cocktail bar"].includes(venue.type)) ?? pick(() => true)
+  const after = pick(venue => venue.type === "Nightclub") ?? pick(() => true)
+  return [
+    early ? { time: "Early evening", venue: early, note: early.hours ? plainCopy(early.hours) : "Check current hours" } : null,
+    late ? { time: "Late", venue: late, note: late.neighborhood ? plainCopy(late.neighborhood) : late.type } : null,
+    after ? { time: "After hours", venue: after, note: "A nightclub for the end of the night" } : null,
+  ].filter((item): item is { time: string; venue: Venue; note: string } => !!item)
+}
+export function goodToKnow(report: NightlifeReport) {
+  const traits = venueTraits(report), notes: string[] = []
+  if (traits.outdoor > 0) notes.push(`${traits.percent(traits.outdoor)}% of mapped venues list outdoor seating.`)
+  if (traits.wheelchair > 0) notes.push(`${traits.percent(traits.wheelchair)}% list step-free access; check individual venues before relying on it.`)
+  if (traits.smokeFree > 0) notes.push(`${traits.percent(traits.smokeFree)}% list a smoke-free policy.`)
+  if (traits.reservations > 0) notes.push(`${traits.reservations.toLocaleString("en")} venues accept reservations.`)
+  if (traits.websites > 0) notes.push(`${traits.websites.toLocaleString("en")} listings link to a website or contact page.`)
+  const areas = nightlifeClusters(report).items
+  if (areas[0]) notes.push(`${areas[0].name} has the densest cluster of mapped venues (${areas[0].count.toLocaleString("en")}).`)
+  const avoid = report.safety?.zones.filter(zone => zone.level === "avoid") ?? []
+  if (avoid.length) notes.push(`The safety report marks ${avoid.map(zone => zone.name).join(", ")} as areas to avoid after dark.`)
+  return notes.slice(0, 6)
+}
+export function faqItems(report: NightlifeReport) {
+  const traits = venueTraits(report), areas = nightlifeClusters(report).items
+  const overall = report.overall == null ? "not yet rated" : `${report.overall.toFixed(1)}/5`
+  const quality = report.scores.find(score => score.key === "quality")
+  const vibe = report.scores.find(score => score.key === "vibe")
+  const late = traits.lateAfter2 == null ? "Late-night opening hours are not machine-readable yet." : `${traits.lateAfter2}% of venues with interpretable hours stay open past 2am.`
+  return [
+    { question: `Is ${report.city.city} good for nightlife?`, answer: `${report.city.city} scores ${overall} across the available ratings. ${quality?.value != null ? `Quality is ${quality.value.toFixed(1)}/5 and ${vibe?.value != null ? `vibe is ${vibe.value.toFixed(1)}/5.` : "vibe is not yet rated."}` : "The scene is rated on mapped venue evidence."} ${traits.total.toLocaleString("en")} venues are mapped.` },
+    { question: `How late does ${report.city.city} stay open?`, answer: late },
+    { question: `Where is the nightlife concentrated?`, answer: areas[0] ? `${areas[0].name} has the highest concentration of mapped venues, with ${areas[0].count.toLocaleString("en")}. ${areas[1] ? `${areas[1].name} and ${areas[2]?.name ?? "nearby areas"} follow.` : ""}` : "Neighbourhood tags are sparse; use the venue map and the starting points above." },
+    { question: `Is ${report.city.city} safe after dark?`, answer: report.safety ? `The city safety report scores ${Math.round(report.safety.index)}/100 after dark. ${report.safety.zones.filter(zone => zone.level === "avoid").length ? "Check the district guidance below before choosing a route." : "Keep normal precautions in crowded nightlife areas."}` : "No usable city safety data is attached." },
+    { question: `How many nightlife venues are mapped?`, answer: `${traits.total.toLocaleString("en")} venues are mapped inside the verified city boundary. Counts are a lower bound because not every venue is in OpenStreetMap.` },
+  ]
+}
 export function documentedVenues(report: NightlifeReport) {
   const completeness = (venue: Venue) => (venue.hours ? 2 : 0) + (venue.tags?.website ?? venue.tags?.["contact:website"] ? 2 : 0) + (venue.tags?.phone ?? venue.tags?.["contact:phone"] ? 1 : 0)
     + (venue.neighborhood ? 1 : 0) + (venue.type !== "Other" ? 1 : 0) + (venue.tags?.outdoor_seating === "yes" ? 1 : 0)
