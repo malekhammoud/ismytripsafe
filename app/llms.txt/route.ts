@@ -14,6 +14,7 @@ export async function GET() {
     ? `\n## Nightlife reports (${nightlife.length})
 
 - [All city nightlife reports](${nightlifeUrl("/nightlife")})
+- [Attributed traveler testimonials by city](${nightlifeUrl("/nightlife/testimonials")})
 ${[...nightlife].sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0)).slice(0, 12).map((r) => `- [${r.city.city} nightlife](${nightlifeUrl(nightlifePath(r))}) — ${r.venueCount.toLocaleString("en")} mapped venues`).join("\n")}
 `
     : ""

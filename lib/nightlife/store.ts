@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 import { randomUUID } from "node:crypto"
-import type { NightlifeReport } from "./types"
+import type { NightlifeReport, Testimonial } from "./types"
 // Separate from production's safety cache. Never use REPORT_CACHE_DIR here.
 export const NIGHTLIFE_DIR = process.env.NIGHTLIFE_CACHE_DIR || "/var/lib/ismytripsafe/nightlife"
 export type NightlifeSummary = Pick<NightlifeReport, "city" | "updatedAt" | "outcome" | "overall" | "reasons" | "refresh"> & { venueCount: number; scoreCount: number; density: number | null }
@@ -23,14 +23,18 @@ export function summarize(r: NightlifeReport): NightlifeSummary {
   return { city: r.city, updatedAt: r.updatedAt, outcome: r.outcome, overall: r.overall, reasons: r.reasons, refresh: r.refresh, venueCount: r.venues.length, scoreCount: r.scores.filter(s => s.value != null).length, density: typeof density === "number" ? density : null }
 }
 const safeSlug = (s: string) => /^[a-z0-9][a-z0-9-]{0,100}$/.test(s)
+export type TestimonialEntry = Testimonial & { key: string; city: string; country: string; path: string }
 let listCache: { at: number; reports: NightlifeSummary[] } | null = null
+let testimonialCache: { at: number; entries: TestimonialEntry[] } | null = null
 export async function saveNightlife(r: NightlifeReport) {
   if (!safeSlug(r.city.countrySlug) || !safeSlug(r.city.citySlug)) throw new Error("Invalid city slugs")
   const key = safeKey(r.city.key)
   await writeJson(path.join(NIGHTLIFE_DIR, "reports", `${key}.json`), r)
   await writeJson(path.join(NIGHTLIFE_DIR, "index", `${key}.json`), summarize(r))
   await writeJson(path.join(NIGHTLIFE_DIR, "lookup", r.city.countrySlug, `${r.city.citySlug}.json`), { key })
+  await writeJson(path.join(NIGHTLIFE_DIR, "testimonials", `${key}.json`), { key, city: r.city.city, country: r.city.country, path: nightlifePath(r), testimonials: r.testimonials ?? [] })
   listCache = null
+  testimonialCache = null
 }
 // Directory cards, related cities and sitemap only read lightweight summaries,
 // never every city's full venue list. Exact city lookups are one small read.
@@ -47,6 +51,21 @@ export async function listNightlife(includeWithheld = false): Promise<NightlifeS
     listCache = { at: Date.now(), reports: reports.filter((r): r is NightlifeSummary => !!r) }
   }
   return includeWithheld ? listCache.reports : listCache.reports.filter(r => r.outcome !== "withheld")
+}
+export async function listTestimonials(): Promise<TestimonialEntry[]> {
+  if (testimonialCache && Date.now() - testimonialCache.at < 5000) return testimonialCache.entries
+  let files: string[]
+  try { files = await fs.readdir(path.join(NIGHTLIFE_DIR, "testimonials")) } catch (e) { if ((e as NodeJS.ErrnoException).code === "ENOENT") return []; throw e }
+  const reports = await Promise.all(files.filter(file => /^[a-z0-9][a-z0-9_-]*\.json$/.test(file)).map(async file => {
+    try {
+      const record = JSON.parse(await fs.readFile(path.join(NIGHTLIFE_DIR, "testimonials", file), "utf8")) as { key?: string; city?: string; country?: string; path?: string; testimonials?: Testimonial[] }
+      if (!record.key || !record.city || !record.country || !record.path || !Array.isArray(record.testimonials)) return []
+      return record.testimonials.map(item => ({ ...item, key: record.key!, city: record.city!, country: record.country!, path: record.path! }))
+    } catch { return [] }
+  }))
+  const entries = reports.flat().sort((a, b) => a.city.localeCompare(b.city, "en") || (Date.parse(b.publishedAt ?? "") || 0) - (Date.parse(a.publishedAt ?? "") || 0))
+  testimonialCache = { at: Date.now(), entries }
+  return entries
 }
 export async function findNightlife(country: string, city: string) {
   if (!safeSlug(country) || !safeSlug(city)) return null

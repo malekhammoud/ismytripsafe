@@ -94,6 +94,10 @@ async function main() {
 
   let liveOk = 0, dataOk = 0
   if (origin) {
+    try {
+      const hub = await get(`${origin}/nightlife/testimonials`)
+      if (hub.status !== 200 || !hub.text.includes('testimonial-query') || !hub.text.includes('nlt-card')) add('testimonials', 'search page is not serving quote results')
+    } catch (error) { add('testimonials', `search page request failed: ${error.message}`) }
     await pool(reports.filter(report => report.outcome !== 'withheld'), concurrency, async report => {
       const path = nightlifePath(report), canonical = nightlifeUrl(path)
       try {

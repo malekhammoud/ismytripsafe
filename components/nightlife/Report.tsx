@@ -75,6 +75,7 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
             <blockquote>{plainCopy(item.quote)}</blockquote>
             <figcaption><a href={item.url} target="_blank" rel="noopener noreferrer">{item.source} ↗</a><span>{item.kind === "travel guide" ? "Travel guide" : item.kind === "search snippet" ? "Search result" : "Article"} · {item.publishedAt ? dateLabel(item.publishedAt) : "Undated"} · {item.sentiment === "positive" ? "Positive" : item.sentiment === "negative" ? "Critical" : "Mixed"}</span></figcaption>
           </figure>)}</div>
+          <p className="nl-count-note"><Link href="/nightlife/testimonials">Search every traveler quote →</Link></p>
         </section>}
         {r.venues.length > 0 && <section id="venues" className="nl-section nl-scene" aria-label="Venue mix">
           <div className="nl-scene-grid"><div className="nl-venue-total"><Beer size={26}/><strong>{r.venues.length.toLocaleString()}</strong><h2>places to start the evening</h2></div><div className="nl-breakdown">{counts.map(({ type, count }) => <div key={type} className="nl-bar-row"><div><span>{type}</span><strong>{count}</strong></div><div className="nl-bar-track"><span style={{ width: `${count / r.venues.length * 100}%` }}/></div></div>)}</div></div>

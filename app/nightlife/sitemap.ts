@@ -12,6 +12,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const newest = reports.map(report => report.updatedAt).sort().at(-1)
   return [
     { url: nightlifeUrl("/nightlife"), ...(newest ? { lastModified: newest } : {}) },
+    { url: nightlifeUrl("/nightlife/testimonials"), ...(newest ? { lastModified: newest } : {}) },
     ...reports.map(report => ({ url: nightlifeUrl(nightlifePath(report)), lastModified: report.updatedAt })),
   ]
 }
