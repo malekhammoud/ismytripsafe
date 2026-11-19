@@ -6,7 +6,11 @@ production; the branch targets `origin/beta`. Use an explicit `HEAD:beta` push.
 
 ## Routes and design
 
-- `/nightlife`: directory of published reports, with an honest empty state.
+- `/nightlife`: night-sky globe of published city guides plus the searchable
+  directory and a server-rendered index of every published report. City lights
+  are sized by mapped venue count and coloured by nightlife score; countries
+  are tinted by their average score. Clicking a country opens its guides, and
+  clicking a light opens the city report.
 - `/{country}/{city}/nightlife`: sourced, server-rendered report.
 - `/{country}/{city}/nightlife/data.json`: ODbL venue export, excluding all
   proprietary ratings, popularity, review counts, tips, and sentiment labels.
@@ -20,11 +24,20 @@ identity. Five accessible star cards lead into the venue mix, filterable map
 safety, and a source ledger. Booking content stays absent until there are actual links; it never affects ratings. Half-star icons
 accompany precise numeric subscores; the overall displays one decimal.
 
-New nightlife pages are **noindex by default**, independently of the existing
-beta flag (which currently differs from its documentation).
-`NIGHTLIFE_INDEXABLE=1` is reserved for an explicitly approved production
-rollout. Canonicals default to `https://beta.ismytripsafe.com` and can be set
-with `NIGHTLIFE_SITE_URL`. Existing production metadata is unchanged.
+The `/nightlife` globe is deliberately its own night palette: a near-black
+ocean, violet atmosphere, faint country score wash, and warm city lights that
+twinkle and grow with venue count. It has no per-frame React state (the
+safety globe's stamped point-of-view rule still applies), labels only the
+largest scenes until a country is opened, and pauses its render loop when a
+link is clicked or the tab is hidden.
+
+Nightlife is **indexable on beta** for the SEO pilot. The
+`deploy/ismytripsafe-beta-nightlife-seo.conf` drop-in sets
+`NIGHTLIFE_INDEXABLE=1` and `NIGHTLIFE_SITE_URL=https://beta.ismytripsafe.com`.
+Nightlife pages have their own canonical sitemap at
+`https://beta.ismytripsafe.com/nightlife/sitemap.xml`, advertised in
+`robots.txt`; they never leak into the production safety sitemap. Production
+stays noindex until the feature is deliberately merged into `main`.
 
 ## Storage and generation
 
