@@ -19,6 +19,10 @@ worktree build recipe.
   writes `.env.production.local`, `npm install`, `npm run build`,
   `systemctl restart ismytripsafe-beta`). Watch
   `/var/log/ismytripsafe-beta-deploy.log` for `beta deploy OK`.
+  The env file now also carries `NIGHTLIFE_INDEXABLE=1`,
+  `NIGHTLIFE_SITE_URL` and `NIGHTLIFE_CACHE_DIR`: `/nightlife` and
+  `/nightlife/testimonials` are prerendered, so those values must exist at
+  **build** time, not only in the service drop-in.
 - **Prod:** `git push origin main` deploys `/opt/ismytripsafe` through
   `/usr/local/bin/ismytripsafe-deploy.sh`; log at
   `/var/log/ismytripsafe-deploy.log`.
@@ -73,3 +77,32 @@ already honour it.
   loop eats the whole main thread — measured at 1 fps — and React never gets
   the idle slice it needs to commit a navigation, so *every link on the page
   stops working*. Pausing first hands the thread back.
+
+## Performance invariants — don't undo these
+
+- **The globe does not mount itself on a software renderer.**
+  `lib/globe-runtime.ts` probes WebGL, rejects SwiftShader/llvmpipe, Save-Data
+  and <4 cores, and shows the poster with an explicit button instead. On a
+  normal GPU it mounts after idle. Measured cost of mounting
+  unconditionally on a software renderer: a **90-second main-thread task**.
+- **110m geometry first, 50m only when zoomed.** `lib/globe-geo.ts` loads
+  `countries-110m.json` (108 KB) with the renderer in parallel; the 756 KB
+  50m file is fetched once the camera crosses `altitude <= 1.05`. The old
+  order was 50m first and the renderer after — serial, and seven times the
+  vertices.
+- **Every Wikimedia image goes through `sized()` / `wikimediaThumb()`.** They
+  strip `?utm_…` before matching. A query string used to defeat the resize
+  and fetch 2 MB originals for 1,043 of 1,424 heroes.
+- **The postcards use the `-480.webp` / `-960.webp` variants**, not the JPEG
+  art drop. `scripts/build-photo-variants.mjs` makes them; the home page must
+  not go back to eleven eager 960px JPEG preloads (1.2 MB before first paint).
+- **No block of `prefetch` on navigation.** Next fired 5–11 redundant RSC
+  requests per page (the testimonials page six times, every related card,
+  every self-link). With ISR a click is a cached route; leave
+  `prefetch={false}` on links.
+- **Pages are ISR, with a small seed.** `revalidate` is 60–300s, and the city
+  and country routes have `generateStaticParams` seeds so on-demand ISR
+  actually caches the rest. Re-adding `force-dynamic` to the home page,
+  destinations or reports gives back the per-request render.
+- **Nightlife city pages stay `force-dynamic`.** They render live on-demand
+  research state; the rest of the nightlife surface is cached.
