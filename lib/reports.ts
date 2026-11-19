@@ -3,6 +3,7 @@ import path from "path"
 import { CACHE_DIR, readCacheAnyAge, slug, type CachedReport } from "./cache"
 import { computeCategories, computeFinalScore, levelFromIndex, LEVELS } from "./safety-display"
 import { englishCountryName } from "./data/country"
+import { sized } from "./photos"
 import type { SafetyLevel } from "./types"
 
 // ─────────────────────────────────────────────────────────────────────
@@ -91,7 +92,9 @@ function metaFromReport(report: CachedReport): ReportMeta | null {
     lon: geo.lon,
     updatedAt: report.cachedAt,
     createdAt: report.createdAt || report.cachedAt,
-    image: usablePhoto(report.images?.hero) ? report.images.hero : null,
+    // Cards render at ~480 CSS px, so store the 960px rendition rather than
+    // the original. The hero on the report page asks for 1280 separately.
+    image: usablePhoto(report.images?.hero) ? sized(report.images.hero, 960) : null,
   }
 }
 

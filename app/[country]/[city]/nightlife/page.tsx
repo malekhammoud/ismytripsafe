@@ -7,6 +7,9 @@ import { notFound } from "next/navigation"
 import { NightlifeReportPage } from "@/components/nightlife/Report"
 import { findNightlife, listNightlife, nightlifePath, nightlifeUrl, NIGHTLIFE_INDEXABLE } from "@/lib/nightlife/store"
 import { distance } from "@/lib/nightlife/venues"
+// This page is the on-demand research surface: it must render the live job
+// state, not a five-minute-old cached "researching" screen. The index and
+// published reports are cached separately.
 export const dynamic = "force-dynamic"
 type Props = { params: Promise<{ country: string; city: string }> }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

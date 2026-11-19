@@ -19,7 +19,7 @@ import { SectionHeading } from "./shared"
 
 function CardPhoto({ meta, city, country }: { meta: ReportMeta; city: string; country: string }) {
   const supplied = suppliedPhotoFor(meta.path)
-  const src = meta.image ? sized(meta.image, 960) : (supplied?.file ?? null)
+  const src = meta.image ? sized(meta.image, 960) : (supplied?.cardFile ?? supplied?.file ?? null)
   if (src) {
     return (
       <div className="relative h-28 overflow-hidden bg-[var(--paper-deep)]">
@@ -65,7 +65,7 @@ export function RelatedGrid({
         {cards.map((m) => {
           const level = LEVELS[m.level]
           return (
-            <Link
+            <Link prefetch={false}
               key={m.path}
               href={m.path}
               className="card group overflow-hidden !p-0 transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[var(--shadow-float)]"

@@ -413,3 +413,34 @@ City reports now show a city-night photograph (when curated), exact fractional o
 Explicit positive venue recommendations are extracted from licensed first-hand accounts. Names must occur in the source text. Independent discussion groups rank above ratings; repeated mentions in one group do not inflate rank. Expired, negative and merely topical mentions do not create recommendations. Existing mention caches refresh under a new classifier version; no raw text is retained.
 
 Prices use licensed Numbeo observations only. The meal-plus-two-beers budget sums meal item 1 and twice beer item 4. A 5 km taxi estimate uses exact `Taxi Start (Normal Tariff)` and `Taxi 1km (Normal Tariff)` item names from the city response, avoiding guessed item IDs or mile/km conversions. Missing components hide an amount. Dollar signs represent domestic beer USD price, not an overall cost-of-living score. No live Uber quotes, estimated cover fees or invented prices are used.
+
+## City requests (November 2026)
+
+`/nightlife` carries an "Ask for a city" form under the index heading. It
+posts to `/api/nightlife/request` with a safety-report path (the suggestions
+come from the same city list the directory already receives, so no new city
+payload is shipped).
+
+The endpoint does two things. First it writes a durable request to
+`NIGHTLIFE_CACHE_DIR/requests/<safety-key>.json`: one file per city, with the
+first and most recent ask, a count, and an optional note. A repeat ask updates
+that file rather than growing a log. Second, when the shared on-demand budget
+has room, it starts the same `visitJobs` coordinator the city page uses; the
+visitor gets a link to the city page to follow progress. If the budget is
+deferred or busy, the queued request is the fallback.
+
+`--refresh-due` (the nightly command) reads pending requests and puts them
+**ahead of** due refreshes, still under the same 25-city batch cap. After a
+build the script marks the request `done` with the outcome it reached —
+`full`, `limited` or `withheld`. A withheld city is therefore not retried
+every night on the strength of one ask. `--requests` runs the pending queue
+on its own; `--audit` prints the queue alongside the report states.
+
+Safeguards: same-origin POSTs only, a hidden honeypot, four asks per IP per
+ten minutes, and 40 new cities per 24 hours across the site. The IP is hashed
+with SHA-256 before it is stored; the address itself never is. A city whose
+report was withheld returns "we checked and could not find enough" rather
+than queueing a promise that cannot be kept.
+
+`npm run test:nightlife` covers queue dedupe/ordering, completion outcomes,
+the per-IP limiter and the 24-hour count.

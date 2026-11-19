@@ -228,6 +228,67 @@
 .nlg-directory-head { display: flex; align-items: end; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--hairline); padding-bottom: 16px; }
 .nlg-directory-head h2 { margin-top: 4px; color: var(--navy); font: 400 clamp(1.8rem, 3.4vw, 2.5rem)/1.1 var(--font-display), Georgia, serif; letter-spacing: -.025em; }
 .nlg-directory-head p { max-width: 430px; color: var(--ink-soft); font-size: .84rem; line-height: 1.6; }
+
+/* ── Request a city ─────────────────────────────────────────────────── */
+.nlg-request {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 18px 34px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 20px 22px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: #fffaf0;
+  scroll-margin-top: 84px;
+}
+.nlg-request-copy h3 { margin-top: 3px; color: var(--navy); font: 400 1.45rem/1.15 var(--font-display), Georgia, serif; letter-spacing: -.02em; }
+.nlg-request-copy p { max-width: 46ch; margin-top: 7px; color: var(--ink-soft); font-size: .82rem; line-height: 1.65; }
+.nlg-request-copy .nlg-request-count { display: block; margin-top: 9px; color: var(--accent-deep); font-family: var(--font-mono); font-size: .62rem; letter-spacing: .02em; }
+.nlg-request-count svg { margin-right: 3px; vertical-align: -2px; }
+.nlg-request-form { position: relative; min-width: 0; }
+.nlg-request-form > label { display: block; margin-bottom: 5px; color: var(--ink-faint); font-family: var(--font-mono); font-size: .58rem; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; }
+.nlg-request-row { display: flex; gap: 8px; }
+.nlg-request-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--hairline);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--ink);
+  font-size: .85rem;
+  outline: none;
+  transition: border-color .18s, box-shadow .18s;
+}
+.nlg-request-row input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(226, 115, 46, .14); }
+.nlg-request-row button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 15px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--orange-deep);
+  color: #fff;
+  font-size: .8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: filter .18s, opacity .18s;
+}
+.nlg-request-row button:hover { filter: brightness(1.06); }
+.nlg-request-row button:disabled { cursor: progress; opacity: .7; }
+.nlg-request-help { margin-top: 6px; color: var(--ink-faint); font-size: .68rem; line-height: 1.5; }
+.nlg-request-status { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 7px; font-size: .76rem; line-height: 1.5; }
+.nlg-request-status.is-ok { color: #146c4a; }
+.nlg-request-status.is-error { color: var(--risky); }
+.nlg-request-status a { display: inline-flex; align-items: center; gap: 2px; margin-left: 3px; font-weight: 600; color: var(--orange-deep); text-decoration: underline; text-underline-offset: 2px; }
+.nlg-request-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.nlg-request-spin { animation: nlg-request-spin .9s linear infinite; }
+@keyframes nlg-request-spin { to { transform: rotate(360deg); } }
+
 .nlg-disclosure { margin-top: 20px; }
 .nlg-disclosure > summary span { color: var(--ink-faint); font-family: var(--font-mono); font-size: .62rem; font-weight: 400; }
 .nlg-disclosure .disclosure-body { padding: 10px 14px 16px; }
@@ -250,6 +311,7 @@
   .nlg-masthead-grid { grid-template-columns: 1fr; gap: 22px; }
   .nlg-stats { gap: 22px; }
   .nlg-all-guides ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nlg-request { grid-template-columns: 1fr; gap: 14px; }
 }
 @media (max-width: 700px) {
   .nlg-masthead, .nlg-directory-section, .nlg-footer { padding-left: 22px; padding-right: 22px; }
@@ -261,6 +323,10 @@
   .night-country-panel { right: 8px; left: 8px; top: 58px; bottom: 70px; width: auto; }
   .night-hint { display: none; }
   .nlg-all-guides ul { grid-template-columns: 1fr; max-height: 360px; }
+}
+@media (max-width: 520px) {
+  .nlg-request-row { flex-direction: column; }
+  .nlg-request-row button { justify-content: center; }
 }
 @media (prefers-reduced-motion: reduce) {
   .night-moon, .night-light-dot { animation: none; }

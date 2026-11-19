@@ -3,6 +3,7 @@ import Link from "next/link"
 import { SiteHeader } from "@/components/SiteHeader"
 import { SiteFooter } from "@/components/SiteFooter"
 import { NightlifeDirectory, type DirectoryCity } from "@/components/nightlife/Directory"
+import { RequestCity } from "@/components/nightlife/RequestCity"
 import { NightGlobe } from "@/components/nightlife/NightGlobe"
 import { listReports } from "@/lib/reports"
 import { listNightlife, nightlifePath, nightlifeUrl, NIGHTLIFE_INDEXABLE } from "@/lib/nightlife/store"
@@ -13,7 +14,7 @@ import "@/components/nightlife/nightlife.css"
 import "@/components/nightlife/directory.css"
 import "@/components/nightlife/night-globe.css"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 60
 
 export async function generateMetadata(): Promise<Metadata> {
   const reports = await listNightlife()
@@ -48,6 +49,9 @@ export default async function NightlifeIndex() {
   }
 
   const guides = [...nightlife].sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0) || a.city.city.localeCompare(b.city.city, "en"))
+  // One array, one serialisation. Built twice, the RSC payload carried the
+  // 1,300-city list once per client component that received it.
+  const cityList = [...cities.values()]
   const trail = [{ name: "Home", href: "/" }, { name: "Nightlife", href: "/nightlife" }]
   // Nightlife is canonical on the beta origin, so its schema must use the same
   // origin rather than borrowing production's website node.
@@ -87,7 +91,7 @@ export default async function NightlifeIndex() {
             {globe.totals.reports} researched city guides, {globe.totals.venues.toLocaleString("en")} mapped bars, clubs and live-music venues.
             Spin the planet, follow the lights, and open a city for opening hours, neighbourhoods and after-dark safety.
           </p>
-          <p className="nlg-masthead-note">Drag to spin · scroll to zoom · click a country or a city light · <Link href="/nightlife/testimonials">search traveler quotes →</Link></p>
+          <p className="nlg-masthead-note">Drag to spin · scroll to zoom · click a country or a city light · <Link href="/nightlife/testimonials">search traveler quotes →</Link> · <a href="#nlg-request">ask for a city →</a></p>
         </div>
         <dl className="nlg-stats">
           {[
@@ -111,12 +115,13 @@ export default async function NightlifeIndex() {
           </div>
           <p>Published guides lead the list. Open any city to see its venues, late-night hours and safety after dark.</p>
         </div>
+        <RequestCity cities={cityList} />
         {/* Same collapsed disclosure pattern as /destinations: the globe is
             the invitation, the full 1,000-city index is a deliberate choice. */}
         <details className="disclosure nlg-disclosure">
           <summary>Every city and nightlife guide as a plain list <span>{guides.length} published · {cities.size} cities · open ▾</span></summary>
           <div className="disclosure-body">
-            <NightlifeDirectory cities={[...cities.values()]} />
+            <NightlifeDirectory cities={cityList} />
             <div className="nlg-all-guides">
               <h3>Every published guide <span>{guides.length} cities · updated {humanDate(globe.updatedAt)}</span></h3>
               <ul>{guides.map(report => <li key={report.city.key}>
@@ -131,7 +136,7 @@ export default async function NightlifeIndex() {
       </section>
 
       <div className="nlg-footer">
-        <p>Don&apos;t see your city yet? <Link href="/destinations">Browse the safety globe</Link> and open a report to start its nightlife research.</p>
+        <p>Don&apos;t see your city yet? <a href="#nlg-request">Ask for a guide</a> — requests go to the front of the research queue.</p>
         <SiteFooter />
       </div>
     </main>

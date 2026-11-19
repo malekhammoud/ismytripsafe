@@ -66,7 +66,7 @@ export function HeaderPhone({ demo }: { demo: HomeDemo }) {
           })}
         </ul>
 
-        <Link href={demo.path} className="ith-phone-cta">
+        <Link href={demo.path} prefetch={false} className="ith-phone-cta">
           View full report
         </Link>
       </div>

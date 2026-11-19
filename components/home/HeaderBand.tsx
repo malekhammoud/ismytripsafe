@@ -57,7 +57,11 @@ export function HeaderBand({
       <header className="ith">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/photos/hero/barcelona-park-guell.jpg"
+          src="/photos/hero/barcelona-park-guell-1600.webp"
+          srcSet="/photos/hero/barcelona-park-guell-960.webp 960w, /photos/hero/barcelona-park-guell-1280.webp 1280w, /photos/hero/barcelona-park-guell-1600.webp 1600w"
+          sizes="100vw"
+          width={1600}
+          height={494}
           alt="Two travellers on the mosaic bench at Park Güell, looking out over Barcelona in the late afternoon"
           className="ith-photo"
           fetchPriority="high"

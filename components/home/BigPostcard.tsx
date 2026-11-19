@@ -62,7 +62,7 @@ export function BigPostcard({ meta, report }: { meta: ReportMeta; report: Cached
   })
 
   return (
-    <Link
+    <Link prefetch={false}
       href={meta.path}
       className="group block rounded-[4px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--accent)]"
       aria-label={`Read the full safety report for ${meta.city}, ${meta.country}`}

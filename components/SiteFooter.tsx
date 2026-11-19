@@ -34,7 +34,7 @@ export function SiteFooter({ updatedAt, simplePunctuation = false }: { updatedAt
       <div className="flex flex-col gap-9 sm:flex-row sm:justify-between sm:gap-12">
         {/* Brand */}
         <div className="max-w-[19rem]">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link prefetch={false} href="/" className="flex items-center gap-2.5">
             <Logo size={36} />
             <span className="wordmark text-[1.05rem] text-[var(--navy)]">
               IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
@@ -61,7 +61,7 @@ export function SiteFooter({ updatedAt, simplePunctuation = false }: { updatedAt
               <ul className="space-y-1.5">
                 {col.links.map((l) => (
                   <li key={l.href}>
-                    <Link
+                    <Link prefetch={false}
                       href={l.href}
                       className="whitespace-nowrap text-[0.83rem] font-medium text-[var(--ink-soft)] hover:text-[var(--orange-deep)]"
                     >
@@ -84,11 +84,11 @@ export function SiteFooter({ updatedAt, simplePunctuation = false }: { updatedAt
         )}
         <p>
           Every score is computed from named public sources{simplePunctuation ? ". See" : " — see"}{" "}
-          <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
+          <Link prefetch={false} href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
             how we score safety
           </Link>{" "}
           and{" "}
-          <Link href="/about" className="font-medium text-[var(--accent-deep)] hover:underline">
+          <Link prefetch={false} href="/about" className="font-medium text-[var(--accent-deep)] hover:underline">
             who runs IsMyTripSafe
           </Link>
           . Conditions change quickly; always check your own government&apos;s current travel
@@ -97,11 +97,11 @@ export function SiteFooter({ updatedAt, simplePunctuation = false }: { updatedAt
         </p>
         <p className="mt-2.5">
           © {year} IsMyTripSafe. Founded 2026. ·{" "}
-          <Link href="/disclaimer" className="hover:text-[var(--accent-deep)] hover:underline">
+          <Link prefetch={false} href="/disclaimer" className="hover:text-[var(--accent-deep)] hover:underline">
             Disclaimer
           </Link>{" "}
           ·{" "}
-          <Link href="/credits" className="hover:text-[var(--accent-deep)] hover:underline">
+          <Link prefetch={false} href="/credits" className="hover:text-[var(--accent-deep)] hover:underline">
             Photo credits
           </Link>
         </p>

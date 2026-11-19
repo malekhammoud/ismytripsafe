@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound, permanentRedirect } from "next/navigation"
 import { cache } from "react"
-import { findCityElsewhere, getCityReport, getRelated } from "@/lib/reports"
+import { findCityElsewhere, getCityReport, getRelated, listReports } from "@/lib/reports"
 import { computeFinalScore, LEVELS } from "@/lib/safety-display"
 import { absUrl, humanDate, monthYear } from "@/lib/site"
 import {
@@ -26,13 +26,30 @@ import {
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
 import { RelatedGrid } from "@/components/seo/DestinationCards"
+import { wikimediaThumb } from "@/lib/photos"
 import { SectionNav, BackToTopPill } from "@/components/report/SectionNav"
 import type { CachedReport } from "@/lib/cache"
 import { ArrowRight, Check, Globe2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
 
-// Always render fresh from the report store — new and refreshed reports
-// appear immediately, and Googlebot/AI crawlers get full HTML.
-export const dynamic = "force-dynamic"
+// A report is static between revalidations: a new or refreshed report is
+// visible within five minutes, and every visit in between is served from the
+// ISR cache instead of re-rendering 275 KB of HTML from disk.
+export const revalidate = 300
+
+// Prerender a small, high-traffic seed set. Every other city still generates
+// on demand and is then cached for `revalidate`; the seed only makes the
+// first visit to the most-linked reports instant.
+export async function generateStaticParams() {
+  // The biggest cities are the ones the home page and search land on first.
+  // Everything else is generated on demand and cached from then on.
+  const cities = (await listReports()).filter(
+    (report) => report.path.split("/").filter(Boolean).length === 2,
+  )
+  return cities
+    .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
+    .slice(0, 24)
+    .map((report) => ({ country: report.countrySlug, city: report.citySlug }))
+}
 
 interface Params {
   country: string
@@ -177,7 +194,7 @@ export default async function CityReportPage({
       meta,
       headline: `Is ${meta.city} Safe in ${new Date(report.cachedAt).getFullYear()}? Travel Safety Report`,
       description: metaDescription(report),
-      image: report.images.hero,
+      image: report.images.hero ? (wikimediaThumb(report.images.hero, 1280) ?? report.images.hero) : null,
     }),
     reportDatasetNode(meta)
   )

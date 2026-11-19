@@ -3,21 +3,21 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { feature } from "topojson-client"
-import { AmbientLight, Color, DirectionalLight, MeshPhongMaterial } from "three"
-import type { Topology, GeometryCollection } from "topojson-specification"
+import type { MeshPhongMaterial } from "three"
 import { Crosshair, Maximize2, Moon, Pause, Play, Search, X } from "lucide-react"
 import type { NightlifeGlobeCountry, NightlifeGlobePayload, NightlifeGlobePoint } from "@/lib/nightlife/globe"
+import { loadCountryFeatures, type GlobeFeature } from "@/lib/globe-geo"
+import {
+  canAutoStartGlobe,
+  MAX_GLOBE_PIXEL_RATIO,
+  prefersReducedMotion,
+  whenIdle,
+} from "@/lib/globe-runtime"
 
 // WebGL only exists in the browser; keep the globe out of the server bundle.
 const Globe = dynamic(() => import("react-globe.gl"), { ssr: false, loading: () => null })
 
-interface Feat {
-  type: "Feature"
-  id?: string | number
-  properties: { name?: string }
-  geometry: unknown
-}
+type Feat = GlobeFeature
 type Poly = Feat & { __c?: NightlifeGlobeCountry }
 type LightCity = NightlifeGlobePoint & { showName: boolean; size: number }
 
@@ -59,16 +59,36 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
   const [query, setQuery] = useState("")
   const [region, setRegion] = useState("All")
   const [ready, setReady] = useState(false)
+  const [enabled, setEnabled] = useState(false)
+  const [gated, setGated] = useState(false)
+  const detailedRef = useRef(false)
+  /** True once the camera is close enough that 110m coastlines would show. */
+  const [close, setClose] = useState(false)
 
-  const seaMaterial = useMemo(() => new MeshPhongMaterial({
-    color: new Color("#040711"),
-    emissive: new Color("#080d23"),
-    emissiveIntensity: 0.95,
-    shininess: 14,
-    specular: new Color("#6e5bff"),
-    transparent: false,
-    opacity: 1,
-  }), [])
+  // three.js travels with the globe, never with the page (see the safety
+  // globe for the measured reason: an 83 KB initial chunk for a gated toy).
+  const [three, setThree] = useState<typeof import("three") | null>(null)
+  const [seaMaterial, setSeaMaterial] = useState<MeshPhongMaterial | null>(null)
+
+  useEffect(() => {
+    if (!enabled || three) return
+    void import("three").then(setThree)
+  }, [enabled, three])
+
+  useEffect(() => {
+    if (!three || seaMaterial) return
+    setSeaMaterial(
+      new three.MeshPhongMaterial({
+        color: new three.Color("#040711"),
+        emissive: new three.Color("#080d23"),
+        emissiveIntensity: 0.95,
+        shininess: 14,
+        specular: new three.Color("#6e5bff"),
+        transparent: false,
+        opacity: 1,
+      }),
+    )
+  }, [three, seaMaterial])
 
   const byNumericId = useMemo(() => {
     const map = new Map<string, NightlifeGlobeCountry>()
@@ -129,33 +149,40 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
   const selectedPoints = selected ? pointsBySlug.get(selected.slug) ?? [] : []
 
   // ─── World geometry ────────────────────────────────────────────────
+  // 110m first (108 KB), 50m only when the camera is close. See
+  // `lib/globe-geo.ts` for the French Guiana fix that both globes share.
   useEffect(() => {
+    if (!enabled) return
     let alive = true
-    fetch("/geo/countries-50m.json")
-      .then(response => response.json())
-      .then((topology: Topology<{ countries: GeometryCollection }>) => {
-        if (!alive) return
-        const collection = feature(topology, topology.objects.countries) as unknown as { features: Feat[] }
-        const features = collection.features as Poly[]
-        // world-atlas folds French Guiana into France; detach it so it is its
-        // own dark shape rather than part of France's nightlife wash.
-        if (!features.some(feature => String(feature.id) === "254")) {
-          const france = features.find(feature => String(feature.id) === "250")
-          if (france) {
-            const geometry = (france as unknown as { geometry: { type: string; coordinates: unknown } }).geometry
-            const parts = geometry.type === "MultiPolygon" ? geometry.coordinates as unknown[][][] : [geometry.coordinates] as unknown as unknown[][][]
-            const guiana = parts.filter(part => part[0].some(coordinate => (coordinate as number[])[1] < 10 && (coordinate as number[])[0] < -50))
-            if (guiana.length) {
-              for (const part of guiana) features.push({ type: "Feature", id: "254", properties: { name: "French Guiana" }, geometry: { type: "Polygon", coordinates: part } } as unknown as Poly)
-              if (geometry.type === "MultiPolygon") (geometry.coordinates as unknown[][][]) = parts.filter(part => !guiana.includes(part))
-            }
-          }
-        }
-        setPolys(features)
+    loadCountryFeatures("/geo/countries-110m.json")
+      .then((features) => {
+        if (alive) setPolys(features as Poly[])
       })
-      .catch(() => setPolys([]))
-    return () => { alive = false }
-  }, [])
+      .catch(() => {
+        if (alive) setPolys([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [enabled])
+
+  useEffect(() => {
+    if (!enabled || detailedRef.current || !close) return
+    detailedRef.current = true
+    let alive = true
+    whenIdle(() => {
+      loadCountryFeatures("/geo/countries-50m.json")
+        .then((features) => {
+          if (alive) setPolys(features as Poly[])
+        })
+        .catch(() => {
+          /* keep the 110m outlines */
+        })
+    }, 2500)
+    return () => {
+      alive = false
+    }
+  }, [enabled, close])
 
   useEffect(() => {
     const element = stageRef.current
@@ -179,8 +206,35 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
   }, [spinning, ready])
 
   useEffect(() => {
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) setSpinning(false)
+    if (prefersReducedMotion()) setSpinning(false)
+    if (canAutoStartGlobe()) whenIdle(() => setEnabled(true), 900)
+    else setGated(true)
   }, [])
+
+  // Same rules as the safety globe: CSS-resolution buffer, and no render
+  // loop once the stage has been scrolled past.
+  useEffect(() => {
+    if (!ready) return
+    const renderer = globeRef.current?.renderer?.()
+    renderer?.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO))
+  }, [ready])
+
+  useEffect(() => {
+    if (!ready) return
+    const element = stageRef.current
+    if (!element) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const globe = globeRef.current
+        if (!globe) return
+        if (entry.isIntersecting && !document.hidden) globe.resumeAnimation()
+        else globe.pauseAnimation()
+      },
+      { threshold: 0.02 },
+    )
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [ready])
 
   // Hand the main thread back before a link navigates. Without this, a slow
   // WebGL frame loop can starve the router's transition and make every link
@@ -320,7 +374,7 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
   return (
     <div className="night-globe-stage relative h-[min(86vh,860px)] w-full">
       <div ref={stageRef} className="absolute inset-0">
-        {size.w > 0 && polys.length > 0 && (
+        {enabled && size.w > 0 && (
           <Suspense fallback={null}>
             <Globe
               ref={globeRef}
@@ -333,16 +387,23 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
               atmosphereColor="#6d5cff"
               atmosphereAltitude={0.22}
               globeImageUrl={null}
-              globeMaterial={seaMaterial}
-              onGlobeReady={() => {
+              globeMaterial={seaMaterial ?? undefined}
+              onGlobeReady={async () => {
                 setReady(true)
                 globeRef.current?.pointOfView({ lat: 20, lng: -18, altitude: 2.45 })
-                const ambient = new AmbientLight(0x7786ff, 1.9)
-                const key = new DirectionalLight(0xffb875, 1.7)
+                const T = three ?? (await import("three"))
+                const ambient = new T.AmbientLight(0x7786ff, 1.9)
+                const key = new T.DirectionalLight(0xffb875, 1.7)
                 key.position.set(1, 0.6, 0.9)
-                const rim = new DirectionalLight(0x7b5cff, 0.9)
+                const rim = new T.DirectionalLight(0x7b5cff, 0.9)
                 rim.position.set(-1, -0.35, -0.6)
                 globeRef.current?.lights([ambient, key, rim])
+              }}
+              onZoom={(view: { altitude: number }) => {
+                // Only the crossing, never the frame — this state must not
+                // update continuously while the globe turns.
+                const next = view.altitude <= 1.05
+                setClose((prev) => (prev === next ? prev : next))
               }}
               polygonsData={polys}
               polygonAltitude={altOf}
@@ -373,10 +434,42 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
       </div>
 
       {!ready && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <div className="text-center">
-            <Moon className="night-moon mx-auto text-[#ffcb8c]" size={30} />
-            <p className="mt-3 text-[0.78rem] font-medium tracking-wide text-[#c9c5ff]">Lighting up the cities…</p>
+        <div className="absolute inset-0 z-10 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/geo/globe-night.webp"
+            alt=""
+            aria-hidden
+            width={1400}
+            height={1000}
+            fetchPriority="high"
+            decoding="async"
+            className="h-full w-full object-contain object-center"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(60%_60%_at_50%_50%,transparent,rgba(3,2,12,0.42))]">
+            {gated ? (
+              <div className="pointer-events-auto px-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGated(false)
+                    setEnabled(true)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#ffcb8c] px-5 py-2.5 text-[0.86rem] font-semibold text-[#1b1033] shadow-[0_10px_30px_-8px_rgba(0,0,0,0.7)] transition hover:brightness-105"
+                >
+                  <Play size={14} aria-hidden />
+                  Explore the interactive globe
+                </button>
+                <p className="mt-2.5 text-[0.72rem] text-[#c9c5ff]">
+                  The 3D globe is heavy on this device. The guides work without it.
+                </p>
+              </div>
+            ) : (
+              <div className="text-center">
+                <Moon className="night-moon mx-auto text-[#ffcb8c]" size={30} />
+                <p className="mt-3 text-[0.78rem] font-medium tracking-wide text-[#c9c5ff]">Lighting up the cities…</p>
+              </div>
+            )}
           </div>
         </div>
       )}

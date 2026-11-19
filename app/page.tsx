@@ -11,7 +11,10 @@ import { SiteFooter } from "@/components/SiteFooter"
 
 // Server-rendered so crawlers land on real HTML with real links; the
 // interactive checker hydrates on top.
-export const dynamic = "force-dynamic"
+// The landing page reads the report index, not a request. Cache it for a
+// minute: a new report is visible on the next revalidation, and 999 of 1,000
+// requests get a static response instead of re-rendering the whole page.
+export const revalidate = 60
 
 /** The city the big demonstration card shows. */
 const SHOWCASE = { country: "hungary", city: "budapest" } as const

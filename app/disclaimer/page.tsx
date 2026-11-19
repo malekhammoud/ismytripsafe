@@ -5,7 +5,6 @@ import { absUrl } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { Breadcrumbs, SeoFooter, SiteHeader } from "@/components/seo/shared"
 
-export const dynamic = "force-dynamic"
 
 export async function generateMetadata(): Promise<Metadata> {
   return {

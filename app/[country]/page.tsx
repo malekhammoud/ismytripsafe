@@ -30,10 +30,17 @@ import {
   type Crumb,
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
+import { wikimediaThumb } from "@/lib/photos"
 import type { SafetySignal } from "@/lib/types"
 import { ArrowRight, SlidersHorizontal } from "lucide-react"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 120
+
+// The twelve biggest hubs are prerendered; the rest generate on demand.
+export async function generateStaticParams() {
+  const hubs = await listCountries()
+  return hubs.slice(0, 12).map((hub) => ({ country: hub.countrySlug }))
+}
 
 interface Params {
   country: string
@@ -157,7 +164,9 @@ export default async function CountryHubPage({
             meta: countryMeta,
             headline: `Is ${hub.country} Safe in ${new Date(hub.updatedAt).getFullYear()}? Travel Safety Report`,
             description: capsule.slice(0, 300),
-            image: countryReport.images.hero,
+            image: countryReport.images.hero
+              ? (wikimediaThumb(countryReport.images.hero, 1280) ?? countryReport.images.hero)
+              : null,
           }),
           reportDatasetNode(countryMeta),
         ]

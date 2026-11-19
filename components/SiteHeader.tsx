@@ -38,6 +38,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-[56px] max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link
           href="/"
+          prefetch={false}
           className="wordmark flex shrink-0 items-center gap-2 text-[1rem] text-[var(--navy)]"
         >
           <Logo size={27} />
@@ -54,6 +55,7 @@ export function SiteHeader() {
               <Link
                 key={l.href}
                 href={l.href}
+                prefetch={false}
                 aria-current={active ? "page" : undefined}
                 className={`nav-link text-[0.83rem] font-medium ${active ? "is-active" : ""}`}
               >
@@ -62,7 +64,7 @@ export function SiteHeader() {
             )
           })}
           {!isHome && (
-            <Link href="/" className="btn inline-flex items-center gap-1.5 px-4 py-1.5 text-[0.8rem]">
+            <Link href="/" prefetch={false} className="btn inline-flex items-center gap-1.5 px-4 py-1.5 text-[0.8rem]">
               <ShieldCheck size={14} />
               Check a place
             </Link>
@@ -92,6 +94,7 @@ export function SiteHeader() {
               <Link
                 key={l.href}
                 href={l.href}
+                prefetch={false}
                 aria-current={active ? "page" : undefined}
                 className="block border-b border-[var(--hairline)] py-3 text-[0.95rem] font-medium last:border-b-0"
                 style={{ color: active ? "var(--orange-deep)" : "var(--ink-soft)" }}
@@ -101,7 +104,7 @@ export function SiteHeader() {
             )
           })}
           {!isHome && (
-            <Link href="/" className="btn mt-3 flex items-center justify-center gap-2 py-2.5 text-[0.9rem]">
+            <Link href="/" prefetch={false} className="btn mt-3 flex items-center justify-center gap-2 py-2.5 text-[0.9rem]">
               <ShieldCheck size={15} />
               Check a place
             </Link>

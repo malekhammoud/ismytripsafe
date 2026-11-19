@@ -53,6 +53,12 @@ export interface PoolPhoto {
   licenseUrl: string
   source: string
   /**
+   * A smaller rendition for card grids. The 1440px original is only needed
+   * by the one big postcard, which goes through next/image anyway; a related
+   * card 480px wide has no business decoding it.
+   */
+  cardFile?: string
+  /**
    * Absent → a real photograph, freely licensed.
    * "illustration" → made for this site and not a photograph of anywhere.
    * Anything carrying this is labelled as such wherever it is shown.
@@ -73,7 +79,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "hero-shoreline",
     place: "Cap Ferret, France",
-    file: "/photos/hero-shoreline.jpg",
+    file: "/photos/opt/hero-shoreline-1280.webp",
     title: "Sunrise Cap Ferret Banc du Toulinguet - Arcachon - Oc\u00e9an Atlantique - Picture Image Photography - Sunset - Coucher de soleil - Dune du pilat pyla - Banc d'arguin water eau vagues waves beach plage sky colors red yellow (14501089751).jpg",
     author: "Grand Parc - Bordeaux, France from France",
     license: "CC BY 2.0",
@@ -83,7 +89,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "koh-mak-sunset",
     place: "Koh Mak, Thailand",
-    file: "/photos/koh-mak-sunset.jpg",
+    file: "/photos/opt/koh-mak-sunset-1280.webp",
     title: "Koh Mak, Thailand, Sunset on the beach with palms.jpg",
     author: "Vyacheslav Argenberg",
     license: "CC BY 4.0",
@@ -93,7 +99,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "philippines",
     place: "Boracay, Philippines",
-    file: "/photos/philippines.jpg",
+    file: "/photos/opt/philippines-1280.webp",
     title: "Tropical Sunset, Philippines (53014260401).jpg",
     author: ". Ray in Manila",
     license: "CC BY 2.0",
@@ -103,7 +109,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "surfer-walk",
     place: null,
-    file: "/photos/surfer-walk.jpg",
+    file: "/photos/opt/surfer-walk-1280.webp",
     title: "Sufer carrying surfboard along the beach.JPG",
     author: "Johntex",
     license: "CC BY 2.5",
@@ -113,7 +119,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "surfer-sunset",
     place: "Seven Mile Beach, Australia",
-    file: "/photos/surfer-sunset.jpg",
+    file: "/photos/opt/surfer-sunset-1280.webp",
     title: "Silhouette surfer at sunset (Unsplash).jpg",
     author: "Rafael Le\u00e3o raflfc",
     license: "CC0",
@@ -123,7 +129,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "palms",
     place: "Puerto Plata, Dominican Republic",
-    file: "/photos/palms.jpg",
+    file: "/photos/opt/palms-1280.webp",
     title: "Palm Trees - Flickr - MassiveKontent.jpg",
     author: "Jason Thibault from Montreal, Canada",
     license: "CC BY 2.0",
@@ -133,7 +139,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "rhodes",
     place: "Rhodes, Greece",
-    file: "/photos/rhodes.jpg",
+    file: "/photos/opt/rhodes-1280.webp",
     title: "A Beach on Rhodes (4838668793).jpg",
     author: "J B from Champaign, IL, USA",
     license: "CC BY 2.0",
@@ -143,7 +149,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "busan",
     place: "Haeundae Beach, Busan, South Korea",
-    file: "/photos/busan.jpg",
+    file: "/photos/opt/busan-1280.webp",
     title: "\"Hae-Un-Dae\" Beach, Sunny Day.(Busan City, Korea) (8661277231).jpg",
     author: "yuseokoh from South Korea",
     license: "CC BY 2.0",
@@ -153,7 +159,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "nissi",
     place: "Nissi Beach, Ayia Napa, Cyprus",
-    file: "/photos/nissi.jpg",
+    file: "/photos/opt/nissi-1280.webp",
     title: "2022 03 Nissi beach 1.jpg",
     author: "Qasinka",
     license: "CC0",
@@ -163,7 +169,7 @@ export const PHOTO_POOL: PoolPhoto[] = [
   {
     slug: "eraclea",
     place: "Eraclea Mare, Italy",
-    file: "/photos/eraclea.jpg",
+    file: "/photos/opt/eraclea-1280.webp",
     title: "Eraclea mare 2009 03.JPG",
     author: "Alberto Vigani",
     license: "CC BY 3.0",
@@ -218,6 +224,7 @@ function ill(slug: string, place: string, reportPath: string | null): PoolPhoto 
     slug,
     place,
     file: `/photos/supplied/${slug}.webp`,
+    cardFile: `/photos/supplied/${slug}-960.webp`,
     title: place,
     author: "Made for IsMyTripSafe",
     license: "Illustration",
@@ -293,19 +300,38 @@ export function poolPhotoFor(seed: string, offset = 0): PoolPhoto {
  *    960px-NAME.jpg. Checked against the cache, that comes back 200 and
  *    turns megabytes into ~170 KB.
  *
+ * Two things this used to miss, both of which shipped megabytes:
+ *
+ *  · **Tracking queries.** Wikipedia API URLs arrive as
+ *    `…/Lisboa.jpg?utm_source=en.wikipedia.org&…`. The filename no longer
+ *    ends in `.jpg`, the old regex refused the URL, and the browser fetched
+ *    a 2.1 MB original for a hero that only needs 1280px. Queries are
+ *    stripped first.
+ *  · **Thumbs with a query.** `…/thumb/…/960px-NAME.jpg?x=1` didn't match
+ *    either, so the width was never rewritten. Strip before matching.
+ *
  * Either can still miss — Wikimedia refuses to upscale, so a file narrower
  * than 960px has no such thumb. Callers pair this with an onError fallback
  * to the untouched URL, which is what `components/beach/Photo.tsx` does.
  */
-export function sized(url: string, prefer: 960 | 1280 = 960): string {
-  if (!/^https?:\/\/upload\.wikimedia\.org\//.test(url)) return url
-  if (/\/thumb\//.test(url)) return url.replace(/\/\d{2,4}px-([^/]+)$/, `/${prefer}px-$1`)
+export function wikimediaThumb(url: string, prefer: 960 | 1280): string | null {
+  if (!/^https?:\/\/upload\.wikimedia\.org\//.test(url)) return null
+  const clean = url.split(/[?#]/, 1)[0]
+  if (/\/thumb\//.test(clean)) {
+    if (!/\/\d{2,4}px-[^/]+$/.test(clean)) return null
+    return clean.replace(/\/\d{2,4}px-([^/]+)$/, `/${prefer}px-$1`)
+  }
 
   // Only the raster formats whose thumb keeps the same extension. SVG and TIFF
   // get a second one appended (NAME.svg/960px-NAME.svg.png) and are rare
   // enough here that guessing wrong isn't worth the request.
-  const m = url.match(/^(https?:\/\/upload\.wikimedia\.org\/wikipedia\/[^/]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/]+\.(?:jpe?g|png|webp))$/i)
-  if (!m) return url
+  const m = clean.match(/^(https?:\/\/upload\.wikimedia\.org\/wikipedia\/[^/]+)\/([0-9a-f])\/([0-9a-f]{2})\/([^/]+\.(?:jpe?g|png|webp))$/i)
+  if (!m) return null
   const [, base, a, b, file] = m
   return `${base}/thumb/${a}/${b}/${file}/${prefer}px-${file}`
+}
+
+/** A picture URL the browser can actually afford to fetch. */
+export function sized(url: string, prefer: 960 | 1280 = 960): string {
+  return wikimediaThumb(url, prefer) ?? url
 }

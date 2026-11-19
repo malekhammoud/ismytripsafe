@@ -7,7 +7,7 @@ import { listTestimonials, nightlifeUrl, NIGHTLIFE_INDEXABLE } from "@/lib/night
 import "@/components/nightlife/nightlife.css"
 import "@/components/nightlife/testimonials.css"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 300
 
 export async function generateMetadata(): Promise<Metadata> {
   const entries = await listTestimonials()

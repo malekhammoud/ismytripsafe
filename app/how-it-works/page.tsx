@@ -6,7 +6,6 @@ import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/
 import { StoplightStrip } from "@/components/home/StoplightStrip"
 import { Breadcrumbs, SeoFooter, SiteHeader } from "@/components/seo/shared"
 
-export const dynamic = "force-dynamic"
 
 export async function generateMetadata(): Promise<Metadata> {
   const year = new Date().getFullYear()

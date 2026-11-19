@@ -38,6 +38,7 @@ import {
   type CategoryKey,
 } from "@/lib/safety-display"
 import { personalizeScore, profileSummary, type TravelerProfile } from "@/lib/profile"
+import { wikimediaThumb } from "@/lib/photos"
 import { extractSourceLinksFromText, sourceUrlForName, sourceUrlForSearchQuery } from "@/lib/source-links"
 import { ScorePyramid } from "./ScorePyramid"
 import { PersonalBrief } from "./PersonalBrief"
@@ -407,13 +408,18 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
   const heroAccent = `color-mix(in oklab, ${TONES[indexTone].strong} 66%, #f4f7fb)`
   // Wikimedia lead images arrive at up to 3840px — request the 1280px thumb
   // bucket instead so the hero paints fast; other hosts pass through untouched.
-  // On any load failure the <img> falls back to the original URL. Country pages
-  // often lead with a flag / coat of arms / map (SVG-derived) — skip those, the
-  // dark tone-glow backdrop looks better than a stretched flag.
+  // On any load failure the <img> steps down to 960px and then the original.
+  // Country pages often lead with a flag / coat of arms / map (SVG-derived) —
+  // skip those, the dark tone-glow backdrop looks better than a stretched flag.
+  //
+  // The sizing helper strips `?utm_source=…` first. Wikipedia API URLs carry
+  // that query, and without stripping it 1,043 of 1,424 heroes in the cache
+  // fell through to the 2 MB original.
   const heroPhoto =
     images?.hero && !/flag_of|coat_of_arms|locator|\.svg/i.test(images.hero)
-      ? images.hero.replace(/\/\d{3,4}px-([^/]+)$/, "/1280px-$1")
+      ? wikimediaThumb(images.hero, 1280) ?? images.hero
       : null
+  const heroFallbackPhoto = images?.hero ? wikimediaThumb(images.hero, 960) : null
   // The "on the ground" block reflects how safe it actually is right now — the
   // traveller-sentiment score if the research has landed, otherwise the overall
   // rating — so a "not safe right now" verdict never sits on a green panel.
@@ -446,9 +452,12 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             data-share-photo
             className="absolute inset-0 h-full w-full object-cover"
             style={{ objectPosition: "center 35%" }}
+            fetchPriority="high"
+            decoding="async"
             onError={(e) => {
               const img = e.currentTarget
-              if (images?.hero && img.src !== images.hero) img.src = images.hero
+              if (heroFallbackPhoto && img.src !== heroFallbackPhoto) img.src = heroFallbackPhoto
+              else if (images?.hero && img.src !== images.hero) img.src = images.hero
               else img.style.display = "none"
             }}
           />

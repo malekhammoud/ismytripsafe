@@ -12,7 +12,7 @@ export function stampInk(score: number): string {
 
 export function PlateCard({ meta, priority = false }: { meta: ReportMeta; priority?: boolean }) {
   const supplied = suppliedPhotoFor(meta.path)
-  const photoFile = supplied?.file || meta.image || poolPhotoFor(meta.path).file
+  const photoFile = supplied?.cardFile || supplied?.file || meta.image || poolPhotoFor(meta.path).file
 
   return (
     <Link
