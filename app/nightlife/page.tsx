@@ -111,18 +111,22 @@ export default async function NightlifeIndex() {
           </div>
           <p>Published guides lead the list. Open any city to see its venues, late-night hours and safety after dark.</p>
         </div>
-        <NightlifeDirectory cities={[...cities.values()]} />
-      </section>
-
-      <section className="nlg-index" aria-label="Every published nightlife guide">
-        <details>
-          <summary>Every published nightlife guide <span>{guides.length} cities · updated {humanDate(globe.updatedAt)}</span></summary>
-          <ul>{guides.map(report => <li key={report.city.key}>
-            <Link href={nightlifePath(report)} prefetch={false}>
-              <strong>{report.city.city}</strong><span>{report.city.country}</span>
-              <em>{report.overall?.toFixed(1) ?? "–"}/5 · {report.venueCount.toLocaleString("en")} venues</em>
-            </Link>
-          </li>)}</ul>
+        {/* Same collapsed disclosure pattern as /destinations: the globe is
+            the invitation, the full 1,000-city index is a deliberate choice. */}
+        <details className="disclosure nlg-disclosure">
+          <summary>Every city and nightlife guide as a plain list <span>{guides.length} published · {cities.size} cities · open ▾</span></summary>
+          <div className="disclosure-body">
+            <NightlifeDirectory cities={[...cities.values()]} />
+            <div className="nlg-all-guides">
+              <h3>Every published guide <span>{guides.length} cities · updated {humanDate(globe.updatedAt)}</span></h3>
+              <ul>{guides.map(report => <li key={report.city.key}>
+                <Link href={nightlifePath(report)} prefetch={false}>
+                  <strong>{report.city.city}</strong><span>{report.city.country}</span>
+                  <em>{report.overall?.toFixed(1) ?? "–"}/5 · {report.venueCount.toLocaleString("en")} venues</em>
+                </Link>
+              </li>)}</ul>
+            </div>
+          </div>
         </details>
       </section>
 

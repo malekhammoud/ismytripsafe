@@ -228,17 +228,20 @@
 .nlg-directory-head { display: flex; align-items: end; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--hairline); padding-bottom: 16px; }
 .nlg-directory-head h2 { margin-top: 4px; color: var(--navy); font: 400 clamp(1.8rem, 3.4vw, 2.5rem)/1.1 var(--font-display), Georgia, serif; letter-spacing: -.025em; }
 .nlg-directory-head p { max-width: 430px; color: var(--ink-soft); font-size: .84rem; line-height: 1.6; }
-.nlg-index { max-width: 1120px; margin: 26px auto 0; padding: 0 36px; }
-.nlg-index details { border: 1px solid var(--hairline); border-radius: 4px; background: #fffaf0; }
-.nlg-index summary { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; cursor: pointer; padding: 14px 17px; color: var(--navy); font-size: .84rem; font-weight: 600; }
-.nlg-index summary span { color: var(--ink-faint); font-family: var(--font-mono); font-size: .62rem; font-weight: 400; }
-.nlg-index ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px; max-height: 430px; overflow: auto; border-top: 1px solid var(--hairline); padding: 6px 17px 16px; list-style: none; }
-.nlg-index li { border-bottom: 1px solid var(--hairline); }
-.nlg-index a { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; padding: 8px 0; color: var(--ink); text-decoration: none; }
-.nlg-index a:hover strong { color: var(--orange-deep); text-decoration: underline; text-underline-offset: 3px; }
-.nlg-index strong { font-size: .8rem; font-weight: 600; }
-.nlg-index a span { color: var(--ink-faint); font-size: .68rem; }
-.nlg-index em { margin-left: auto; color: var(--ink-faint); font-family: var(--font-mono); font-size: .58rem; font-style: normal; white-space: nowrap; }
+.nlg-disclosure { margin-top: 20px; }
+.nlg-disclosure > summary span { color: var(--ink-faint); font-family: var(--font-mono); font-size: .62rem; font-weight: 400; }
+.nlg-disclosure .disclosure-body { padding: 10px 14px 16px; }
+.nlg-disclosure .nld-directory { padding-top: 8px; }
+.nlg-all-guides { margin-top: 26px; border-top: 1px solid var(--hairline); padding-top: 18px; }
+.nlg-all-guides h3 { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--navy); font: 400 1.35rem/1.2 var(--font-display), Georgia, serif; }
+.nlg-all-guides h3 span { color: var(--ink-faint); font-family: var(--font-mono); font-size: .58rem; font-weight: 400; }
+.nlg-all-guides ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 24px; max-height: 430px; overflow: auto; margin-top: 10px; padding: 6px 0 0; list-style: none; }
+.nlg-all-guides li { border-bottom: 1px solid var(--hairline); }
+.nlg-all-guides a { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 8px; padding: 8px 0; color: var(--ink); text-decoration: none; }
+.nlg-all-guides a:hover strong { color: var(--orange-deep); text-decoration: underline; text-underline-offset: 3px; }
+.nlg-all-guides strong { font-size: .8rem; font-weight: 600; }
+.nlg-all-guides a span { color: var(--ink-faint); font-size: .68rem; }
+.nlg-all-guides em { margin-left: auto; color: var(--ink-faint); font-family: var(--font-mono); font-size: .58rem; font-style: normal; white-space: nowrap; }
 .nlg-footer { max-width: 1120px; margin: 0 auto; padding: 26px 36px 18px; }
 .nlg-footer > p { max-width: 660px; margin-bottom: 12px; color: var(--ink-soft); font-size: .82rem; line-height: 1.7; }
 .nlg-footer > p a { color: var(--orange-deep); text-decoration: underline; text-underline-offset: 3px; }
@@ -246,10 +249,10 @@
 @media (max-width: 900px) {
   .nlg-masthead-grid { grid-template-columns: 1fr; gap: 22px; }
   .nlg-stats { gap: 22px; }
-  .nlg-index ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nlg-all-guides ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 700px) {
-  .nlg-masthead, .nlg-directory-section, .nlg-index, .nlg-footer { padding-left: 22px; padding-right: 22px; }
+  .nlg-masthead, .nlg-directory-section, .nlg-footer { padding-left: 22px; padding-right: 22px; }
   .nlg-masthead { padding-top: 24px; }
   .nlg-masthead h1 { font-size: 2.35rem; }
   .nlg-stats dd { font-size: 1.5rem; }
@@ -257,7 +260,7 @@
   .nlg-directory-head p { margin-top: 8px; }
   .night-country-panel { right: 8px; left: 8px; top: 58px; bottom: 70px; width: auto; }
   .night-hint { display: none; }
-  .nlg-index ul { grid-template-columns: 1fr; max-height: 360px; }
+  .nlg-all-guides ul { grid-template-columns: 1fr; max-height: 360px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .night-moon, .night-light-dot { animation: none; }
