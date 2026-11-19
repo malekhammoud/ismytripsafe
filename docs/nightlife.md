@@ -11,7 +11,11 @@ production; the branch targets `origin/beta`. Use an explicit `HEAD:beta` push.
   are sized by mapped venue count and coloured by nightlife score; countries
   are tinted by their average score. Clicking a country opens its guides, and
   clicking a light opens the city report.
-- `/{country}/{city}/nightlife`: sourced, server-rendered report.
+- `/nightlife/testimonials`: searchable index of every attributed traveler
+  quote by text, city and tone. The first 24 results are server-rendered; the
+  full 403-quote set is filtered client-side.
+- `/{country}/{city}/nightlife`: sourced, server-rendered report, including a
+  **What people are saying** section.
 - `/{country}/{city}/nightlife/data.json`: ODbL venue export, excluding all
   proprietary ratings, popularity, review counts, tips, and sentiment labels.
 - Existing city safety pages start nightlife research on a real browser visit and show a teaser even before the first report qualifies.
