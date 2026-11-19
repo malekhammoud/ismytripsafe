@@ -56,7 +56,7 @@ async function main() {
     if (!report.city.boundaryVerified) add(summary.city.key, 'city boundary is not verified')
     if (!(Number(report.city.population) > 0)) add(summary.city.key, 'city population is missing')
     if (report.venues.length < 10) add(summary.city.key, `only ${report.venues.length} venues`)
-    for (const key of ['density', 'variety', 'safety']) {
+    for (const key of ['density', 'quality', 'variety', 'vibe', 'safety']) {
       if (report.scores.find(score => score.key === key)?.value == null) add(summary.city.key, `${key} score is missing`)
     }
     for (const id of ['wikidata', 'osm', 'safety']) {
