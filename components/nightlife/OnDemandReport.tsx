@@ -53,15 +53,15 @@ export function OnDemandReport({ country, city, cityName, mode = "page" }: { cou
     if (status.state === "idle" || status.state === "ready") return null
     return <p className="nl-live-refresh" role="status">{terminal ? "Showing the saved report. A fresh check isn’t available yet." : <><LoaderCircle size={13} className="nl-research-spin"/> Updating the nightlife evidence in the background. Your saved report stays available.</>}</p>
   }
-  if (mode === "teaser") return <div className="nl-live-teaser"><p role="status">{terminal ? explanation : <><LoaderCircle size={13} className="nl-research-spin"/> {status.state === "busy" ? "Waiting to research the nightlife scene…" : "Researching this city’s nightlife automatically…"}</>}</p><Link href={`/${country}/${city}/nightlife`}>Explore the nightlife report <ArrowUpRight size={13}/></Link></div>
+  if (mode === "teaser") return <div className="nl-live-teaser"><p role="status">{terminal ? explanation : <><LoaderCircle size={13} className="nl-research-spin"/> {status.state === "busy" ? "Waiting to research the nightlife scene…" : "Researching this city’s nightlife automatically…"}</>}</p><Link prefetch={false} href={`/${country}/${city}/nightlife`}>Explore the nightlife report <ArrowUpRight size={13}/></Link></div>
   return <section className="nl-research" aria-labelledby="nightlife-progress-title">
     <div className="nl-research-icon"><Moon size={27}/>{!terminal && <span/>}</div>
-    <Link className="nl-research-back" href="/nightlife">← All nightlife reports</Link>
+    <Link prefetch={false} className="nl-research-back" href="/nightlife">← All nightlife reports</Link>
     <h1 id="nightlife-progress-title">{heading}</h1>
     <h2 className="nl-research-subtitle">{subtitle}</h2>
     <p className="nl-research-explanation" role="status" aria-live="polite">{explanation}</p>
     {!terminal && <ol className="nl-research-steps">{PHASES.map((phase, index) => <li key={phase.key} className={status.state === "running" && index === phaseIndex ? "is-current" : index < phaseIndex ? "is-done" : ""}><span>{index < phaseIndex ? <Check size={15}/> : index === phaseIndex && status.state === "running" ? <LoaderCircle size={15} className="nl-research-spin"/> : String(index + 1).padStart(2, "0")}</span><div><h2>{phase.label}</h2><p>{phase.detail}</p></div></li>)}</ol>}
-    <div className="nl-research-actions"><Link className="nl-button" href={`/${country}/${city}`}><ShieldCheck size={15}/> Read the {cityName} safety report</Link>{terminal && <button type="button" disabled={retrySeconds > 0} onClick={() => setAttempt(value => value + 1)}>{retrySeconds > 0 ? `Retry in ${retryLabel}` : status.issue === "connection" ? "Reconnect ↗" : "Check again ↗"}</button>}</div>
+    <div className="nl-research-actions"><Link prefetch={false} className="nl-button" href={`/${country}/${city}`}><ShieldCheck size={15}/> Read the {cityName} safety report</Link>{terminal && <button type="button" disabled={retrySeconds > 0} onClick={() => setAttempt(value => value + 1)}>{retrySeconds > 0 ? `Retry in ${retryLabel}` : status.issue === "connection" ? "Reconnect ↗" : "Check again ↗"}</button>}</div>
     <p className="nl-footnote">Ratings use sourced data. Missing evidence stays unscored.</p>
     <noscript><p className="nl-footnote">Enable JavaScript to start the nightlife research and see live progress.</p></noscript>
   </section>

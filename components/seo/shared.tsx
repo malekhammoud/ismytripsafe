@@ -285,7 +285,7 @@ export function FaqList({ items }: { items: { q: string; a: React.ReactNode }[] 
  */
 export function ReportLink({ meta, anchor }: { meta: ReportMeta; anchor?: string }) {
   return (
-    <Link
+    <Link prefetch={false}
       href={meta.path}
       className="card flex items-center justify-between gap-3 py-3 pl-3 pr-4 transition-shadow hover:shadow-[var(--shadow-float)]"
     >

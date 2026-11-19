@@ -142,7 +142,7 @@ export default function AboutPage() {
           </section>
 
           <div className="mt-11 flex flex-wrap items-center gap-3 border-t border-[var(--hairline)] pt-9">
-            <Link href="/" className="btn inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+            <Link prefetch={false} href="/" className="btn inline-flex items-center gap-2 px-5 py-2.5 text-sm">
               <ShieldCheck size={15} />
               Check a destination
             </Link>

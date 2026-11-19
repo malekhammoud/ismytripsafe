@@ -239,7 +239,7 @@ export default async function CityReportPage({
           {/* The one action on the page — big, orange, explicit, and readable at a
               glance. Centered title, then what it actually does, one bullet
               per line: no wall of text, four quick promises. */}
-          <Link
+          <Link prefetch={false}
             href={personalizeHref}
             className="group mt-5 block rounded-[16px] bg-[var(--orange-deep)] px-6 py-5 text-center transition-transform hover:-translate-y-0.5 hover:bg-[#c03f21]"
             style={{
@@ -323,7 +323,7 @@ export default async function CityReportPage({
                     {safeZones.length ? `: ${safeZones.length} safer` : ""}
                     {cautionZones.length ? `, ${cautionZones.length} needing caution` : ""}
                     {avoidZones.length ? ` and ${avoidZones.length} best avoided` : ""}.{" "}
-                    <Link href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
+                    <Link prefetch={false} href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
                       See them plotted on the {meta.city} safety map
                     </Link>
                     .
@@ -363,7 +363,7 @@ export default async function CityReportPage({
                     <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold" style={{ background: "rgba(214,69,65,0.12)", color: "var(--risky)" }}>
                       {avoidZones.length} avoid
                     </span>
-                    <Link
+                    <Link prefetch={false}
                       href={mapHref}
                       className="btn ml-auto inline-flex items-center gap-2 px-4 py-2 text-[0.82rem] font-semibold"
                     >
@@ -431,7 +431,7 @@ export default async function CityReportPage({
                           backpacker face different street-level risks, so the headline
                           score shifts and the report leads with the findings that matter
                           for that group.{" "}
-                          <Link
+                          <Link prefetch={false}
                             href={personalizeHref}
                             className="font-medium text-[var(--accent-deep)] hover:underline"
                           >
@@ -450,7 +450,7 @@ export default async function CityReportPage({
                             {avoidZones.length
                               ? `Field research flags ${avoidZones.map((z) => z.name).join(", ")} as best avoided.`
                               : (e.avoidAreas ?? []).slice(0, 3).join("; ") + "."}{" "}
-                            <Link href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
+                            <Link prefetch={false} href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
                               See the district-by-district safety map
                             </Link>
                             .
@@ -478,7 +478,7 @@ export default async function CityReportPage({
                           <p>
                             {meta.city} ranks #{countryRank} of {related.sameCountry.length + 1}{" "}
                             {meta.country} destinations we&apos;ve assessed, scoring {meta.score}/100. See the{" "}
-                            <Link href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
+                            <Link prefetch={false} href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
                               {meta.country} safety overview
                             </Link>{" "}
                             for the full list.
@@ -486,7 +486,7 @@ export default async function CityReportPage({
                         ) : (
                           <p>
                             {meta.city} scores {meta.score}/100 — see the{" "}
-                            <Link href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
+                            <Link prefetch={false} href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
                               {meta.country} safety overview
                             </Link>{" "}
                             for country-level data.
@@ -505,7 +505,7 @@ export default async function CityReportPage({
                             ? " (and U.S. reports lean more on the latest field research)"
                             : ""}; the traveller-sentiment
                           score from field research carries the rest.{" "}
-                          <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
+                          <Link prefetch={false} href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
                             Full methodology
                           </Link>
                           .
@@ -530,20 +530,20 @@ export default async function CityReportPage({
           <section className="card mt-10 px-6 py-6 text-center">
             <p className="postcard-greeting">Keep exploring</p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-              <Link
+              <Link prefetch={false}
                 href={mapHref}
                 className="btn inline-flex items-center gap-2 px-4 py-2 text-[0.84rem] font-semibold"
               >
                 <MapIcon size={14} />
                 {meta.city} district map
               </Link>
-              <Link
+              <Link prefetch={false}
                 href={`/${meta.countrySlug}`}
                 className="btn-secondary inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] px-4 py-2 text-[0.84rem] font-semibold text-[var(--ink-soft)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-deep)]"
               >
                 All of {meta.country}
               </Link>
-              <Link
+              <Link prefetch={false}
                 href="/destinations"
                 className="btn-secondary inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] px-4 py-2 text-[0.84rem] font-semibold text-[var(--ink-soft)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-deep)]"
               >

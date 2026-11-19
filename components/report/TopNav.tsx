@@ -15,7 +15,7 @@ export function TopNav({ active }: { active: "report" | "map" }) {
   const placeParam = place ? `?place=${encodeURIComponent(place)}` : ""
 
   const tab = (href: string, label: string, icon: React.ReactNode, on: boolean) => (
-    <Link
+    <Link prefetch={false}
       href={href}
       className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[0.8rem] font-semibold transition-colors"
       style={

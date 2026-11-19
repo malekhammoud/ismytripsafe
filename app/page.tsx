@@ -113,11 +113,11 @@ export default async function Home() {
             {countries.length > 0 && (
               <p className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.78rem] text-[var(--ink-soft)]">
                 {countries.slice(0, 8).map((c) => (
-                  <Link key={c.countrySlug} href={`/${c.countrySlug}`} className="font-medium hover:text-[var(--accent)]">
+                  <Link prefetch={false} key={c.countrySlug} href={`/${c.countrySlug}`} className="font-medium hover:text-[var(--accent)]">
                     {c.flag} {c.country}
                   </Link>
                 ))}
-                <Link href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
+                <Link prefetch={false} href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
                   Spin the globe →
                 </Link>
               </p>
@@ -150,7 +150,7 @@ export default async function Home() {
             <StoplightStrip
               footer={
                 <p className="mt-4 text-center text-[0.82rem]">
-                  <Link href="/how-it-works" className="font-semibold text-[var(--accent-deep)] hover:underline">
+                  <Link prefetch={false} href="/how-it-works" className="font-semibold text-[var(--accent-deep)] hover:underline">
                     How the score is built →
                   </Link>
                 </p>

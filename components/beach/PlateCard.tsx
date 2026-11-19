@@ -15,7 +15,7 @@ export function PlateCard({ meta, priority = false }: { meta: ReportMeta; priori
   const photoFile = supplied?.cardFile || supplied?.file || meta.image || poolPhotoFor(meta.path).file
 
   return (
-    <Link
+    <Link prefetch={false}
       href={meta.path}
       className="pc"
       aria-label={`${meta.city}, ${meta.country} — safety score ${meta.score} out of 100`}

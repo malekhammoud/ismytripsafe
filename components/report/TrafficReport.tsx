@@ -894,7 +894,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             )}
 
             {/* neighbourhood ratings live on the map page, not here */}
-            <Link
+            <Link prefetch={false}
               href={mapHref}
               className="mt-4 flex items-center justify-between gap-3 rounded-[3px] px-4 py-3 transition-opacity hover:opacity-75"
               style={{ background: `${it.deep}12`, border: `1px solid ${it.deep}2e` }}
@@ -950,7 +950,7 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
         {permalink && (
           <p className="mt-2 text-[0.68rem]" style={{ color: "rgba(238,242,248,0.55)" }}>
             Permanent report:{" "}
-            <Link href={permalink} className="font-medium underline" style={{ color: "rgba(238,242,248,0.8)" }}>
+            <Link prefetch={false} href={permalink} className="font-medium underline" style={{ color: "rgba(238,242,248,0.8)" }}>
               ismytripsafe.com{permalink}
             </Link>
           </p>

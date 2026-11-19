@@ -81,7 +81,7 @@ export default function CreditsPage() {
           </p>
 
           <p className="mt-6 text-[0.85rem] text-[var(--ink-soft)]">
-            <Link href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
+            <Link prefetch={false} href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
               Back to the globe →
             </Link>
           </p>

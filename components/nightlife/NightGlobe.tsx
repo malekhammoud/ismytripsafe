@@ -499,7 +499,7 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
                   </button>
                 ))}
                 {results.cities.map(point => (
-                  <Link key={point.path} href={point.path} className="night-result-row">
+                  <Link prefetch={false} key={point.path} href={point.path} className="night-result-row">
                     <span className="min-w-0 truncate">{point.city}<small>{point.country}</small></span>
                     <span className="night-result-score" style={{ background: lightFor(point.overall) }}>{point.overall?.toFixed(1) ?? "–"}</span>
                   </Link>
@@ -555,7 +555,7 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
               <ul>
                 {selectedPoints.map(point => (
                   <li key={point.path}>
-                    <Link href={point.path} className="night-city-row">
+                    <Link prefetch={false} href={point.path} className="night-city-row">
                       <span className="night-city-name">{point.city}</span>
                       <span className="night-city-meta">{point.venueCount} venues{point.limited ? " · limited" : ""}</span>
                       <span className="night-city-score" style={{ background: lightFor(point.overall) }}>{point.overall?.toFixed(1) ?? "–"}</span>
@@ -572,7 +572,7 @@ export function NightGlobe({ payload }: { payload: NightlifeGlobePayload }) {
             )}
           </div>
           <div className="night-country-foot">
-            <Link href={`/${selected.slug}`}>Open the {selected.name} safety report →</Link>
+            <Link prefetch={false} href={`/${selected.slug}`}>Open the {selected.name} safety report →</Link>
           </div>
         </aside>
       )}

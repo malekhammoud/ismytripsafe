@@ -41,14 +41,14 @@ export default async function TestimonialsPage() {
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
     <main className="nlt-main">
       <header className="nlt-masthead">
-        <Link href="/nightlife" className="nlt-back">← Nightlife reports</Link>
+        <Link prefetch={false} href="/nightlife" className="nlt-back">← Nightlife reports</Link>
         <p className="postcard-greeting">What people say</p>
         <h1>Nightlife, in other people&apos;s words.</h1>
         <p className="nlt-deck">Short, attributed excerpts from public travel guides and articles. Search by city, tone or what people mention, then follow the link to the original source. These are opinions, not verified reviews or paid endorsements.</p>
         <p className="nlt-note">{entries.length.toLocaleString("en")} quotes across {cities} cities · updated when reports refresh</p>
       </header>
       <TestimonialSearch entries={entries} />
-      <div className="nlt-footer"><Link href="/nightlife">Explore the nightlife globe and city guides →</Link><SiteFooter /></div>
+      <div className="nlt-footer"><Link prefetch={false} href="/nightlife">Explore the nightlife globe and city guides →</Link><SiteFooter /></div>
     </main>
   </div>
 }

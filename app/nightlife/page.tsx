@@ -91,7 +91,7 @@ export default async function NightlifeIndex() {
             {globe.totals.reports} researched city guides, {globe.totals.venues.toLocaleString("en")} mapped bars, clubs and live-music venues.
             Spin the planet, follow the lights, and open a city for opening hours, neighbourhoods and after-dark safety.
           </p>
-          <p className="nlg-masthead-note">Drag to spin · scroll to zoom · click a country or a city light · <Link href="/nightlife/testimonials">search traveler quotes →</Link> · <a href="#nlg-request">ask for a city →</a></p>
+          <p className="nlg-masthead-note">Drag to spin · scroll to zoom · click a country or a city light · <Link href="/nightlife/testimonials" prefetch={false}>search traveler quotes →</Link> · <a href="#nlg-request">ask for a city →</a></p>
         </div>
         <dl className="nlg-stats">
           {[

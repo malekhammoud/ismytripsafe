@@ -826,7 +826,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
                   </button>
                 ))}
                 {results.cities.map((p) => (
-                  <Link
+                  <Link prefetch={false}
                     key={p.path}
                     href={p.path}
                     className="flex items-center justify-between gap-2 rounded-[3px] px-2.5 py-1.5 text-[0.83rem] hover:bg-[rgba(15,155,171,0.12)]"
@@ -975,7 +975,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
                     >
                       <Crosshair size={13} />
                     </button>
-                    <Link
+                    <Link prefetch={false}
                       href={p.path}
                       className="flex min-w-0 flex-1 items-center justify-between gap-2 py-2 text-[0.84rem] hover:text-[var(--accent-deep)]"
                     >
@@ -1001,7 +1001,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
           </div>
 
           <div className="shrink-0 border-t border-[var(--hairline)] p-3">
-            <Link
+            <Link prefetch={false}
               href={`/${selected.slug}`}
               className="btn flex w-full items-center justify-center gap-1.5 py-2 text-[0.85rem]"
             >

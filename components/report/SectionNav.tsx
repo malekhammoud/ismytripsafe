@@ -67,7 +67,7 @@ export function SectionNav({ items }: { items: SectionItem[] }) {
         {items.map((it) => {
           const on = active === it.href
           return (
-            <Link
+            <Link prefetch={false}
               key={it.href}
               href={it.href}
               aria-current={on ? "true" : undefined}
@@ -86,7 +86,7 @@ export function SectionNav({ items }: { items: SectionItem[] }) {
 /** The little "scroll to start" affordance used at the end of the document. */
 export function BackToTopPill({ href = "#report-hero" }: { href?: string }) {
   return (
-    <Link
+    <Link prefetch={false}
       href={href}
       className="inline-flex items-center gap-1.5 rounded-full border border-[var(--hairline)] px-4 py-2 text-[0.78rem] font-semibold text-[var(--ink-soft)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-deep)]"
     >

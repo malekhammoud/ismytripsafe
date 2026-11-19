@@ -50,7 +50,7 @@ export function TestimonialSearch({ entries }: { entries: TestimonialEntry[] }) 
     {filtered.length ? <div className="nlt-grid">{filtered.slice(0, limit).map(entry => <figure key={entry.id} className={`nlt-card nlt-${entry.sentiment}`}>
       <blockquote>{plainCopy(entry.quote)}</blockquote>
       <figcaption>
-        <Link href={entry.path}>{entry.city}<span>{entry.country}</span></Link>
+        <Link prefetch={false} href={entry.path}>{entry.city}<span>{entry.country}</span></Link>
         <div><a href={entry.url} target="_blank" rel="noopener noreferrer">{entry.source} <ArrowUpRight size={11}/></a><small>{entry.kind === "travel guide" ? "Travel guide" : entry.kind === "search snippet" ? "Search result" : "Article"} · {dateLabel(entry.publishedAt)}</small></div>
       </figcaption>
     </figure>)}</div> : <div className="nlt-empty"><h3>No quotes match.</h3><p>Try a different word, city or tone.</p><button type="button" onClick={reset}>Clear the filters</button></div>}

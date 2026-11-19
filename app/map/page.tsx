@@ -130,7 +130,7 @@ export default function MapPage() {
           <p className="mx-auto mt-1 max-w-sm text-sm text-[var(--ink-soft)]">
             {status === "loading" ? "Your report is still loading…" : "Search a place first, then open its safety map."}
           </p>
-          <Link href="/" className="btn mt-5 inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+          <Link prefetch={false} href="/" className="btn mt-5 inline-flex items-center gap-2 px-5 py-2.5 text-sm">
             <Search size={14} /> Search a destination
           </Link>
         </div>

@@ -66,7 +66,7 @@ export default function Error({
                 <RotateCw size={15} />
                 Try again
               </button>
-              <Link
+              <Link prefetch={false}
                 href="/"
                 className="inline-flex items-center gap-1.5 text-[0.85rem] font-medium text-[var(--accent-deep)] hover:underline"
               >

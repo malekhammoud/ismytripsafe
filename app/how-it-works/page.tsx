@@ -119,7 +119,7 @@ export default function HowItWorksPage() {
             <p>
               If you&apos;d like to learn more about the specific weighting process and algorithm,
               it&apos;s all written up in the{" "}
-              <Link href="/methodology">full methodology</Link> — or just{" "}
+              <Link prefetch={false} href="/methodology">full methodology</Link> — or just{" "}
               <a href="mailto:malek@ismytripsafe.com">contact us</a>.
             </p>
 
@@ -152,11 +152,11 @@ export default function HowItWorksPage() {
           </div>
 
           <div className="mt-11 flex flex-wrap items-center gap-3 border-t border-[var(--hairline)] pt-9">
-            <Link href="/" className="btn inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+            <Link prefetch={false} href="/" className="btn inline-flex items-center gap-2 px-5 py-2.5 text-sm">
               <ShieldCheck size={15} />
               Check a destination
             </Link>
-            <Link
+            <Link prefetch={false}
               href="/about"
               className="text-[0.85rem] font-medium text-[var(--accent-deep)] hover:underline"
             >
