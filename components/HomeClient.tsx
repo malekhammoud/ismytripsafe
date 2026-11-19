@@ -1,14 +1,31 @@
 "use client"
 
 import { useEffect, useState, type ReactNode } from "react"
+import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { SiteHeader } from "@/components/SiteHeader"
 import { HeaderBand } from "@/components/home/HeaderBand"
 
-import { AssessmentProgress } from "@/components/AssessmentProgress"
-import { ProfileSetup } from "@/components/ProfileSetup"
-import { TrafficReport } from "@/components/report/TrafficReport"
-import { TopNav } from "@/components/report/TopNav"
+// The report UI is only needed once somebody actually asks for a report.
+// Statically imported, it put the score ring, the maps, the share sheet and
+// the whole personalised briefing into the landing page's first bundle for
+// every visitor who never searched.
+const AssessmentProgress = dynamic(
+  () => import("@/components/AssessmentProgress").then((m) => m.AssessmentProgress),
+  { ssr: false },
+)
+const ProfileSetup = dynamic(
+  () => import("@/components/ProfileSetup").then((m) => m.ProfileSetup),
+  { ssr: false },
+)
+const TrafficReport = dynamic(
+  () => import("@/components/report/TrafficReport").then((m) => m.TrafficReport),
+  { ssr: false },
+)
+const TopNav = dynamic(
+  () => import("@/components/report/TopNav").then((m) => m.TopNav),
+  { ssr: false },
+)
 import { useReport } from "@/lib/store"
 import { profileFromParams, profileToParams, type TravelerProfile } from "@/lib/profile"
 import type { HomeDemo } from "@/lib/home-demo"

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily check for due beta nightlife data refreshes
+
+[Timer]
+OnCalendar=*-*-* 04:30:00 UTC
+RandomizedDelaySec=30m
+Persistent=true
+Unit=ismytripsafe-nightlife-beta.service
+
+[Install]
+WantedBy=timers.target

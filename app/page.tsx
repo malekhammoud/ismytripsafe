@@ -11,7 +11,10 @@ import { SiteFooter } from "@/components/SiteFooter"
 
 // Server-rendered so crawlers land on real HTML with real links; the
 // interactive checker hydrates on top.
-export const dynamic = "force-dynamic"
+// The landing page reads the report index, not a request. Cache it for a
+// minute: a new report is visible on the next revalidation, and 999 of 1,000
+// requests get a static response instead of re-rendering the whole page.
+export const revalidate = 60
 
 /** The city the big demonstration card shows. */
 const SHOWCASE = { country: "hungary", city: "budapest" } as const
@@ -110,11 +113,11 @@ export default async function Home() {
             {countries.length > 0 && (
               <p className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[0.78rem] text-[var(--ink-soft)]">
                 {countries.slice(0, 8).map((c) => (
-                  <Link key={c.countrySlug} href={`/${c.countrySlug}`} className="font-medium hover:text-[var(--accent)]">
+                  <Link prefetch={false} key={c.countrySlug} href={`/${c.countrySlug}`} className="font-medium hover:text-[var(--accent)]">
                     {c.flag} {c.country}
                   </Link>
                 ))}
-                <Link href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
+                <Link prefetch={false} href="/destinations" className="font-semibold text-[var(--accent-deep)] hover:underline">
                   Spin the globe →
                 </Link>
               </p>
@@ -147,7 +150,7 @@ export default async function Home() {
             <StoplightStrip
               footer={
                 <p className="mt-4 text-center text-[0.82rem]">
-                  <Link href="/how-it-works" className="font-semibold text-[var(--accent-deep)] hover:underline">
+                  <Link prefetch={false} href="/how-it-works" className="font-semibold text-[var(--accent-deep)] hover:underline">
                     How the score is built →
                   </Link>
                 </p>

@@ -5,7 +5,6 @@ import { absUrl } from "@/lib/site"
 import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { Breadcrumbs, SeoFooter, SiteHeader } from "@/components/seo/shared"
 
-export const dynamic = "force-dynamic"
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
@@ -74,11 +73,11 @@ export default function DisclaimerPage() {
           </div>
 
           <div className="mt-9 flex flex-wrap items-center gap-3 border-t border-[var(--hairline)] pt-7">
-            <Link href="/" className="btn inline-flex items-center gap-2 px-5 py-2.5 text-sm">
+            <Link prefetch={false} href="/" className="btn inline-flex items-center gap-2 px-5 py-2.5 text-sm">
               <ShieldCheck size={15} />
               Check a destination
             </Link>
-            <Link
+            <Link prefetch={false}
               href="/methodology"
               className="text-[0.85rem] font-medium text-[var(--accent-deep)] hover:underline"
             >

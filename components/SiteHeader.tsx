@@ -10,6 +10,7 @@ import { Logo } from "@/components/Logo"
 // report and the map. It knows where it is from the path rather than from a
 // prop, so no page can drift out of step with the others.
 const LINKS = [
+  { href: "/nightlife", label: "Nightlife" },
   { href: "/destinations", label: "Destinations" },
   { href: "/how-it-works", label: "How it works" },
   { href: "/methodology", label: "Methodology" },
@@ -37,6 +38,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-[56px] max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link
           href="/"
+          prefetch={false}
           className="wordmark flex shrink-0 items-center gap-2 text-[1rem] text-[var(--navy)]"
         >
           <Logo size={27} />
@@ -46,13 +48,14 @@ export function SiteHeader() {
         </Link>
 
         {/* Desktop */}
-        <nav className="hidden items-center gap-6 sm:flex">
+        <nav className="hidden items-center gap-6 lg:flex">
           {LINKS.map((l) => {
-            const active = pathname === l.href
+            const active = pathname === l.href || (l.href === "/nightlife" && !!pathname?.endsWith("/nightlife"))
             return (
               <Link
                 key={l.href}
                 href={l.href}
+                prefetch={false}
                 aria-current={active ? "page" : undefined}
                 className={`nav-link text-[0.83rem] font-medium ${active ? "is-active" : ""}`}
               >
@@ -61,7 +64,7 @@ export function SiteHeader() {
             )
           })}
           {!isHome && (
-            <Link href="/" className="btn inline-flex items-center gap-1.5 px-4 py-1.5 text-[0.8rem]">
+            <Link href="/" prefetch={false} className="btn inline-flex items-center gap-1.5 px-4 py-1.5 text-[0.8rem]">
               <ShieldCheck size={14} />
               Check a place
             </Link>
@@ -74,7 +77,7 @@ export function SiteHeader() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-label={open ? "Close menu" : "Open menu"}
-          className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[rgba(29,47,56,0.07)] sm:hidden"
+          className="-mr-1.5 flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink-soft)] transition-colors hover:bg-[rgba(29,47,56,0.07)] lg:hidden"
         >
           {open ? <X size={19} /> : <Menu size={19} />}
         </button>
@@ -82,15 +85,16 @@ export function SiteHeader() {
 
       {open && (
         <nav
-          className="border-t border-[var(--hairline)] px-4 pb-4 pt-2 sm:hidden"
+          className="border-t border-[var(--hairline)] px-4 pb-4 pt-2 lg:hidden"
           style={{ background: "rgba(251, 244, 230, 0.97)" }}
         >
           {LINKS.map((l) => {
-            const active = pathname === l.href
+            const active = pathname === l.href || (l.href === "/nightlife" && !!pathname?.endsWith("/nightlife"))
             return (
               <Link
                 key={l.href}
                 href={l.href}
+                prefetch={false}
                 aria-current={active ? "page" : undefined}
                 className="block border-b border-[var(--hairline)] py-3 text-[0.95rem] font-medium last:border-b-0"
                 style={{ color: active ? "var(--orange-deep)" : "var(--ink-soft)" }}
@@ -100,7 +104,7 @@ export function SiteHeader() {
             )
           })}
           {!isHome && (
-            <Link href="/" className="btn mt-3 flex items-center justify-center gap-2 py-2.5 text-[0.9rem]">
+            <Link href="/" prefetch={false} className="btn mt-3 flex items-center justify-center gap-2 py-2.5 text-[0.9rem]">
               <ShieldCheck size={15} />
               Check a place
             </Link>

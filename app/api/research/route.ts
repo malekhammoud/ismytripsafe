@@ -63,13 +63,18 @@ export async function POST(request: Request) {
   // pass and any stale-while-revalidate rebuild. Populated inside the stream and
   // drained by `after`, so none of it holds up the reader.
   const background: Array<() => Promise<void>> = []
+  let closed = false
 
   const stream = new ReadableStream({
+    cancel() { closed = true },
     async start(controller) {
-      let closed = false
       const send = (event: StreamEvent) => {
         if (closed) return
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+        // The browser may navigate away while a source is still pending.
+        // Collection can finish and cache its result without writing to the
+        // cancelled stream or throwing another error from the error handler.
+        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`)) }
+        catch { closed = true }
       }
 
       const t0 = Date.now()
@@ -242,12 +247,13 @@ export async function POST(request: Request) {
         // 4. AI safety enrichment — interpret the real signals, add local intel
         let enrichment: SafetyEnrichment | null = null
         let prose = ""
+        let completion: Extract<StreamEvent, { type: "done" }> | null = null
         const allowFallback = input.provider === "antigravity" || !input.noFallback
         for await (const event of runSafetyAgent(geo, bundle, wikivoyage, dossier, allowFallback, input.provider)) {
           if (event.type === "enrichment") enrichment = event.data
           if (event.type === "text") prose += event.content
           if (event.type === "done") {
-            send({ ...event, path: pathForGeo(geo) })
+            completion = { ...event, path: pathForGeo(geo) }
           } else {
             send(event)
           }
@@ -257,7 +263,7 @@ export async function POST(request: Request) {
         // 5. Persist the finished report for next time (only if it fully built).
         //    The permanent page is live the moment the file lands — tell the
         //    search engines about it (IndexNow → Bing → ChatGPT's index).
-        if (enrichment) {
+        if (enrichment && completion) {
           const settled = enrichment
           const enrichedSignals = attachResearchSignals(bundle.safety.signals, settled)
           const rescored = computeSafetyIndex(enrichedSignals)
@@ -297,12 +303,16 @@ export async function POST(request: Request) {
               prose,
             })
           })
+          // Only advertise the permanent link once its cache file exists.
+          send(completion)
         }
       } catch (err) {
         send({ type: "error", message: String(err) })
       } finally {
-        closed = true
-        controller.close()
+        if (!closed) {
+          closed = true
+          controller.close()
+        }
       }
     },
   })
@@ -341,12 +351,14 @@ async function rebuild(geo: GeoPoint, key: string, place: string): Promise<void>
 
   let enrichment: SafetyEnrichment | null = null
   let prose = ""
+  let completed = false
   for await (const event of runSafetyAgent(geo, bundle, wikivoyage, dossier, false)) {
     if (event.type === "enrichment") enrichment = event.data
     if (event.type === "text") prose += event.content
+    if (event.type === "done") completed = true
     if (event.type === "done" || event.type === "error") break
   }
-  if (!enrichment) return
+  if (!enrichment || !completed) return
 
   const zones = await generateMapZones(geo, bundle, wikivoyage, dossier, false)
   await writeCache(key, {

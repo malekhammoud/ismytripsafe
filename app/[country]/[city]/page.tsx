@@ -1,8 +1,9 @@
+import { SafetyCrosslink } from "@/components/nightlife/SafetyCrosslink"
 import type { Metadata } from "next"
 import Link from "next/link"
 import { notFound, permanentRedirect } from "next/navigation"
 import { cache } from "react"
-import { findCityElsewhere, getCityReport, getRelated } from "@/lib/reports"
+import { findCityElsewhere, getCityReport, getRelated, listReports } from "@/lib/reports"
 import { computeFinalScore, LEVELS } from "@/lib/safety-display"
 import { absUrl, humanDate, monthYear } from "@/lib/site"
 import {
@@ -25,13 +26,30 @@ import {
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
 import { RelatedGrid } from "@/components/seo/DestinationCards"
+import { wikimediaThumb } from "@/lib/photos"
 import { SectionNav, BackToTopPill } from "@/components/report/SectionNav"
 import type { CachedReport } from "@/lib/cache"
 import { ArrowRight, Check, Globe2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
 
-// Always render fresh from the report store — new and refreshed reports
-// appear immediately, and Googlebot/AI crawlers get full HTML.
-export const dynamic = "force-dynamic"
+// A report is static between revalidations: a new or refreshed report is
+// visible within five minutes, and every visit in between is served from the
+// ISR cache instead of re-rendering 275 KB of HTML from disk.
+export const revalidate = 300
+
+// Prerender a small, high-traffic seed set. Every other city still generates
+// on demand and is then cached for `revalidate`; the seed only makes the
+// first visit to the most-linked reports instant.
+export async function generateStaticParams() {
+  // The biggest cities are the ones the home page and search land on first.
+  // Everything else is generated on demand and cached from then on.
+  const cities = (await listReports()).filter(
+    (report) => report.path.split("/").filter(Boolean).length === 2,
+  )
+  return cities
+    .sort((a, b) => (b.population ?? 0) - (a.population ?? 0))
+    .slice(0, 24)
+    .map((report) => ({ country: report.countrySlug, city: report.citySlug }))
+}
 
 interface Params {
   country: string
@@ -145,7 +163,7 @@ export default async function CityReportPage({
       meta,
       headline: `Is ${meta.city} Safe in ${new Date(report.cachedAt).getFullYear()}? Travel Safety Report`,
       description: metaDescription(report),
-      image: report.images.hero,
+      image: report.images.hero ? (wikimediaThumb(report.images.hero, 1280) ?? report.images.hero) : null,
     }),
     reportDatasetNode(meta)
   )
@@ -190,7 +208,7 @@ export default async function CityReportPage({
           {/* The one action on the page — big, orange, explicit, and readable at a
               glance. Centered title, then what it actually does, one bullet
               per line: no wall of text, four quick promises. */}
-          <Link
+          <Link prefetch={false}
             href={personalizeHref}
             className="group mt-5 block rounded-[16px] bg-[var(--orange-deep)] px-6 py-5 text-center transition-transform hover:-translate-y-0.5 hover:bg-[#c03f21]"
             style={{
@@ -240,6 +258,8 @@ export default async function CityReportPage({
             <time dateTime={report.cachedAt}>{humanDate(report.cachedAt)}</time>
           </p>
 
+          <SafetyCrosslink country={country.toLowerCase()} city={city.toLowerCase()} />
+
           {/* The full report card — sections 01–05 */}
           <div className="mt-7">
             <TrafficReport
@@ -271,7 +291,7 @@ export default async function CityReportPage({
                     {safeZones.length ? `: ${safeZones.length} safer` : ""}
                     {cautionZones.length ? `, ${cautionZones.length} needing caution` : ""}
                     {avoidZones.length ? ` and ${avoidZones.length} best avoided` : ""}.{" "}
-                    <Link href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
+                    <Link prefetch={false} href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
                       See them plotted on the {meta.city} safety map
                     </Link>
                     .
@@ -311,7 +331,7 @@ export default async function CityReportPage({
                     <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.72rem] font-semibold" style={{ background: "rgba(214,69,65,0.12)", color: "var(--risky)" }}>
                       {avoidZones.length} avoid
                     </span>
-                    <Link
+                    <Link prefetch={false}
                       href={mapHref}
                       className="btn ml-auto inline-flex items-center gap-2 px-4 py-2 text-[0.82rem] font-semibold"
                     >
@@ -379,7 +399,7 @@ export default async function CityReportPage({
                           backpacker face different street-level risks, so the headline
                           score shifts and the report leads with the findings that matter
                           for that group.{" "}
-                          <Link
+                          <Link prefetch={false}
                             href={personalizeHref}
                             className="font-medium text-[var(--accent-deep)] hover:underline"
                           >
@@ -398,7 +418,7 @@ export default async function CityReportPage({
                             {avoidZones.length
                               ? `Field research flags ${avoidZones.map((z) => z.name).join(", ")} as best avoided.`
                               : (e.avoidAreas ?? []).slice(0, 3).join("; ") + "."}{" "}
-                            <Link href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
+                            <Link prefetch={false} href={mapHref} className="font-medium text-[var(--accent-deep)] hover:underline">
                               See the district-by-district safety map
                             </Link>
                             .
@@ -426,7 +446,7 @@ export default async function CityReportPage({
                           <p>
                             {meta.city} ranks #{countryRank} of {related.sameCountry.length + 1}{" "}
                             {meta.country} destinations we&apos;ve assessed, scoring {meta.score}/100. See the{" "}
-                            <Link href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
+                            <Link prefetch={false} href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
                               {meta.country} safety overview
                             </Link>{" "}
                             for the full list.
@@ -434,7 +454,7 @@ export default async function CityReportPage({
                         ) : (
                           <p>
                             {meta.city} scores {meta.score}/100 — see the{" "}
-                            <Link href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
+                            <Link prefetch={false} href={`/${meta.countrySlug}`} className="font-medium text-[var(--accent-deep)] hover:underline">
                               {meta.country} safety overview
                             </Link>{" "}
                             for country-level data.
@@ -453,7 +473,7 @@ export default async function CityReportPage({
                             ? " (and U.S. reports lean more on the latest field research)"
                             : ""}; the traveller-sentiment
                           score from field research carries the rest.{" "}
-                          <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
+                          <Link prefetch={false} href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
                             Full methodology
                           </Link>
                           .
@@ -478,20 +498,20 @@ export default async function CityReportPage({
           <section className="card mt-10 px-6 py-6 text-center">
             <p className="postcard-greeting">Keep exploring</p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
-              <Link
+              <Link prefetch={false}
                 href={mapHref}
                 className="btn inline-flex items-center gap-2 px-4 py-2 text-[0.84rem] font-semibold"
               >
                 <MapIcon size={14} />
                 {meta.city} district map
               </Link>
-              <Link
+              <Link prefetch={false}
                 href={`/${meta.countrySlug}`}
                 className="btn-secondary inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] px-4 py-2 text-[0.84rem] font-semibold text-[var(--ink-soft)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-deep)]"
               >
                 All of {meta.country}
               </Link>
-              <Link
+              <Link prefetch={false}
                 href="/destinations"
                 className="btn-secondary inline-flex items-center gap-2 rounded-full border border-[var(--hairline)] px-4 py-2 text-[0.84rem] font-semibold text-[var(--ink-soft)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent-deep)]"
               >

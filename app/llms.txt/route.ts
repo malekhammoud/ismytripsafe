@@ -1,4 +1,5 @@
 import { listCountries, listReports } from "@/lib/reports"
+import { NIGHTLIFE_INDEXABLE, listNightlife, nightlifePath, nightlifeUrl } from "@/lib/nightlife/store"
 
 // /llms.txt — the convention AI crawlers check first (llmstxt.org). A short
 // map of the site in plain text so ChatGPT, Claude, Perplexity and friends
@@ -6,9 +7,17 @@ import { listCountries, listReports } from "@/lib/reports"
 export const dynamic = "force-dynamic"
 
 export async function GET() {
-  const [hubs, reports] = await Promise.all([listCountries(), listReports()])
+  const [hubs, reports, nightlife] = await Promise.all([listCountries(), listReports(), listNightlife()])
   const cities = reports.filter((r) => r.path.split("/").filter(Boolean).length === 2).length
   const updated = reports.map((r) => r.updatedAt).sort().at(-1) ?? "recently"
+  const nightlifeSection = NIGHTLIFE_INDEXABLE && nightlife.length
+    ? `\n## Nightlife reports (${nightlife.length})
+
+- [All city nightlife reports](${nightlifeUrl("/nightlife")})
+- [Attributed traveler testimonials by city](${nightlifeUrl("/nightlife/testimonials")})
+${[...nightlife].sort((a, b) => (b.overall ?? 0) - (a.overall ?? 0)).slice(0, 12).map((r) => `- [${r.city.city} nightlife](${nightlifeUrl(nightlifePath(r))}) — ${r.venueCount.toLocaleString("en")} mapped venues`).join("\n")}
+`
+    : ""
 
   const text = `# IsMyTripSafe
 
@@ -30,7 +39,7 @@ Every destination has a permanent, crawlable page: https://ismytripsafe.com/{cou
 - [Methodology — how scores are built and which databases back them](https://ismytripsafe.com/methodology)
 - [About IsMyTripSafe](https://ismytripsafe.com/about)
 - [Home](https://ismytripsafe.com/)
-
+${nightlifeSection}
 ## Countries covered (${hubs.length})
 
 ${hubs

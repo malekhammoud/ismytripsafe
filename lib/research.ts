@@ -35,6 +35,7 @@ export interface ArticleExtract {
   url: string
   domain: string
   text: string
+  publishedAt?: string | null
 }
 
 export interface ResearchDossier {
@@ -171,7 +172,14 @@ export async function fetchArticle(url: string): Promise<ArticleExtract | null> 
   if (!html) return null
   const text = extractReadableText(html).slice(0, MAX_EXTRACT_CHARS)
   if (text.length < 500) return null // paywall, block page, or thin content
-  return { url, domain, text }
+  // A publication date is what makes a testimonial reviewable. Prefer the
+  // machine-readable date, then the common meta tags; never invent one.
+  const rawDate = html.match(/"datePublished"\s*:\s*"([^"]+)"/i)?.[1]
+    ?? html.match(/property=["']article:published_time["']\s+content=["']([^"']+)/i)?.[1]
+    ?? html.match(/content=["']([^"']+)["']\s+property=["']article:published_time["']/i)?.[1]
+    ?? html.match(/<time[^>]+datetime=["']([^"']+)/i)?.[1]
+  const publishedAt = rawDate && Number.isFinite(Date.parse(rawDate)) && Date.parse(rawDate) <= Date.now() ? new Date(rawDate).toISOString() : null
+  return { url, domain, text, publishedAt }
 }
 
 /** Pick the best crawl candidates: one per domain, skipping blocked sites. */

@@ -1,0 +1,129 @@
+require('../scripts/typescript-worker.cjs')
+const {test}=require('node:test')
+const assert=require('node:assert/strict')
+const {createOverpassClient,boundaryQuery,venueQuery,collectionQuery,verifiedArea,verifiedVenues,verifiedCollection,chooseFallbackArea,fallbackAreaQuery,usesPublicOverpass}=require('../lib/nightlife/overpass.ts')
+const {SourceHttpError,SourceOperationError,SourceUnavailable,sourceFailure}=require('../lib/nightlife/source-errors.ts')
+const {fetchJson}=require('../lib/nightlife/http.ts')
+const city={wikidataId:'Q994',relationId:1996871}
+const boundary={type:'relation',id:1996871,tags:{wikidata:'Q994',boundary:'administrative'}}
+const area={type:'area',id:3601996871,tags:{wikidata:'Q994'}}
+const elements=[{type:'node',id:1,lat:41.7,lon:44.8,tags:{name:'Fixture pub',amenity:'pub'}},{type:'way',id:2,center:{lat:41.7,lon:44.81},tags:{name:'Fixture club',amenity:'nightclub'}},{type:'relation',id:3,center:{lat:41.71,lon:44.8},tags:{name:'Fixture music hall',amenity:'music_venue'}}]
+const count={type:'count',id:0,tags:{nodes:'1',ways:'1',relations:'1',total:'3'}}
+const response=()=>({elements:[area,...structuredClone(elements),structuredClone(count)]})
+test('OSM boundary is verified before querying its searchable area',()=>{
+ assert.deepEqual(verifiedArea(city,{elements:[boundary,area]}),{boundary,areaId:area.id})
+ assert.throws(()=>verifiedArea(city,{elements:[boundary]}),SourceUnavailable)
+ assert.throws(()=>verifiedArea({...city,wikidataId:'Q1',relationId:null},{elements:[boundary,area]}),SourceUnavailable)
+ assert.deepEqual(verifiedArea({...city,wikidataId:'Q1'},{elements:[boundary,area]}),{boundary,areaId:area.id})
+ assert.throws(()=>verifiedArea({...city,relationId:null},{elements:[boundary,area,{...boundary,id:99}]}),SourceUnavailable)
+ assert.throws(()=>boundaryQuery({...city,relationId:NaN}),SourceUnavailable)
+})
+test('ceremonial and political city boundaries are valid venue areas',()=>{
+ const london={...city,relationId:65606,wikidataId:'Q84'}
+ const ceremonial={type:'relation',id:65606,tags:{wikidata:'Q23306',boundary:'ceremonial'}}
+ const londonArea={type:'area',id:3600065606,tags:{wikidata:'Q23306',boundary:'ceremonial'}}
+ assert.deepEqual(verifiedArea(london,{elements:[ceremonial,londonArea]}),{boundary:ceremonial,areaId:londonArea.id})
+ assert.match(collectionQuery(london),/rel\(65606\)->\.boundary;/)
+ const placeCity={...london,relationId:5750005,wikidataId:'Q3130'}
+ const placeBoundary={type:'relation',id:5750005,tags:{wikidata:'Q3130',boundary:'place',place:'city'}}
+ const placeArea={type:'area',id:3605750005,tags:{wikidata:'Q3130',boundary:'place',place:'city'}}
+ assert.deepEqual(verifiedArea(placeCity,{elements:[placeBoundary,placeArea]}),{boundary:placeBoundary,areaId:placeArea.id})
+})
+test('a containing administrative area is selected only when the city boundary is unavailable',()=>{
+ const mumbai={...city,city:'Mumbai',lat:19.0758,lon:72.8775}
+ const areas={elements:[
+  {type:'area',id:3607964375,tags:{name:'Mumbai Suburban District',boundary:'administrative',admin_level:'5'}},
+  {type:'area',id:3613312356,tags:{name:'Mumbai Metropolitan Region',boundary:'local_authority',admin_level:'7',population:'26237000'}},
+  {type:'area',id:3607885380,tags:{name:'L Ward',boundary:'administrative',admin_level:'10'}},
+ ]}
+ assert.equal(chooseFallbackArea(mumbai,areas).id,3613312356)
+ const santorini={...city,city:'Santorini',lat:36.4,lon:25.4}
+ const greek={elements:[
+  {type:'area',id:3605318852,tags:{name:'Δήμος Θήρας',boundary:'administrative',admin_level:'7'}},
+  {type:'area',id:3605323612,tags:{name:'Περιφερειακή Ενότητα Θήρας',boundary:'administrative',admin_level:'6'}},
+ ]}
+ assert.equal(chooseFallbackArea(santorini,greek).id,3605318852)
+ assert.equal(fallbackAreaQuery(mumbai),'[out:json][timeout:25][maxsize:67108864];is_in(19.0758,72.8775);out tags;')
+ assert.equal(chooseFallbackArea(mumbai,{elements:[]}),null)
+})
+test('complete venue queries retain nodes, ways and relations',()=>{
+ assert.equal(verifiedVenues(response(),area.id).length,3)
+ assert.match(boundaryQuery(city),/out tags;map_to_area;out tags;/)
+ assert.doesNotMatch(boundaryQuery(city),/out geom/)
+ assert.match(venueQuery(area.id),/out body center qt;out count;/)
+ assert.ok(venueQuery(area.id).includes('[amenity=restaurant][bar=yes]'))
+})
+test('zero venues is accepted only with a matching area and explicit zero count',()=>{
+ const zero={elements:[area,{type:'count',id:0,tags:{nodes:'0',ways:'0',relations:'0',total:'0'}}]}
+ assert.deepEqual(verifiedVenues(zero,area.id),[])
+ assert.throws(()=>verifiedVenues({elements:[]},area.id),SourceUnavailable)
+})
+test('one combined query verifies the boundary, area and complete venue union',()=>{
+ const raw={elements:[boundary,area,...structuredClone(elements),structuredClone(count)]}
+ const result=verifiedCollection(city,raw)
+ assert.equal(result.boundary.id,boundary.id);assert.equal(result.areaId,area.id);assert.equal(result.venues.length,3)
+ assert.match(collectionQuery(city),/rel\(1996871\)->\.boundary;/)
+ assert.match(collectionQuery(city),/map_to_area->\.area/)
+ assert.match(collectionQuery(city),/out tags center qt;out count;/)
+ assert.doesNotMatch(collectionQuery(city),/out body center qt/)
+ const noBoundary={elements:[area,...structuredClone(elements),structuredClone(count)]};assert.throws(()=>verifiedCollection(city,noBoundary),SourceUnavailable)
+ const wrongCount={elements:[boundary,area,...structuredClone(elements),{type:'count',id:0,tags:{nodes:'1',ways:'1',relations:'1',total:'4'}}]};assert.throws(()=>verifiedCollection(city,wrongCount),/completeness/)
+})
+test('truncated, partial, duplicated and wrong-area responses cannot become low ratings',()=>{
+ const missing=response();missing.elements.pop()
+ const truncated=response();truncated.elements.splice(1,1)
+ const duplicate=response();duplicate.elements[2]=duplicate.elements[1]
+ const wrongArea=response();wrongArea.elements[0]={...area,id:1}
+ for(const raw of [missing,truncated,duplicate,wrongArea,{...response(),remark:'runtime error: Query timed out'}])assert.throws(()=>verifiedVenues(raw,area.id))
+})
+test('transport timeout uses one fallback and stays there for subsequent city requests',async()=>{
+ const hosts=[]
+ const client=createOverpassClient({primary:'https://primary.example/api',fallback:'https://fallback.example/api',request:async(url,options,policy)=>{
+  const host=new URL(url).hostname;hosts.push(host);assert.equal(policy.retries,0)
+  if(host==='primary.example')throw new DOMException('Fixture timeout','TimeoutError')
+  return response()
+ }})
+ await client.query('query','boundary',35000);await client.query('query','venues',45000)
+ assert.deepEqual(hosts,['primary.example','fallback.example','fallback.example'])
+ assert.equal(client.requests.length,2);assert.equal(client.requests[0].provider,'fallback.example')
+})
+test('generic service failure can recover but query refusals never rotate providers',async()=>{
+ for(const [status,retryAfter,expectedCalls] of [[503,null,2],[429,null,1],[403,null,1],[400,null,1],[504,null,1],[503,60,1]]) {
+  let calls=0
+  const client=createOverpassClient({primary:'https://primary.example/api',fallback:'https://fallback.example/api',request:async()=>{if(++calls===1)throw new SourceHttpError(status,retryAfter);return response()}})
+  if(expectedCalls===2)assert.ok(await client.query('query','venues',45000))
+  else await assert.rejects(()=>client.query('query','venues',45000),e=>e instanceof SourceOperationError&&e.failure.status===status)
+  assert.equal(calls,expectedCalls)
+ }
+})
+test('an explicit provider has no implicit public fallback',async()=>{
+ let calls=0
+ const client=createOverpassClient({primary:'https://private.example/api',request:async()=>{calls++;throw new TypeError('Fixture network failure')}})
+ await assert.rejects(()=>client.query('query','venues',45000));assert.equal(calls,1)
+})
+test('partial query results do not trigger failover or successful request traces',async()=>{
+ let calls=0
+ const client=createOverpassClient({primary:'https://primary.example/api',fallback:'https://fallback.example/api',request:async()=>{calls++;return {...response(),remark:'runtime error: Query timed out'}}})
+ await assert.rejects(()=>client.query('query','venues',45000));assert.equal(calls,1);assert.equal(client.requests.length,0)
+})
+test('timeout diagnostics retain stage, duration and safe hostname without credentials',async()=>{
+ const client=createOverpassClient({primary:'https://primary.example/api?key=secret',fallback:'',request:async()=>{throw new TypeError('fetch failed',{cause:{code:'UND_ERR_CONNECT_TIMEOUT'}})}})
+ const error=await client.query('query','OpenStreetMap boundary lookup',35000).catch(e=>e)
+ const failure=sourceFailure(error)
+ assert.equal(failure.kind,'timeout');assert.equal(failure.code,'UND_ERR_CONNECT_TIMEOUT');assert.equal(failure.operation,'OpenStreetMap boundary lookup');assert.equal(failure.provider,'primary.example');assert.ok(failure.elapsedMs>=0)
+ assert.ok(!JSON.stringify(failure).includes('secret'));assert.ok(!error.message.includes('secret'))
+})
+test('Overpass controls its attempt budget instead of inheriting nested HTTP retries',async()=>{
+ let calls=0
+ await assert.rejects(()=>fetchJson('https://example.com',{}, {retries:0,fetch:async()=>{calls++;throw new TypeError('Fixture failure')},sleep:async()=>assert.fail('Unexpected retry')}))
+ assert.equal(calls,1)
+})
+test('public primary or fallback endpoints retain the public pilot budget',()=>{
+ const before=[process.env.OVERPASS_URL,process.env.OVERPASS_FALLBACK_URL]
+ try {
+  process.env.OVERPASS_URL='https://private.example/api';delete process.env.OVERPASS_FALLBACK_URL;assert.equal(usesPublicOverpass(),false)
+  process.env.OVERPASS_FALLBACK_URL='https://overpass-api.de/api/interpreter';assert.equal(usesPublicOverpass(),true)
+  process.env.OVERPASS_URL='https://overpass.private.coffee/api/interpreter';process.env.OVERPASS_FALLBACK_URL='';assert.equal(usesPublicOverpass(),true)
+  process.env.OVERPASS_URL='https://overpass.openstreetmap.fr/api/interpreter';assert.equal(usesPublicOverpass(),true)
+ }finally{for(const [i,name]of ['OVERPASS_URL','OVERPASS_FALLBACK_URL'].entries()){if(before[i]===undefined)delete process.env[name];else process.env[name]=before[i]}}
+})

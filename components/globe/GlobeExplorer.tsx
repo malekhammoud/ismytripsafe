@@ -3,11 +3,16 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import Link from "next/link"
-import { feature } from "topojson-client"
-import { AmbientLight, Color, DirectionalLight, MeshPhongMaterial } from "three"
-import type { Topology, GeometryCollection } from "topojson-specification"
+import type { MeshPhongMaterial } from "three"
 import { Search, X, Pause, Play, Compass, Maximize2, Crosshair } from "lucide-react"
 import type { GlobeCountry, GlobePayload, GlobePoint } from "@/lib/globe-data"
+import { loadCountryFeatures, type GlobeFeature } from "@/lib/globe-geo"
+import {
+  canAutoStartGlobe,
+  MAX_GLOBE_PIXEL_RATIO,
+  prefersReducedMotion,
+  whenIdle,
+} from "@/lib/globe-runtime"
 import { poolPhotoFor, sized } from "@/lib/photos"
 import { Photo } from "@/components/beach/Photo"
 
@@ -83,12 +88,7 @@ function tintSolid(score: number): string {
   return `rgb(${r}, ${g}, ${b})`
 }
 
-interface Feat {
-  type: "Feature"
-  id?: string | number
-  properties: { name?: string }
-  geometry: unknown
-}
+type Feat = GlobeFeature
 
 type Poly = Feat & { __c?: GlobeCountry }
 
@@ -144,27 +144,51 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
   const [query, setQuery] = useState("")
   const [region, setRegion] = useState<string>("All")
   const [ready, setReady] = useState(false)
+  /**
+   * WebGL is opt-in on machines that can afford it. `enabled` flips after the
+   * page is idle (capable hardware) or when the poster's button is pressed;
+   * `gated` means the capability check said no and the poster is waiting for
+   * a person to decide. See `lib/globe-runtime.ts` for why.
+   */
+  const [enabled, setEnabled] = useState(false)
+  const [gated, setGated] = useState(false)
+  /** 110m geometry first; 50m only once the camera is close enough to see it. */
+  const detailedRef = useRef(false)
 
   /**
    * The sea. There's no texture on this globe — the whole point is that the
    * countries carry the colour — so the sphere itself is one lagoon-blue
    * Phong material with enough emissive to keep the night side readable
    * rather than a black void.
+   *
+   * three.js is ~83 KB gzipped, and a static `import` here put it in the
+   * landing bundle even though the globe is gated. It now arrives with the
+   * globe, from the same chunk react-globe.gl wants anyway.
    */
-  const seaMaterial = useMemo(() => {
-    const m = new MeshPhongMaterial({
-      color: new Color(SEA),
-      emissive: new Color("#0a4356"),
-      emissiveIntensity: 0.85,
-      shininess: 18,
-      specular: new Color("#7fd4de"),
-      // Opaque on purpose: a see-through sphere lets the far side of the
-      // planet bleed through to the near side.
-      transparent: false,
-      opacity: 1,
-    })
-    return m
-  }, [])
+  const [three, setThree] = useState<typeof import("three") | null>(null)
+  const [seaMaterial, setSeaMaterial] = useState<MeshPhongMaterial | null>(null)
+
+  useEffect(() => {
+    if (!enabled || three) return
+    void import("three").then(setThree)
+  }, [enabled, three])
+
+  useEffect(() => {
+    if (!three || seaMaterial) return
+    setSeaMaterial(
+      new three.MeshPhongMaterial({
+        color: new three.Color(SEA),
+        emissive: new three.Color("#0a4356"),
+        emissiveIntensity: 0.85,
+        shininess: 18,
+        specular: new three.Color("#7fd4de"),
+        // Opaque on purpose: a see-through sphere lets the far side of the
+        // planet bleed through to the near side.
+        transparent: false,
+        opacity: 1,
+      }),
+    )
+  }, [three, seaMaterial])
 
   // ─── Indexes ───────────────────────────────────────────────────────
 
@@ -300,60 +324,57 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     return pinsRef.current
   }, [nextPins])
 
+  // ─── Boot: should this device run WebGL at all? ─────────────────────
+
+  useEffect(() => {
+    if (prefersReducedMotion()) setSpinning(false)
+    if (canAutoStartGlobe()) {
+      // Let the hero, the fonts and hydration finish first. The poster is
+      // already on screen, so there is nothing to look at in the meantime.
+      whenIdle(() => setEnabled(true), 900)
+    } else {
+      setGated(true)
+    }
+  }, [])
+
   // ─── Load the country outlines ─────────────────────────────────────
 
-  /**
-   * world-atlas folds French Guiana INTO France's polygon (its landmass is
-   * one of France's MultiPolygon parts), so the whole region used to tint and
-   * click as France. Detach it at load time: pull the South-American polygon
-   * out of France and present it as its own feature — sand, "No report yet" —
-   * exactly like every other country we haven't reported on. Works for any
-   * topology file, because it uses the real geometry.
-   */
+  // The first render is 110m: 108 KB rather than 756 KB, and it starts at the
+  // same time as the three.js chunk instead of after it. Both downloads used
+  // to run in series — topology, then the renderer.
   useEffect(() => {
+    if (!enabled) return
     let alive = true
-    fetch("/geo/countries-50m.json")
-      .then((r) => r.json())
-      .then((topo: Topology<{ countries: GeometryCollection }>) => {
-        if (!alive) return
-        const fc = feature(topo, topo.objects.countries) as unknown as { features: Feat[] }
-        const feats = fc.features as Poly[]
-
-        // French Guiana is already its own feature? Nothing to do.
-        if (!feats.some((f) => String(f.id) === "254")) {
-          const france = feats.find((f) => String(f.id) === "250")
-          if (france) {
-            const geom = (france as unknown as { geometry: { type: string; coordinates: unknown } }).geometry
-            const polys =
-              geom.type === "MultiPolygon"
-                ? (geom.coordinates as unknown[][][])
-                : ([geom.coordinates] as unknown as unknown[][][])
-            // France's part that sits in South America is French Guiana.
-            const guyanese = polys.filter((p) =>
-              p[0].some((c) => (c as number[])[1] < 10 && (c as number[])[0] < -50)
-            )
-            if (guyanese.length) {
-              for (const p of guyanese) {
-                feats.push({
-                  type: "Feature",
-                  id: "254",
-                  properties: { name: "French Guiana" },
-                  geometry: { type: "Polygon", coordinates: p },
-                } as unknown as Poly)
-              }
-              if (geom.type === "MultiPolygon") {
-                ;(geom.coordinates as unknown[][][]) = polys.filter((p) => !guyanese.includes(p))
-              }
-            }
-          }
-        }
-        setPolys(feats)
+    loadCountryFeatures("/geo/countries-110m.json")
+      .then((feats) => {
+        if (alive) setPolys(feats as Poly[])
       })
-      .catch(() => setPolys([]))
+      .catch(() => {
+        if (alive) setPolys([])
+      })
     return () => {
       alive = false
     }
-  }, [])
+  }, [enabled])
+
+  // Only when the camera is close enough for coastlines to matter. Once.
+  useEffect(() => {
+    if (!enabled || detailedRef.current || pov.altitude > 1.05) return
+    detailedRef.current = true
+    let alive = true
+    whenIdle(() => {
+      loadCountryFeatures("/geo/countries-50m.json")
+        .then((feats) => {
+          if (alive) setPolys(feats as Poly[])
+        })
+        .catch(() => {
+          /* keep the 110m outlines */
+        })
+    }, 2500)
+    return () => {
+      alive = false
+    }
+  }, [enabled, pov.altitude])
 
   // ─── Size the canvas to its container ──────────────────────────────
 
@@ -422,6 +443,38 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     document.addEventListener("visibilitychange", onVis)
     return () => document.removeEventListener("visibilitychange", onVis)
   }, [])
+
+  /**
+   * The same rule for a globe that is on the page but scrolled past. Without
+   * this, reading the index below the stage still paid for a rotating planet.
+   */
+  useEffect(() => {
+    if (!ready) return
+    const el = stageRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        const g = globeRef.current
+        if (!g) return
+        if (entry.isIntersecting && !document.hidden) g.resumeAnimation()
+        else g.pauseAnimation()
+      },
+      { threshold: 0.02 },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [ready])
+
+  /**
+   * Render at CSS resolution, not retina resolution. A 2× buffer is four
+   * times the fragments for a difference invisible on a soft-lit sphere, and
+   * it is the single easiest lever on a weak GPU.
+   */
+  useEffect(() => {
+    if (!ready) return
+    const renderer = globeRef.current?.renderer?.()
+    renderer?.setPixelRatio?.(Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO))
+  }, [ready])
 
   const flyTo = useCallback((lat: number, lng: number, alt = 0.85) => {
     setSpinning(false)
@@ -583,7 +636,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
     <div className="globe-stage relative h-[min(86vh,860px)] w-full">
       {/* ── The planet ── */}
       <div ref={stageRef} className="absolute inset-0">
-        {size.w > 0 && polys.length > 0 && (
+        {enabled && size.w > 0 && (
           /* The lazy WebGL component must sit behind its own Suspense
              boundary. Without one, every client-side navigation away from
              this page re-renders it inside React's transition, it suspends,
@@ -607,17 +660,18 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
             atmosphereColor="#ffc857"
             atmosphereAltitude={0.2}
             globeImageUrl={null}
-            globeMaterial={seaMaterial}
-            onGlobeReady={() => {
+            globeMaterial={seaMaterial ?? undefined}
+            onGlobeReady={async () => {
               setReady(true)
               // Open on the Atlantic — land on both sides, sun on the water.
               globeRef.current?.pointOfView({ lat: 22, lng: -22, altitude: 2.4 })
               // Relight it: a strong warm ambient so no hemisphere falls into
               // black, plus a low golden key from the upper right for shape.
-              const ambient = new AmbientLight(0xfff1d6, 2.5)
-              const key = new DirectionalLight(0xffd9a0, 1.5)
+              const T = three ?? (await import("three"))
+              const ambient = new T.AmbientLight(0xfff1d6, 2.5)
+              const key = new T.DirectionalLight(0xffd9a0, 1.5)
               key.position.set(1, 0.55, 0.9)
-              const rim = new DirectionalLight(0x9fe6f0, 0.75)
+              const rim = new T.DirectionalLight(0x9fe6f0, 0.75)
               rim.position.set(-1, -0.3, -0.6)
               globeRef.current?.lights([ambient, key, rim])
             }}
@@ -673,14 +727,50 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
         )}
       </div>
 
-      {/* ── Loading state ── */}
+      {/* ── Poster / loading state ──
+          The poster is a real orthographic render of the same geometry at the
+          same opening angle, painted immediately. On capable hardware it is
+          replaced by the live globe after the page goes idle; on hardware
+          that shouldn't run WebGL it stays, with an explicit way in. */}
       {!ready && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <div className="text-center">
-            <Compass className="spin-slow mx-auto text-[#ffc857]" size={30} />
-            <p className="mt-3 text-[0.78rem] font-medium tracking-wide text-[#bfe6ef]">
-              Bringing the world into view…
-            </p>
+        <div className="absolute inset-0 z-10 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/geo/globe-day.webp"
+            alt=""
+            aria-hidden
+            width={1400}
+            height={1000}
+            fetchPriority="high"
+            decoding="async"
+            className="h-full w-full object-contain object-center"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(60%_60%_at_50%_50%,transparent,rgba(4,25,33,0.38))]">
+            {gated ? (
+              <div className="pointer-events-auto px-4 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGated(false)
+                    setEnabled(true)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#ffc857] px-5 py-2.5 text-[0.86rem] font-semibold text-[#083848] shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition hover:brightness-105"
+                >
+                  <Play size={14} aria-hidden />
+                  Explore the interactive globe
+                </button>
+                <p className="mt-2.5 text-[0.72rem] text-[#cfe9ee]">
+                  The 3D globe is heavy on this device. Everything below works without it.
+                </p>
+              </div>
+            ) : (
+              <div className="text-center">
+                <Compass className="spin-slow mx-auto text-[#ffc857]" size={30} />
+                <p className="mt-3 text-[0.78rem] font-medium tracking-wide text-[#bfe6ef]">
+                  Bringing the world into view…
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -736,7 +826,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
                   </button>
                 ))}
                 {results.cities.map((p) => (
-                  <Link
+                  <Link prefetch={false}
                     key={p.path}
                     href={p.path}
                     className="flex items-center justify-between gap-2 rounded-[3px] px-2.5 py-1.5 text-[0.83rem] hover:bg-[rgba(15,155,171,0.12)]"
@@ -885,7 +975,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
                     >
                       <Crosshair size={13} />
                     </button>
-                    <Link
+                    <Link prefetch={false}
                       href={p.path}
                       className="flex min-w-0 flex-1 items-center justify-between gap-2 py-2 text-[0.84rem] hover:text-[var(--accent-deep)]"
                     >
@@ -911,7 +1001,7 @@ export function GlobeExplorer({ payload }: { payload: GlobePayload }) {
           </div>
 
           <div className="shrink-0 border-t border-[var(--hairline)] p-3">
-            <Link
+            <Link prefetch={false}
               href={`/${selected.slug}`}
               className="btn flex w-full items-center justify-center gap-1.5 py-2 text-[0.85rem]"
             >

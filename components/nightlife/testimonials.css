@@ -1,0 +1,24 @@
+.nlt-main{max-width:1120px;margin:0 auto;padding:0 36px}
+.nlt-masthead{padding:40px 0 30px;border-bottom:1px solid var(--nl-line)}
+.nlt-back{display:inline-block;margin-bottom:24px;font-family:var(--font-mono);font-size:9px;color:#7c7570}.nlt-back:hover{text-decoration:underline;text-underline-offset:3px}
+.nlt-masthead h1{margin:5px 0 12px;max-width:760px;color:var(--nl-ink);font:400 clamp(2.2rem,5vw,3.5rem)/1.02 var(--font-display),Georgia,serif;letter-spacing:-.035em}
+.nlt-deck{max-width:700px;color:#5e665f;font-size:15px;line-height:1.75}
+.nlt-note{margin-top:12px;color:#8a8379;font-family:var(--font-mono);font-size:8px;line-height:1.6;text-transform:uppercase;letter-spacing:.05em}
+.nlt-search{padding:28px 0 0}
+.nlt-controls{display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap}
+.nlt-query{flex:1;min-width:240px;max-width:560px}.nlt-query label,.nlt-city label{display:block;margin-bottom:8px;font-size:11px;color:#615955}
+.nlt-query-field{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;border:1px solid #cfc5b9;border-radius:4px;background:#fffaf2;color:#827a74}.nlt-query-field:focus-within{border-color:#776655;outline:2px solid #bba99366;outline-offset:2px}
+.nlt-query-field input{width:100%;min-width:0;background:transparent;border:0;outline:0;font-size:14px;color:#34302e;height:100%}.nlt-query-field input::placeholder{color:#948b83}.nlt-query-field button{display:flex;padding:4px;color:#716861;cursor:pointer}
+.nlt-city{width:210px}.nlt-city select{width:100%;height:48px;border:1px solid #cfc5b9;border-radius:4px;background:#fffaf2;padding:0 11px;color:#4f4742;font-size:12px}
+.nlt-tabs{display:flex;align-items:center;gap:17px;flex-wrap:wrap;border-bottom:1px solid #a99a8c;padding:22px 0 10px;margin-bottom:18px}.nlt-tabs button{font-size:12px;color:#84786e;cursor:pointer;border-bottom:1px solid transparent;padding:2px 0}.nlt-tabs button[aria-pressed=true]{color:#39312a;border-bottom-color:#6d5742}.nlt-count{margin-left:auto;font-family:var(--font-mono);font-size:9px;color:#867b72}
+.nlt-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.nlt-card{margin:0;padding:20px 20px 16px;border:1px solid #e0ddd1;border-left:3px solid #93a57d;border-radius:6px;background:#fffcf4}
+.nlt-card blockquote{margin:0;color:#2e3931;font:400 17px/1.55 var(--font-display),Georgia,serif;letter-spacing:-.01em}.nlt-card blockquote:before{content:"“";color:#a7b197}.nlt-card blockquote:after{content:"”";color:#a7b197}
+.nlt-card figcaption{margin-top:15px;padding-top:10px;border-top:1px solid #e7e3d8;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.nlt-card figcaption>a{display:inline-flex;align-items:baseline;gap:5px;color:#435b3d;font-weight:600;font-size:12px;text-decoration:none}.nlt-card figcaption>a:hover{text-decoration:underline}.nlt-card figcaption>a span{color:#8b8378;font-weight:400;font-size:9px;font-family:var(--font-mono)}
+.nlt-card figcaption>div{text-align:right}.nlt-card figcaption>div a{display:inline-flex;align-items:center;gap:3px;color:#4b6745;font-family:var(--font-mono);font-size:9px;text-decoration:underline;text-underline-offset:3px}.nlt-card figcaption small{display:block;margin-top:3px;color:#8d948a;font-family:var(--font-mono);font-size:8px}
+.nlt-positive{border-left-color:#93a57d}.nlt-mixed{border-left-color:#c6a25d}.nlt-negative{border-left-color:#c17862}
+.nlt-empty{padding:44px 20px;border:1px dashed #d3c9bc;border-radius:6px;text-align:center;color:#7d756d}.nlt-empty h3{font:400 27px/1.2 var(--font-display),Georgia,serif;color:#3b332d}.nlt-empty p{margin-top:5px;font-size:12px}.nlt-empty button{margin-top:16px;font-family:var(--font-mono);font-size:9px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.nlt-more{display:block;margin:22px auto 0;border:1px solid #cabeaf;border-radius:3px;padding:10px 18px;background:transparent;color:#625246;font-family:var(--font-mono);font-size:9px;cursor:pointer}.nlt-more:hover{background:#eee5d7}
+.nlt-footer{display:flex;flex-direction:column;gap:20px;margin-top:42px;padding-top:22px;border-top:1px solid var(--nl-line);font-size:12px}.nlt-footer>a{color:#4b6745;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:800px){.nlt-grid{grid-template-columns:1fr}.nlt-main{padding:0 22px}.nlt-masthead h1{font-size:2.4rem}.nlt-city{width:100%}.nlt-query{max-width:none}}

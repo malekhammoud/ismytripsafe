@@ -30,10 +30,17 @@ import {
   type Crumb,
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
+import { wikimediaThumb } from "@/lib/photos"
 import type { SafetySignal } from "@/lib/types"
 import { ArrowRight, SlidersHorizontal } from "lucide-react"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 120
+
+// The twelve biggest hubs are prerendered; the rest generate on demand.
+export async function generateStaticParams() {
+  const hubs = await listCountries()
+  return hubs.slice(0, 12).map((hub) => ({ country: hub.countrySlug }))
+}
 
 interface Params {
   country: string
@@ -158,7 +165,9 @@ export default async function CountryHubPage({
             meta: countryMeta,
             headline: `Is ${hub.country} Safe in ${new Date(hub.updatedAt).getFullYear()}? Travel Safety Report`,
             description: articleDescription.slice(0, 300),
-            image: countryReport.images.hero,
+            image: countryReport.images.hero
+              ? (wikimediaThumb(countryReport.images.hero, 1280) ?? countryReport.images.hero)
+              : null,
           }),
           reportDatasetNode(countryMeta),
         ]
@@ -198,7 +207,7 @@ export default async function CountryHubPage({
           q: `What is the safest place to visit in ${hub.country}?`,
           a: (
             <p>
-              Of the destinations we&apos;ve assessed, <Link href={best.path} className="font-medium text-[var(--accent-deep)] hover:underline">{best.city}</Link> currently
+              Of the destinations we&apos;ve assessed, <Link prefetch={false} href={best.path} className="font-medium text-[var(--accent-deep)] hover:underline">{best.city}</Link> currently
               scores highest at {best.score}/100 ({LEVELS[best.level].label}).
               {worst && worst.path !== best.path
                 ? ` ${worst.city} scores lowest at ${worst.score}/100.`
@@ -214,7 +223,7 @@ export default async function CountryHubPage({
           Directly from public sources: US, UK and Canadian government advisories, World
           Bank and UNODC crime statistics, WHO health data, live air-quality, disaster
           and earthquake feeds — plus AI field research over current local reporting.{" "}
-          <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
+          <Link prefetch={false} href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
             Read the full methodology
           </Link>
           .
@@ -234,7 +243,7 @@ export default async function CountryHubPage({
           {/* The one action on the page — big, orange, and explicit. Personalisation
               is the whole point of the checker, and it starts the interactive flow
               with this country pre-filled. */}
-          <Link
+          <Link prefetch={false}
             href={`/?place=${encodeURIComponent(hub.country)}`}
             className="group mt-4 flex items-center gap-3.5 rounded-[14px] bg-[var(--orange-deep)] px-5 py-4 transition-transform hover:-translate-y-0.5 hover:bg-[#c03f21]"
             style={{
@@ -346,7 +355,7 @@ export default async function CountryHubPage({
                   <RankedCityList items={hub.cities} />
                   <p className="mt-4 text-[0.82rem] text-[var(--ink-soft)]">
                     Missing a place?{" "}
-                    <Link href="/" className="font-medium text-[var(--accent-deep)] hover:underline">
+                    <Link prefetch={false} href="/" className="font-medium text-[var(--accent-deep)] hover:underline">
                       Generate its report in about a minute
                     </Link>
                     .
@@ -386,7 +395,7 @@ async function RegionLinks({ currentSlug, region }: { currentSlug: string; regio
       <SectionHeading>{sameRegion.length ? `More of ${region}` : "Other countries"}</SectionHeading>
       <div className="mt-3.5 flex flex-wrap gap-2">
         {items.map((c) => (
-          <Link
+          <Link prefetch={false}
             key={c.countrySlug}
             href={`/${c.countrySlug}`}
             className="card px-3.5 py-2 text-[0.84rem] font-medium text-[var(--ink)] transition-shadow hover:shadow-[var(--shadow-float)]"

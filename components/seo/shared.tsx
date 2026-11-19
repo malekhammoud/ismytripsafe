@@ -47,7 +47,7 @@ export function Breadcrumbs({ trail }: { trail: Crumb[] }) {
             {i === trail.length - 1 ? (
               <span aria-current="page" className="font-medium text-[var(--ink-soft)]">{c.name}</span>
             ) : (
-              <Link href={c.href} className="hover:text-[var(--accent)]">{c.name}</Link>
+              <Link href={c.href} prefetch={false} className="hover:text-[var(--accent)]">{c.name}</Link>
             )}
           </li>
         ))}
@@ -228,6 +228,7 @@ export function RankedCityList({ items }: { items: ReportMeta[] }) {
         <Link
           key={m.path}
           href={m.path}
+          prefetch={false}
           className="group flex items-center gap-3 py-3 sm:gap-4"
           style={{ borderTop: i === 0 ? undefined : `1px solid ${HAIR}` }}
         >
@@ -284,7 +285,7 @@ export function FaqList({ items }: { items: { q: string; a: React.ReactNode }[] 
  */
 export function ReportLink({ meta, anchor }: { meta: ReportMeta; anchor?: string }) {
   return (
-    <Link
+    <Link prefetch={false}
       href={meta.path}
       className="card flex items-center justify-between gap-3 py-3 pl-3 pr-4 transition-shadow hover:shadow-[var(--shadow-float)]"
     >

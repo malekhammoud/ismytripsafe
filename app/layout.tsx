@@ -37,7 +37,10 @@ const display = Instrument_Serif({
 const text = Newsreader({
   variable: "--font-text-src",
   subsets: ["latin"],
-  style: ["normal", "italic"],
+  // Italic is only used for a handful of fine-print notes. The italic face is
+  // 144 KB — more than the rest of the type combined — so the browser
+  // synthesises the oblique instead and the budget goes to the reading face.
+  style: ["normal"],
   axes: ["opsz"],
   display: "swap",
 })
@@ -79,15 +82,34 @@ export default function RootLayout({
     >
       {/* TravelPayouts Drive monetization loader — the exact snippet supplied
           by the network: an async self-appending <script> for emrldtp.cc.
-          Remove this <script> block to turn it off. */}
+          Remove this <script> block to turn it off.
+
+          It used to append that script during head parse, so a third-party
+          download and its main-thread work raced the hero image, the fonts
+          and hydration. It now waits for the page's `load` event and an idle
+          slot — or for the first real interaction, whichever comes first. */}
       <script
         dangerouslySetInnerHTML={{
           __html: `(function () {
-  var script = document.createElement("script");
-  script.async = 1;
-  script.setAttribute("data-cmp-ab","2");
-  script.src = 'https://emrldtp.cc/NTgzNjQ3.js?t=583647';
-  document.head.appendChild(script);
+  var loaded = false;
+  function load() {
+    if (loaded) return;
+    loaded = true;
+    var script = document.createElement("script");
+    script.async = 1;
+    script.setAttribute("data-cmp-ab","2");
+    script.src = 'https://emrldtp.cc/NTgzNjQ3.js?t=583647';
+    document.head.appendChild(script);
+  }
+  function arm() {
+    if ("requestIdleCallback" in window) requestIdleCallback(load, { timeout: 5000 });
+    else setTimeout(load, 4000);
+  }
+  if (document.readyState === "complete") arm();
+  else window.addEventListener("load", arm, { once: true });
+  ["pointerdown", "keydown", "scroll"].forEach(function (event) {
+    window.addEventListener(event, load, { once: true, passive: true });
+    });
 })();`,
         }}
       />

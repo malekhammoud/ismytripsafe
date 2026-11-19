@@ -11,6 +11,7 @@ import type {
 } from "./types"
 
 type Status = "idle" | "loading" | "done" | "error"
+let activeRequest: AbortController | null = null
 
 interface ReportState {
   status: Status
@@ -49,7 +50,9 @@ export const useReport = create<ReportState>((set, get) => ({
   cached: false,
   reportPath: null,
 
-  reset: () =>
+  reset: () => {
+    activeRequest?.abort()
+    activeRequest = null
     set({
       status: "idle",
       query: null,
@@ -62,12 +65,18 @@ export const useReport = create<ReportState>((set, get) => ({
       error: null,
       cached: false,
       reportPath: null,
-    }),
+      generatedAt: "",
+    })
+  },
 
   run: async (q: SafetyQuery) => {
     // Ignore a duplicate submit for the same place while one is in flight.
     if (get().status === "loading" && get().query?.place === q.place) return
 
+    activeRequest?.abort()
+    const controller = new AbortController()
+    activeRequest = controller
+    const current = () => activeRequest === controller && !controller.signal.aborted
     set({
       status: "loading",
       query: q,
@@ -92,16 +101,21 @@ export const useReport = create<ReportState>((set, get) => ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(q),
+        signal: controller.signal,
       })
+      if (!current()) return
+      if (!res.ok) throw new Error(res.status === 429 ? "Too many reports were requested at once. Please wait a minute and try again." : "The research service is temporarily unavailable. Please try again.")
+      if (!res.headers.get("content-type")?.includes("text/event-stream")) throw new Error("The research service returned an unexpected response. Please try again.")
       if (!res.body) throw new Error("No response stream")
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buf = ""
+      let completed = false
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, { stream: true })
+        if (!current()) { await reader.cancel(); return }
+        buf += done ? decoder.decode() + "\n" : decoder.decode(value, { stream: true })
         const lines = buf.split("\n")
         buf = lines.pop() ?? ""
         for (const line of lines) {
@@ -134,9 +148,11 @@ export const useReport = create<ReportState>((set, get) => ({
               set((s) => ({ queries: [...s.queries, ev.query] }))
               break
             case "error":
+              completed = true
               set({ error: ev.message, status: "error" })
               break
             case "done":
+              completed = true
               set((s) => ({
                 status: s.status === "error" ? "error" : "done",
                 cached: ev.cached ?? false,
@@ -151,11 +167,14 @@ export const useReport = create<ReportState>((set, get) => ({
               break
           }
         }
+        if (done) break
       }
+      reader.releaseLock()
+      if (!completed) throw new Error("The connection ended before the report finished. Please try again.")
     } catch (err) {
-      set({ error: String(err), status: "error" })
+      if (current()) set({ error: err instanceof Error ? err.message : "The report could not finish. Please try again.", status: "error" })
     } finally {
-      set((s) => (s.status === "loading" ? { status: "done" } : {}))
+      if (activeRequest === controller) activeRequest = null
     }
   },
 }))

@@ -18,9 +18,15 @@ worktree build recipe.
   `/usr/local/bin/ismytripsafe-deploy.sh` (`git reset --hard origin/main`,
   `npm install`, `npm run build`, `systemctl restart ismytripsafe`).
   Watch `/var/log/ismytripsafe-deploy.log` for `deploy OK`.
-- **Beta:** `git push origin main:beta` (or push the beta branch) → the same
-  pipeline against `origin/beta` in `/opt/ismytripsafe-beta`, restarting
+- **Beta:** `git push origin beta` (or `main:beta`) → the same pipeline
+  against `origin/beta` in `/opt/ismytripsafe-beta`, restarting
   `ismytripsafe-beta`; log at `/var/log/ismytripsafe-beta-deploy.log`.
+- **Nightlife env is build-time.** `/nightlife` and `/nightlife/testimonials`
+  are prerendered, so `NIGHTLIFE_INDEXABLE`, `NIGHTLIFE_SITE_URL` and
+  `NIGHTLIFE_CACHE_DIR` must be present for `npm run build`, not only in the
+  service unit. Both deploy scripts export them; production uses
+  `NIGHTLIFE_SITE_URL=https://ismytripsafe.com` and `NIGHTLIFE_INDEXABLE=1`.
+  Beta uses the production URL for canonicals and `NIGHTLIFE_INDEXABLE=0`.
 
 Ports: 3000 prod, 3002 beta, 3001 whatgradsmake. 3003–3005 are free for
 worktree previews. **Outley** (`/opt/outley`, ports 3200/3400/8200) is a
@@ -32,14 +38,18 @@ Beta is currently a **public mirror** (the deploy script writes
 `app/robots.ts`, `app/layout.tsx` and `components/beach/BetaRibbon.tsx`
 already honour it.
 
-## Beta branch — nightlife reports
+## Nightlife reports (on production)
 
-`origin/beta` carries the Nightlife Report feature (not on prod): pages at
+The feature now lives on both `main` and `origin/beta`: pages at
 `/{country}/{city}/nightlife`, pipeline in `lib/nightlife/*`, batch entry
-`scripts/nightlife.cjs`, worker under `workers/nightlife/`. Records live in
-`/var/lib/ismytripsafe/nightlife` (`NIGHTLIFE_CACHE_DIR`): `outcome: limited`
-publishes with a "Limited data" label, `withheld` publishes nothing.
-Promoting it to prod is a deliberate merge into `main`.
+`scripts/nightlife.cjs`, worker under `workers/nightlife/`, and the request
+intake at `/api/nightlife/request` (form on `/nightlife`). Records are shared
+at `/var/lib/ismytripsafe/nightlife` (`NIGHTLIFE_CACHE_DIR`): `outcome:
+limited` publishes with a "Limited data" label, `withheld` publishes nothing.
+Production is canonical; beta points `NIGHTLIFE_SITE_URL` at
+`https://ismytripsafe.com` and keeps `NIGHTLIFE_INDEXABLE=0` so the two hosts
+do not compete. The nightly refresh still runs from the beta checkout against
+the shared cache.
 
 ## Design system
 
@@ -60,6 +70,7 @@ beach.
 **Location integrity** — `node scripts/check-locations.mjs` after changing
 `lib/data/geo.ts` or running a batch pregeneration.
 
+
 ## Traps this site has already hit — don't undo these
 
 - **Never set React state from `onZoom` unsnapped.** It fires every animation
@@ -73,3 +84,32 @@ beach.
   loop eats the whole main thread — measured at 1 fps — and React never gets
   the idle slice it needs to commit a navigation, so *every link on the page
   stops working*. Pausing first hands the thread back.
+
+## Performance invariants — don't undo these
+
+- **The globe does not mount itself on a software renderer.**
+  `lib/globe-runtime.ts` probes WebGL, rejects SwiftShader/llvmpipe, Save-Data
+  and <4 cores, and shows the poster with an explicit button instead. On a
+  normal GPU it mounts after idle. Measured cost of mounting
+  unconditionally on a software renderer: a **90-second main-thread task**.
+- **110m geometry first, 50m only when zoomed.** `lib/globe-geo.ts` loads
+  `countries-110m.json` (108 KB) with the renderer in parallel; the 756 KB
+  50m file is fetched once the camera crosses `altitude <= 1.05`. The old
+  order was 50m first and the renderer after — serial, and seven times the
+  vertices.
+- **Every Wikimedia image goes through `sized()` / `wikimediaThumb()`.** They
+  strip `?utm_…` before matching. A query string used to defeat the resize
+  and fetch 2 MB originals for 1,043 of 1,424 heroes.
+- **The postcards use the `-480.webp` / `-960.webp` variants**, not the JPEG
+  art drop. `scripts/build-photo-variants.mjs` makes them; the home page must
+  not go back to eleven eager 960px JPEG preloads (1.2 MB before first paint).
+- **No block of `prefetch` on navigation.** Next fired 5–11 redundant RSC
+  requests per page (the testimonials page six times, every related card,
+  every self-link). With ISR a click is a cached route; leave
+  `prefetch={false}` on links.
+- **Pages are ISR, with a small seed.** `revalidate` is 60–300s, and the city
+  and country routes have `generateStaticParams` seeds so on-demand ISR
+  actually caches the rest. Re-adding `force-dynamic` to the home page,
+  destinations or reports gives back the per-request render.
+- **Nightlife city pages stay `force-dynamic`.** They render live on-demand
+  research state; the rest of the nightlife surface is cached.

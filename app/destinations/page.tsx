@@ -6,7 +6,7 @@ import { breadcrumbNode, graph, organizationNode, websiteNode } from "@/lib/seo/
 import { Breadcrumbs, SectionHeading, SeoFooter, SiteHeader } from "@/components/seo/shared"
 import { GlobeExplorer } from "@/components/globe/GlobeExplorer"
 
-export const dynamic = "force-dynamic"
+export const revalidate = 120
 
 export async function generateMetadata(): Promise<Metadata> {
   const year = new Date().getFullYear()
@@ -156,7 +156,7 @@ export default async function DestinationsPage() {
           <div className="deckle" aria-hidden />
           <p className="mt-6 text-center text-[0.9rem] leading-relaxed text-[var(--ink-soft)]">
             Don&apos;t see your destination on the globe?{" "}
-            <Link href="/" className="font-semibold text-[var(--accent-deep)] hover:underline">
+            <Link href="/" prefetch={false} className="font-semibold text-[var(--accent-deep)] hover:underline">
               Generate its report in about a minute
             </Link>
             {updatedAt && <> · last refresh {humanDate(updatedAt)}</>}

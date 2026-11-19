@@ -33,5 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: m.updatedAt,
     }))
 
+  // Nightlife has its own sitemap and canonical origin (/nightlife/sitemap.xml)
+  // so a beta nightlife URL never leaks into production's safety sitemap.
   return [...staticPages, ...countryPages, ...cityPages]
 }

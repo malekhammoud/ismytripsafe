@@ -1,0 +1,449 @@
+# Nightlife reports — beta release
+
+This feature belongs to `/opt/ismytripsafe-beta`, served by
+`ismytripsafe-beta.service` on port 3002. Do not deploy it to `main` /
+production; the branch targets `origin/beta`. Use an explicit `HEAD:beta` push.
+
+## Routes and design
+
+- `/nightlife`: night-sky globe of published city guides plus the searchable
+  directory and a server-rendered index of every published report. City lights
+  are sized by mapped venue count and coloured by nightlife score; countries
+  are tinted by their average score. Clicking a country opens its guides, and
+  clicking a light opens the city report.
+- `/nightlife/testimonials`: searchable index of every attributed traveler
+  quote by text, city and tone. The first 24 results are server-rendered; the
+  full 403-quote set is filtered client-side.
+- `/{country}/{city}/nightlife`: sourced, server-rendered report, including a
+  **What people are saying** section.
+- `/{country}/{city}/nightlife/data.json`: ODbL venue export, excluding all
+  proprietary ratings, popularity, review counts, tips, and sentiment labels.
+- Existing city safety pages start nightlife research on a real browser visit and show a teaser even before the first report qualifies.
+- Published nightlife pages link back to safety and to the nearest available
+  nightlife reports. Withheld cities never get a scored report, directory card, data export, or sitemap URL. Known cities can show a noindex research/availability screen while data is being gathered.
+
+The evening palette uses charcoal/plum, lime, and the existing paper/serif
+identity. Five accessible star cards, each with a precise numeric value, lead
+into a jump nav, a by-the-numbers table, the venue mix, a filterable map
+(with a text list), neighbourhood clusters, good-to-know notes, a documented
+three-stop night plan, shortlist, late hours, events, beer, traveler themes,
+safety, answered questions, and a source ledger. Every published report now
+has five non-null scores.
+
+Every report also carries a **What people are saying** section: short,
+attributed excerpts from Wikivoyage travel guides and public travel articles,
+with source links and a publication date when available. The collector uses
+the keyless Wikivoyage API, slices the Drink/Nightlife section including
+neighbourhood subsections, reads listing `content` fields when a section has
+only templates, and falls back to the country guide for small places. Reddit,
+TripAdvisor, Yelp and booking sites are deliberately excluded. Testimonials
+are context, not score inputs; a missing quote is recorded as no suitable
+public excerpt rather than invented. `node scripts/nightlife.cjs
+--testimonials-all` recomputes them without refetching venue data.
+
+Quality and Vibe use licensed ratings and enough independent traveler mentions
+when those sources exist. Without them, the report uses a labelled **Editorial
+estimate**: Quality combines effective venue types, late-night opening,
+mapped density and published listing detail; Vibe combines after-2am and
+after-4am opening shares, the nightlife venue mix, density and late venue
+volume. These are transparent editorial indices, never customer-rating or
+review averages. `FORMULA_VERSION=nightlife-v1.1-editorial`;
+`node scripts/nightlife.cjs --rescore-all` regenerates every published report
+without refetching upstream sources.
+
+If Wikidata has no single city boundary (or points at a road route), OSM
+`is_in()` selects the enclosing administrative/local-authority area and the
+report explicitly says so. The fallback preserves the city's own population
+when it exists, otherwise uses the area population from OSM or Wikidata.
+Scenes with three to nine mapped venues publish as limited **small-scene**
+reports with a small-scene Variety estimate and a visible "Limits" note;
+fewer than three venues still withholds. This keeps every supported city
+publishable without pretending a three-venue map is a complete scene. Booking content stays absent until there are actual links; it never affects ratings. Half-star icons
+accompany precise numeric subscores; the overall displays one decimal.
+
+The `/nightlife` globe is deliberately its own night palette: a near-black
+ocean, violet atmosphere, faint country score wash, and warm city lights that
+twinkle and grow with venue count. It has no per-frame React state (the
+safety globe's stamped point-of-view rule still applies), labels only the
+largest scenes until a country is opened, and pauses its render loop when a
+link is clicked or the tab is hidden.
+
+Nightlife is **indexable on beta** for the SEO pilot. The
+`deploy/ismytripsafe-beta-nightlife-seo.conf` drop-in sets
+`NIGHTLIFE_INDEXABLE=1` and `NIGHTLIFE_SITE_URL=https://beta.ismytripsafe.com`.
+Nightlife pages have their own canonical sitemap at
+`https://beta.ismytripsafe.com/nightlife/sitemap.xml`, advertised in
+`robots.txt`; they never leak into the production safety sitemap. Production
+stays noindex until the feature is deliberately merged into `main`.
+
+## Storage and generation
+
+`NIGHTLIFE_CACHE_DIR` defaults to `/var/lib/ismytripsafe/nightlife`. This is
+separate from the shared safety report store. The worker reads safety reports;
+it never generates, refreshes, or writes them.
+
+```
+reports/<safety-cache-key>.json   full record, inputs, source dates, score reasons
+index/<safety-cache-key>.json     small directory/peer/sitemap metadata
+lookup/<country>/<city>.json     direct route lookup, no corpus scan
+raw/<safety-cache-key>/*.json     source responses, fetch dates, private
+last-run.json                    job results and source failures
+```
+
+Writes use temporary files + atomic rename. Raw API keys and request headers
+are never persisted. External-source failures preserve a previous valid raw
+response and its original timestamp. A source failure cannot replace a
+published report with a withheld one or reduce its score coverage.
+
+The root `npm install` now installs the pinned opening-hours worker automatically through `postinstall`, including during beta deployment. Its dependency scripts are disabled. For an existing install made with `--ignore-scripts`, install it explicitly before generating:
+
+```sh
+cd /opt/ismytripsafe-beta
+npm install --prefix workers/nightlife --no-audit --no-fund
+npm run nightlife -- --test-batch
+npm run nightlife -- --audit
+npm run nightlife -- ge_tbilisi
+npm run nightlife -- ge_tbilisi --rescore
+npm run nightlife -- ge_tbilisi --events-only
+npm run nightlife -- --refresh-due
+```
+
+The worker loads Next's local environment files through `@next/env` and also
+accepts ordinary process environment variables. API source credentials are
+server-only. `--force` bypasses raw-source TTLs. `--rescore` recomputes stored
+inputs without calling external APIs. City resolution requires an existing
+city safety report, then matches Wikidata by settlement/administrative type (P31/P279), label/alias, country ISO code, and coordinates. Exact city labels outrank aliases; nearby landmarks are excluded. Resolution caches carry a version so a corrected resolver never reuses an old wrong-city match. It reads the latest dated, nondeprecated population and
+supports year-only and month-only dates without inventing a day, and excludes population claims for only part of a city. The OSM administrative relation must identify the same Wikidata item. If P402 is absent, the adapter can find a unique administrative relation tagged with that item; it never substitutes a radius for a boundary.
+Unverified boundaries/populations do not produce density scores.
+
+### Wikidata availability and visitor requests
+
+The October 20 beta logs showed repeated generic `HTTP 503` lookup failures.
+The old HTTP helper also converted MediaWiki's HTTP 200 `maxlag` response into
+that same error, so those historical logs cannot distinguish replication lag
+from an actual HTTP 503. The helper now preserves the real HTTP status, API
+error code, lookup operation and requested retry time. It reads at most 8 KiB
+of an error body to extract the code; response bodies and credentials never
+enter public status or logs.
+
+Visitor-triggered research uses interactive Wikidata requests without
+`maxlag`; CLI and scheduled requests retain `maxlag=5`, following
+[MediaWiki's documented distinction](https://www.mediawiki.org/wiki/Manual:Maxlag_parameter).
+Both modes keep the bounded retry, descriptive User-Agent and source cache.
+HTTP 200 API errors obey `Retry-After` too. Job cooldowns never shorten an
+upstream retry time longer than the normal ten-minute cooldown. Explicit retry
+times from the required Wikidata/OSM sources also cover other cities, across
+processes, without spending another attempt or blocking fresh saved reports.
+
+If search/entity reads fail with a service or transport error, the resolver
+can obtain a candidate ID from Wikipedia's summary API and read it through
+[Wikidata's linked-data interface](https://www.wikidata.org/wiki/Wikidata:Data_access).
+This fallback makes sequential reads, is capped at 12 entities, and applies
+the same settlement type, name, country and coordinate validation. A nearby
+station, an ambiguous page or a same-name city in another country cannot
+qualify. Wikipedia prose is neither stored nor used for population or scores.
+The source note identifies successful linked-data resolution. Access denials,
+rate limits, `maxlag`, `readonly` and explicit requests to wait do not trigger
+alternate-interface requests. Verified cached source data still survives an
+outage with its original date.
+
+Regression coverage includes visitor versus batch request parameters, both
+search and entity outages, full pipeline recovery, country/station rejection,
+HTTP 200 and 503 error documents, oversized bodies, rate limits and persisted
+retry times. These use controlled fixtures; they do not substitute for a
+successful live-source pilot after deployment.
+
+The pilot is Budapest, London, Tbilisi, Shkoder, Gdansk, and Luang Prabang.
+It spans a major nightlife destination, a megacity, and smaller/less-covered
+places. Before scaling, inspect boundary identity, population year, OSM
+coverage, duplicate matches, category counts, rating coverage, and each
+publication outcome. Density's initial cut-offs and Quality's cut-offs are
+**provisional**, not empirically calibrated. Do not claim this pilot has been
+calibrated until a live-source run has succeeded and been reviewed.
+
+The default Overpass endpoint is now `https://overpass.openstreetmap.fr/api/interpreter`. The previous defaults, `overpass.private.coffee` and `overpass-api.de`, were both unreachable from the application host: the first consumed a 35-second timeout on every cold city, the second refused the connection, and every report in that window failed. The French instance answers the same city query in roughly 3-25 seconds. The client can fall back once to `https://overpass.private.coffee/api/interpreter` after a connection failure, request timeout, or generic HTTP 500/502/503. It never switches on 429, 504 resource-admission refusals, explicit `Retry-After`, query errors or partial data. The successful endpoint is remembered for ten minutes so a dead primary is not retried for every city. An explicit `OVERPASS_URL` has no automatic public fallback; configure `OVERPASS_FALLBACK_URL` deliberately (an empty value disables it). Both variables accept comma-separated endpoint lists.
+
+Public Overpass runs are capped at 25 cities per batch invocation and 50 on-demand attempts per day, including when a public endpoint is configured explicitly or used as a fallback. Keep the single-worker limit and configure a dedicated endpoint before scaling. Larger jobs must configure private/commercial `OVERPASS_URL` and optional `OVERPASS_FALLBACK_URL` endpoints or replace the adapter with a regional extract. The provided systemd service uses `flock` for one worker. The daily timer only checks due data: venues/ratings/mentions monthly, events weekly, population and prices every 180 days. Copy the two `deploy/ismytripsafe-nightlife-beta.*` units to systemd and enable the timer on the host only after a successful pilot. No timer is enabled by this code.
+
+### November 18 reliability and latency pass
+
+Cold reports used to make two sequential Overpass requests (boundary, then venues) and could spend 35 seconds timing out against the dead default before falling back. Collection now makes one combined request: verify the boundary relation, map it to a searchable area, fetch the exact venue union, and require the final per-type count to match. The complete Berlin report went from a timeout/withheld outcome to about 15 seconds end to end; Gdansk, Belgrade, London, New York, Johannesburg, Paris, Tokyo and Bangkok were also exercised live.
+
+Boundary matching now understands `ceremonial`, `political` and `statistical` city relations (Greater London is a ceremonial county) and can use a verified parent municipality relation when a city such as Johannesburg has no P402 of its own. Name matching accepts settlement wrappers such as "New York City" for the seed "New York" without turning "Kansas City" into Kansas. Cities with no verifiable boundary still withhold rather than inventing one.
+
+Optional sources now start in parallel with Wikidata/OSM, and the interactive research deadline is 90 seconds. The map receives a capped, tag-free sample of at most 600 venues; the full ODbL list stays in `/{country}/{city}/nightlife/data.json`. A retained source error is disclosed on the saved report but no longer forces a rebuild on every visit; the normal data-age schedule is the retry clock.
+
+`node scripts/nightlife.cjs --tier1 --limit=25` warms missing TIER1 destinations that have a safety report. `--refresh-due` remains the nightly refresh entry point.
+
+### October 21 venue-fetch recovery (superseded by the combined query above)
+
+The two-request design below is retained as history. The November 18 pass
+replaced it with one combined request because the sequential boundary/venue
+lookups doubled the exposure to a slow Overpass server.
+
+The deployed Johannesburg job resolved Wikidata successfully but timed out
+twice fetching OSM. The collector previously requested full boundary geometry
+and venues together, then repeated that request on the same endpoint: two
+65-second timeouts plus a 30-second delay. Those logs cannot establish whether
+the underlying problem was connectivity, server load or query execution.
+
+Collection now uses a small boundary/area lookup (15-second query budget,
+35-second client deadline), followed by an exact-tag venue union (25/45
+seconds). Requests reserve 64 MiB rather than the default 512 MiB. The
+boundary must match the Wikidata item, and its generated Overpass area must
+exist. Venue output includes node coordinates and way/relation centers; the
+area marker and final per-type count must agree with the returned records.
+Missing areas, partial queries and truncated lists never become zero-venue
+ratings. Full boundary geometry is only requested for licensed Foursquare
+clipping and has its own 25-second budget; failure keeps the complete OSM
+list and limits Foursquare merging to matched OSM venues.
+
+The raw cache stores boundary, venue and optional geometry responses plus
+provider/operation/fetch timestamps. Cache identity and pipeline versions
+invalidate old collector results and failed-job cooldowns. Failure diagnostics
+include stage, safe provider hostname, duration and underlying network error
+code when available; request credentials are omitted. Explicit provider retry
+times still propagate to the shared cooldown.
+
+Contracts checked against the [operator's terms](https://overpass.private.coffee/),
+[Overpass resource/admission rules](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html),
+[area semantics](https://dev.overpass-api.de/overpass-doc/en/full_data/area.html)
+and [output formats](https://dev.overpass-api.de/overpass-doc/en/targets/formats.html).
+Public services are a small beta pilot dependency, not the scaling plan.
+
+Run a real browser-equivalent generation check after deployment:
+
+```sh
+npm run check:nightlife -- --generate --wait-for-deploy germany/berlin
+npm run check:nightlife -- --generate georgia/tbilisi
+```
+
+`--generate` is opt-in and restricted to beta (or beta/preview localhost ports).
+It waits for the expected `X-Nightlife-Pipeline` header, starts the existing
+visitor job, checks progress, then verifies report sections, noindex, export,
+safety crosslink and assets. It fails on source errors or withheld reports,
+including an old saved report served after a failed refresh. Without
+`--generate`, the check remains read-only. Passing unit fixtures/builds is
+not a substitute for this live check; do not report live recovery until it
+succeeds.
+
+## Score contracts
+
+All values retain full calculation precision. The overall is the unweighted
+mean of available subscores, never a weighted commercial recommendation.
+
+- Density: venues/population × 100,000. Peer percentile within under-100k,
+  100k–under-500k, 500k–under-2M, and 2M+ bands, only after 20 other published
+  cities exist in the band. Ties receive half credit. Until then use the
+  openly labelled provisional scale: 0→1, 5→1.5, 15→2, 30→3, 60→4, 100→5,
+  linearly interpolated. Never claim a measured percentile on this scale.
+- Quality: at least eight venues with finite 0–10 rating, vote count, and
+  0–1 popularity. Select up to 20 by popularity; adjusted rating is
+  `(votes × rating + 20 × city mean) / (votes + 20)`. Median adjusted rating
+  maps 6.5→1, 7→2, 7.5→3, 8→4, 8.5→5, interpolated and clamped. Missing
+  popularity or votes is not fabricated.
+- Variety: effective types `exp(-sum(p log p))`, excluding Other. At least
+  ten classified venues. Under 2 types→1 star, 2–under 3→2, 3–under 4.5→3,
+  4.5–under 6→4, 6+→5. Each venue has one type from `VENUE_TYPES`.
+- Vibe: at least ten relevant mentions within three years and at least four
+  independent groups. Last-year weight 1, older weight .5. Water filling
+  caps every thread/article at 25% of total weight. Reddit comments group
+  with their thread; tracking parameters cannot split a blog article.
+  `stars = 1 + 4 × (positive + .5 × mixed) / weighted total`.
+- Safety: 40% published city safety index, 40% walking-after-dark signal,
+  20% existing traveler **safety** sentiment. Missing components are removed
+  and weights renormalized. Existing advisory caps apply after weighting.
+  0–20→1, >20–40→2, >40–60→3, >60–80→4, >80–100→5. District guidance
+  is shown separately: the report does not falsely claim measured district
+  crime rates or that a venue cluster is safe because it is busy.
+
+All five computable → full. One or two missing, at least ten venues → limited,
+with the available denominator stated. Fewer than ten venues or three missing
+→ withheld, logged with reasons. Unknown data never becomes a zero star score.
+
+Opening times and events/beer prices never enter any score. Opening hours
+are interpreted by `opening_hours`, not a hand-built regex parser. The
+known-hours denominator excludes missing, invalid, and conditional schedules.
+It samples local wall-clock 00:01, 02:01, and 04:01 across a reference week,
+showing the share open on at least one sampled night. No library means an
+explicit unavailable section, not fabricated hours.
+
+## Source contracts and licensing check (19–20 October 2026)
+
+These links were checked before implementation. They describe API contracts,
+not evidence that this account has a paid licence. Optional sources stay off
+until the account's entitlements and intended storage/analysis rights are set.
+
+| Source | Adapter and licensing boundary |
+| --- | --- |
+| [OSM / Overpass](https://wiki.openstreetmap.org/wiki/Overpass_API) | Administrative area query of nodes/ways/relations for bar, pub, nightclub, biergarten, music_venue; restaurant only with bar=yes. Keep real coordinates, name, hours, useful tags. Skip closed/disused places. Full boundary geometry clips unmatched FSQ places; if geometry is incomplete, only matched OSM records are enriched. Public services are for small workloads. |
+| [OSM copyright](https://www.openstreetmap.org/copyright) | © OpenStreetMap contributors, ODbL 1.0 attribution on maps/figures and a downloadable OSM-derived database. Preserve source tags in export; do not relicense proprietary FSQ fields as OSM. |
+| [Wikidata](https://www.wikidata.org/wiki/Wikidata:Data_access) | CC0 structured claims: P1082 dated population, P625 coordinates, P17/P297 country validation, P402 relation. No Wikipedia prose used in scores. |
+| [Foursquare current search](https://docs.foursquare.com/fsq-developers-places/reference/place-search) | New `https://places-api.foursquare.com/places/search`, Bearer auth, `X-Places-Api-Version: 2025-06-17`, current `fsq_category_ids`, `fsq_place_id`, latitude/longitude. Request rating, popularity, price, stats and location. [Legacy V3 deprecated May 2026](https://docs.foursquare.com/developer/reference/upcoming-changes). Rich fields depend on plan. Up to 50 popularity-selected places are a sample, not an exhaustive city count. |
+| [Foursquare usage guidelines](https://docs.foursquare.com/developer/reference/usage-guidelines-personalization-apis) | Personalization API cache restrictions must not be confused with a blanket right to archive Places data. Require explicit account agreement covering server storage, derived scores and displayed fields: `FOURSQUARE_DURABLE_STORAGE_LICENSED=1`, `FOURSQUARE_API_KEY`, `FOURSQUARE_CATEGORY_IDS`. Tips require a separate `FOURSQUARE_TIPS_LICENSED=1`. The open places dataset could support a later bulk adapter, but does not replace licensed ratings/tips. |
+| [Ticketmaster](https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/) | Optional `TICKETMASTER_API_KEY`; `geoPoint` geohash (latlong is deprecated), radius 15 km, music, next 45 days, first 100 listings. Store source response and link each event. Weekly cache; suppress past/cancelled events in rendered listings. Listings are shown as partial coverage. |
+| [Numbeo](https://www.numbeo.com/api/doc.jsp) | Licensed API only; no new price scraping. `NUMBEO_API_KEY`, `NUMBEO_STORAGE_LICENSED=1`; X-Api-Key header; `/api/city_prices`, strict matching, `use_estimated=false`; restaurant IDs 4 and 5 in local currency and USD. Stored source fetch and observation dates differ visibly. |
+| [Reddit terms](https://redditinc.com/policies/data-api-terms) and [API](https://www.reddit.com/dev/api/) | No scraping. `REDDIT_COMMERCIAL_ANALYSIS_LICENSED=1` must cover commercial derived sentiment and third-party LLM processing, plus `REDDIT_ACCESS_TOKEN`. OAuth search + comments, limited request rate. Raw posts/comments are transient; only derived themes/labels, links, dates and content hashes remain. Deletion/retention obligations in the actual agreement still apply. |
+| [Blog discovery](https://api-dashboard.search.brave.com/app/documentation/web-search/get-started) | `BRAVE_SEARCH_API_KEY`, `NIGHTLIFE_BLOG_ANALYSIS_LICENSED=1`, and `NIGHTLIFE_BLOG_ALLOWED_DOMAINS` (comma-separated domains whose access/analysis rights have been reviewed). Fetch only HTTPS allowlisted pages, no redirects to other domains. Require a source publication date. Source prose is transient. No generic scrape-all mode. |
+| [District geocoding policy](https://operations.osmfoundation.org/policies/nominatim/) | Optional `NIGHTLIFE_NOMINATIM_URL`; no default bulk calls to the public service. Cached district positions/polygons; reject matches over 30 km away. If deliberately pointed at public Nominatim, serialize at under four requests per minute for regular jobs. For scaling use a private provider. Missing coordinates leave text guidance, never guessed zones. |
+| Internal safety | Read the existing cached city report. Reuse walking-after-dark, sentiment, advisory ceilings and neighborhood guidance. Never call `/api/research` from this worker. |
+
+Live sentiment classification additionally requires `OPENROUTER_API_KEY` and
+an explicitly selected `NIGHTLIFE_SENTIMENT_MODEL`; no paid fallback or
+unbounded model loop. At most ten inputs per classification request, validated
+against original IDs. A model cannot invent URLs, timestamps, extra mentions,
+or a new source identity. Relevance excludes marketing and safety-only accounts.
+
+Existing licensed labels can instead be supplied in
+`NIGHTLIFE_MENTIONS_DIR/<safety-cache-key>.json`, as an array of:
+
+```json
+[{"id":"stable-id","source":"blogs","url":"https://approved.example/article",
+  "group":"article-id","publishedAt":"2026-09-12","relevant":true,
+  "sentiment":"mixed","themes":["Lively on weekends"]}]
+```
+
+The source's rights flag is still required. The worker derives canonical groups
+from URLs, validates dates and labels, and discards duplicates. To honor a
+source deletion, remove the import label, remove that city's private
+`raw/.../sentiment.json`, then force regenerate. There is no public raw-text API.
+Raw reproducibility is intentionally limited for UGC/blogs: hashes + validated
+labels are retained instead of violating the no-raw-content requirement.
+
+## Verification and beta deployment
+
+```sh
+npm run test:nightlife
+npx tsc --noEmit
+```
+
+The tests cover formulas, thresholds, vote shrinkage, recency/group caps,
+merging, clipping holes in boundaries, source identity validation, and hours
+handling. The mocked integration job covers full/limited/withheld records,
+raw caching, source failure dates, internal safety, current FSQ headers, and
+licence-safe export. All fixtures are in isolated temporary directories;
+none are committed as real city reports. `tests/nightlife-render.cjs <fixture-dir>`
+checks both full and limited reports render every evidence section on the server.
+
+Build from an isolated copy, never in a serving checkout:
+
+```sh
+npm run build
+```
+
+A restricted-session fallback verification can use `next build --webpack`
+with Next's `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` pointing at the existing real
+font assets. That checks compilation, types and all routes without downloading
+fonts, but does not replace the normal host build or a browser smoke test.
+
+After the live pilot and isolated build succeed, commit the feature and push
+**only** `git push origin HEAD:beta`. The existing beta webhook builds and
+restarts only port 3002. Check the beta deploy log and HTTP responses for the
+directory, a qualified city, its safety crosslink, its data export and a
+unknown city's 404 and a known withheld city's unscored availability screen. Run `npm run check:nightlife -- country/city` for read-only HTTP checks.
+Confirm noindex, source dates, mobile layout, map filter,
+JSON-LD and absence of browser errors. Do not mark deployment complete from
+a local build alone.
+
+## Recovery fixes (20 October 2026)
+
+The live Tbilisi record had cached Q1341835 (Tbilisi Central Station) instead of Q994 (the city). Distance-only ranking selected the station's Tbilisi alias. With no population or boundary, the same cached result failed on every retry. The new resolver checks settlement types, ranks city labels before aliases, and invalidates the old resolution cache. Report and job pipeline versions bypass old failed/withheld cooldowns after a collector fix; no manual cache deletion is required.
+
+Source requests retry transient failures once, honor short Retry-After values, and stop on authentication errors or longer rate limits. MediaWiki error documents returned with HTTP 200 are not treated as data. A four-minute source deadline bounds on-demand work; optional district lookups have their own short budget. Failed source names and genuine evidence shortages are distinct status outcomes. A publishable report remains ready even if an optional source fails.
+
+The browser reconnects after transient status failures, discovers an already-started job after a lost POST response, and retries source outages once after the advertised cooldown. It shows the real retry time and disables premature retries. An expired callback cannot run after another worker reclaims its lease. Concurrent JSON writes use unique temporary filenames.
+
+Broader beta fixes include public-host redirects for mixed-case beta links, a hostname-based noindex header, and safety-search cancellation so old results cannot overwrite a new destination. HTTP errors and prematurely ended safety streams no longer masquerade as completed reports. Cancelling a browser stream is safe, the API only advertises a permanent link after persistence, and an interrupted model cannot cache an unfinished report or replace a healthy report during background refresh. Report wording is simpler and the empty booking promotion is removed.
+
+Regression checks cover the actual wrong-entity failure, year/month population precision, old cache migration, API retries, partial source success, cooldown migration, abandoned jobs, browser polling, safety-stream errors, competing searches, stream cancellation, completion after persistence, interrupted models, and beta redirects. The test suite has 82 unit tests plus mocked pipeline and server-render checks. Browser launch, shell DNS/network and GitHub push are restricted in this environment; a local build is not evidence of a live deployment. The pinned opening-hours dependency must still be fetched by the host's deployment install.
+
+## Visit-triggered generation
+
+Visiting either a known city's safety report or its nightlife page mounts a
+small browser component that starts `POST /api/nightlife/{country}/{city}`.
+This only accepts cities already backed by a safety report. Metadata requests,
+link prefetches, API GETs, and visitors who never open the report do not create
+research jobs. No batch run is needed to discover a report.
+
+The POST claims a durable research slot, responds immediately with progress,
+and uses Next's `after` callback to perform collection and scoring. A status-only
+GET powers polling; real source phases are persisted, not a fabricated progress
+percentage. The browser refreshes the server-rendered page once a report is
+available. A cold known-city route is noindex until it has publishable data;
+unknown cities remain 404. Stale scored reports remain readable during refresh.
+
+Locks and job state live in `NIGHTLIFE_CACHE_DIR/jobs`, alongside a UTC daily
+attempt budget. Independent requests/processes share one active on-demand
+research slot. Each job callback runs once, lock heartbeats prevent accidental
+expiry during active collection, and abandoned jobs recover after 15 minutes.
+Source failures cool down for ten minutes; genuinely insufficient evidence is retried after a day. Published reports remain ready during a failed optional refresh. Pipeline upgrades bypass older failure cooldowns and stale resolver cache identities. Neither can create made-up ratings or overwrite a healthy
+report with broken data.
+
+`NIGHTLIFE_ON_DEMAND_DAILY_LIMIT` controls new on-demand research attempts
+(default and maximum 10 with public Overpass; default 100, maximum 1000 when all configured endpoints are private).
+Cached reports and status polling do not spend the budget. Capacity screens
+check again automatically while the browser is open. Licensing flags and
+credentials from the original adapters still apply; automatic generation does
+not unlock unavailable licensed sources.
+
+`npm run test:nightlife` additionally tests cold visits, concurrent requests
+across independent coordinator instances, fresh-cache reuse, stale refreshes,
+error cooldowns, thin data, global capacity, persisted daily budgets, crash
+recovery, optional-source TTLs, source/formula changes, API GET/POST separation,
+unknown cities, same-origin enforcement and after-response scheduling.
+
+
+## Nightlife directory refresh
+
+The nightlife homepage is a compact city directory rather than a promotional
+landing page: plain paper background, restrained typography, city/country
+search, region filtering, and a two-column list that becomes one column on
+mobile. It includes real cities from the safety index so an empty nightlife
+store does not create a dead end. Opening a city starts the on-demand flow.
+Published guides show their real rating/count and are listed first; unresearched
+cities have an Explore link without invented scores. Prefetch is disabled on
+these research links. The interface distinguishes saved reports from first
+visits, which may take a few minutes. No generic hero art or placeholder city
+photographs are used.
+
+## Compact city report layout (November 2026)
+
+City reports now show a city-night photograph (when curated), exact fractional overall stars, five compact rating cards, venue mix and map, a supported shortlist, known-hours percentages, available prices, safety, traveler themes and nearby cities. Empty data blocks, events, section numbers, kickers and source ledgers are omitted. Per-city provenance, score inputs, coverage, freshness and the ODbL download live at `/methodology/nightlife?country=...&city=...`. Mandatory map and photo attribution remains visible.
+
+Explicit positive venue recommendations are extracted from licensed first-hand accounts. Names must occur in the source text. Independent discussion groups rank above ratings; repeated mentions in one group do not inflate rank. Expired, negative and merely topical mentions do not create recommendations. Existing mention caches refresh under a new classifier version; no raw text is retained.
+
+Prices use licensed Numbeo observations only. The meal-plus-two-beers budget sums meal item 1 and twice beer item 4. A 5 km taxi estimate uses exact `Taxi Start (Normal Tariff)` and `Taxi 1km (Normal Tariff)` item names from the city response, avoiding guessed item IDs or mile/km conversions. Missing components hide an amount. Dollar signs represent domestic beer USD price, not an overall cost-of-living score. No live Uber quotes, estimated cover fees or invented prices are used.
+
+## City requests (November 2026)
+
+`/nightlife` carries an "Ask for a city" form under the index heading. It
+posts to `/api/nightlife/request` with a safety-report path (the suggestions
+come from the same city list the directory already receives, so no new city
+payload is shipped).
+
+The endpoint does two things. First it writes a durable request to
+`NIGHTLIFE_CACHE_DIR/requests/<safety-key>.json`: one file per city, with the
+first and most recent ask, a count, and an optional note. A repeat ask updates
+that file rather than growing a log. Second, when the shared on-demand budget
+has room, it starts the same `visitJobs` coordinator the city page uses; the
+visitor gets a link to the city page to follow progress. If the budget is
+deferred or busy, the queued request is the fallback.
+
+`--refresh-due` (the nightly command) reads pending requests and puts them
+**ahead of** due refreshes, still under the same 25-city batch cap. After a
+build the script marks the request `done` with the outcome it reached —
+`full`, `limited` or `withheld`. A withheld city is therefore not retried
+every night on the strength of one ask, **unless the report still carries a
+source error**: an outage is not a verdict, so the ask stays pending for the
+next run. Immediate research applies the same rule through
+`requestAnswered()`. `--requests` runs the pending queue on its own;
+`--audit` prints the queue alongside the report states.
+
+Safeguards: same-origin POSTs only, a hidden honeypot, four asks per IP per
+ten minutes, and 40 new cities per 24 hours across the site. The IP is hashed
+with SHA-256 before it is stored; the address itself never is. A city whose
+report was withheld returns "we checked and could not find enough" rather
+than queueing a promise that cannot be kept.
+
+`npm run test:nightlife` covers queue dedupe/ordering, completion outcomes,
+the per-IP limiter and the 24-hour count.

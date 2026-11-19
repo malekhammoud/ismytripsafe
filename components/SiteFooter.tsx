@@ -26,7 +26,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
  * print (dates, sourcing, "this is not advice"). `updatedAt` is passed on
  * report pages, where the date is about that report's data.
  */
-export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
+export function SiteFooter({ updatedAt, simplePunctuation = false }: { updatedAt?: string | null; simplePunctuation?: boolean }) {
   const year = new Date().getFullYear()
 
   return (
@@ -34,7 +34,7 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
       <div className="flex flex-col gap-9 sm:flex-row sm:justify-between sm:gap-12">
         {/* Brand */}
         <div className="max-w-[19rem]">
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link prefetch={false} href="/" className="flex items-center gap-2.5">
             <Logo size={36} />
             <span className="wordmark text-[1.05rem] text-[var(--navy)]">
               IsMyTripSafe<span style={{ color: "var(--orange)" }}>.com</span>
@@ -42,7 +42,7 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
           </Link>
           <p className="mt-3 text-[0.8rem] leading-relaxed text-[var(--ink-soft)]">
             One place, one click, one report. Up-to-date, personalised travel safety for
-            anywhere you&apos;re thinking of going — free, every time.
+            anywhere you&apos;re thinking of going{simplePunctuation ? ". Free, every time." : " — free, every time."}
           </p>
           <a
             href="mailto:malek@ismytripsafe.com"
@@ -61,7 +61,7 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
               <ul className="space-y-1.5">
                 {col.links.map((l) => (
                   <li key={l.href}>
-                    <Link
+                    <Link prefetch={false}
                       href={l.href}
                       className="whitespace-nowrap text-[0.83rem] font-medium text-[var(--ink-soft)] hover:text-[var(--orange-deep)]"
                     >
@@ -83,12 +83,12 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
           </p>
         )}
         <p>
-          Every score is computed from named public sources — see{" "}
-          <Link href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
+          Every score is computed from named public sources{simplePunctuation ? ". See" : " — see"}{" "}
+          <Link prefetch={false} href="/methodology" className="font-medium text-[var(--accent-deep)] hover:underline">
             how we score safety
           </Link>{" "}
           and{" "}
-          <Link href="/about" className="font-medium text-[var(--accent-deep)] hover:underline">
+          <Link prefetch={false} href="/about" className="font-medium text-[var(--accent-deep)] hover:underline">
             who runs IsMyTripSafe
           </Link>
           . Conditions change quickly; always check your own government&apos;s current travel
@@ -97,11 +97,11 @@ export function SiteFooter({ updatedAt }: { updatedAt?: string | null }) {
         </p>
         <p className="mt-2.5">
           © {year} IsMyTripSafe. Founded 2026. ·{" "}
-          <Link href="/disclaimer" className="hover:text-[var(--accent-deep)] hover:underline">
+          <Link prefetch={false} href="/disclaimer" className="hover:text-[var(--accent-deep)] hover:underline">
             Disclaimer
           </Link>{" "}
           ·{" "}
-          <Link href="/credits" className="hover:text-[var(--accent-deep)] hover:underline">
+          <Link prefetch={false} href="/credits" className="hover:text-[var(--accent-deep)] hover:underline">
             Photo credits
           </Link>
         </p>
