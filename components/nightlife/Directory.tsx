@@ -15,19 +15,19 @@ export interface DirectoryCity {
 }
 
 const STARTERS = [
-  "/georgia/tbilisi/nightlife", "/portugal/porto/nightlife",
-  "/poland/gdansk/nightlife", "/serbia/belgrade/nightlife",
-  "/hungary/budapest/nightlife", "/albania/shkoder/nightlife",
-  "/slovenia/ljubljana/nightlife", "/laos/luang-prabang/nightlife",
-  "/germany/berlin/nightlife", "/portugal/lisbon/nightlife",
-  "/japan/tokyo/nightlife", "/mexico/mexico-city/nightlife",
+  "/germany/berlin/nightlife", "/japan/tokyo/nightlife",
+  "/united-states/new-york/nightlife", "/united-kingdom/london/nightlife",
+  "/portugal/porto/nightlife", "/netherlands/amsterdam/nightlife",
+  "/hungary/budapest/nightlife", "/france/paris/nightlife",
+  "/australia/sydney/nightlife", "/spain/seville/nightlife",
+  "/georgia/tbilisi/nightlife", "/mexico/mexico-city/nightlife",
 ]
 const normalized = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim()
 
 export function NightlifeDirectory({ cities }: { cities: DirectoryCity[] }) {
   const [query, setQuery] = useState("")
   const [region, setRegion] = useState("")
-  const [publishedOnly, setPublishedOnly] = useState(false)
+  const [publishedOnly, setPublishedOnly] = useState(true)
   const [limit, setLimit] = useState(18)
   const publishedCount = cities.filter(city => city.report).length
   const regions = [...new Set(cities.map(city => city.region).filter(Boolean))].sort((a, b) => a.localeCompare(b, "en"))
@@ -43,6 +43,7 @@ export function NightlifeDirectory({ cities }: { cities: DirectoryCity[] }) {
           if (aStarts !== bStarts) return aStarts - bStarts
         }
         if (!!a.report !== !!b.report) return a.report ? -1 : 1
+        if (publishedOnly && a.report && b.report) return b.report.overall - a.report.overall || b.report.venueCount - a.report.venueCount
         if (!terms.length && !region && !publishedOnly) {
           const aRank = STARTERS.indexOf(a.path), bRank = STARTERS.indexOf(b.path)
           if (aRank !== bRank) return (aRank < 0 ? 999 : aRank) - (bRank < 0 ? 999 : bRank)
@@ -50,7 +51,7 @@ export function NightlifeDirectory({ cities }: { cities: DirectoryCity[] }) {
         return a.city.localeCompare(b.city, "en") || a.country.localeCompare(b.country, "en")
       })
   }, [cities, query, region, publishedOnly])
-  const reset = () => { setQuery(""); setRegion(""); setPublishedOnly(false); setLimit(18) }
+  const reset = () => { setQuery(""); setRegion(""); setPublishedOnly(true); setLimit(18) }
 
   return <section className="nld-directory" aria-labelledby="nightlife-cities-title">
     <div className="nld-controls">
