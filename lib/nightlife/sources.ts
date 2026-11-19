@@ -19,7 +19,7 @@ export const SOURCE_INFO: Record<SourceId, Pick<Source, "name" | "url" | "licenc
   ticketmaster: { name: "Ticketmaster", url: "https://developer.ticketmaster.com/products-and-docs/apis/discovery-api/v2/", licence: "Discovery API terms; linked event listings" },
   numbeo: { name: "Numbeo", url: "https://www.numbeo.com/api/doc.jsp", licence: "Licensed Data API; attribution required" },
   reddit: { name: "Reddit", url: "https://redditinc.com/policies/data-api-terms", licence: "Commercial and analysis rights required" },
-  blogs: { name: "Travel blogs", url: "https://ismytripsafe.com/methodology", licence: "Original links and short derived themes only; no republished text" },
+  blogs: { name: "Travel guides & articles", url: "https://ismytripsafe.com/methodology/nightlife", licence: "Short attributed excerpts and links only; no republished text" },
   safety: { name: "IsMyTripSafe", url: "https://ismytripsafe.com/methodology", licence: "Internal safety report" },
 }
 export function unavailable(id: SourceId, note: string): Source { return { id, ...SOURCE_INFO[id], fetchedAt: null, status: "unavailable", note } }
