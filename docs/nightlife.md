@@ -19,9 +19,22 @@ production; the branch targets `origin/beta`. Use an explicit `HEAD:beta` push.
   nightlife reports. Withheld cities never get a scored report, directory card, data export, or sitemap URL. Known cities can show a noindex research/availability screen while data is being gathered.
 
 The evening palette uses charcoal/plum, lime, and the existing paper/serif
-identity. Five accessible star cards lead into the venue mix, filterable map
-(with a text list), shortlist, late hours, events, beer, traveler themes,
-safety, and a source ledger. Booking content stays absent until there are actual links; it never affects ratings. Half-star icons
+identity. Five accessible star cards, each with a precise numeric value, lead
+into a jump nav, a by-the-numbers table, the venue mix, a filterable map
+(with a text list), neighbourhood clusters, good-to-know notes, a documented
+three-stop night plan, shortlist, late hours, events, beer, traveler themes,
+safety, answered questions, and a source ledger. Every published report now
+has five non-null scores.
+
+Quality and Vibe use licensed ratings and enough independent traveler mentions
+when those sources exist. Without them, the report uses a labelled **Editorial
+estimate**: Quality combines effective venue types, late-night opening,
+mapped density and published listing detail; Vibe combines after-2am and
+after-4am opening shares, the nightlife venue mix, density and late venue
+volume. These are transparent editorial indices, never customer-rating or
+review averages. `FORMULA_VERSION=nightlife-v1.1-editorial`;
+`node scripts/nightlife.cjs --rescore-all` regenerates every published report
+without refetching upstream sources. Booking content stays absent until there are actual links; it never affects ratings. Half-star icons
 accompany precise numeric subscores; the overall displays one decimal.
 
 The `/nightlife` globe is deliberately its own night palette: a near-black
