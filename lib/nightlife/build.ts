@@ -5,6 +5,7 @@ import { scoreReport, FORMULA_VERSION } from "./scoring"
 import { distance, mergeVenues, normalizeName } from "./venues"
 import { withinBoundary } from "./boundary"
 import { fetchBeer, fetchEvents, fetchFoursquare, fetchOsm, importedMentions, resolveCity, SOURCE_INFO, unavailable } from "./sources"
+import { lookupPopulation } from "./wikidata"
 import { lateness } from "./hours"
 import { resolveSafetyZones } from "./zones"
 import { collectMentions, canonicalGroup } from "./sentiment"
@@ -60,7 +61,16 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   await options.onProgress?.("venues")
   const zonesTask = safety ? resolveSafetyZones(city, safety).catch(() => safety!) : Promise.resolve(null)
   const osm = await collect("osm", () => fetchOsm(city, options.force))
-  if (osm) { sources.push(osm.source); city = { ...city, relationId: osm.relationId, boundaryVerified: true } }
+  if (osm) {
+    sources.push(osm.source)
+    let population = city.population, populationDate = city.populationDate
+    if (population == null && osm.fallbackArea?.wikidataId) {
+      const area = await lookupPopulation(osm.fallbackArea.wikidataId).catch(() => null)
+      if (area) { population = area.population; populationDate = area.date }
+    }
+    if (population == null && osm.population != null) population = osm.population
+    city = { ...city, relationId: osm.relationId, boundaryVerified: true, population, populationDate }
+  }
   const zoned = await zonesTask
   if (zoned) safety = zoned
   await options.onProgress?.("details")

@@ -77,7 +77,7 @@ async function run() {
  const missing=await GET(new Request('http://localhost/missing'),{params:Promise.resolve({country:'missing',city:'missing'})});assert.equal(missing.status,404)
  fsq=false;await fs.unlink(path.join(process.env.NIGHTLIFE_MENTIONS_DIR,'xx_preview.json'))
  const editorial=await buildNightlife({...base,key:'xx_limited',citySlug:'limited'},safety,{force:true});assert.equal(editorial.outcome,'full');assert.equal(editorial.scores.filter(s=>s.value==null).length,0)
- count=9
+ count=2
  const withheld=await buildNightlife({...base,key:'xx_withheld',citySlug:'withheld'},safety,{force:true});assert.equal(withheld.outcome,'withheld');assert.equal((await listNightlife()).length,5);assert.equal((await listNightlife(true)).length,6)
  assert.ok(calls.some(c=>c.url.hostname==='places-api.foursquare.com'&&c.init.headers.get('X-Places-Api-Version')==='2025-06-17'))
  const previous=await readNightlife('xx_preview');global.fetch=async()=>{throw new Error('Simulated outage')};const outage=await buildNightlife(base,safety,{force:true});assert.equal(outage.sources.find(s=>s.id==='osm').status,'error');assert.equal(outage.scores.filter(s=>s.value!=null).length,5);assert.ok(Date.parse(outage.updatedAt)>=Date.parse(previous.updatedAt));const priorLimited=await readNightlife('xx_limited');const refreshed=await buildNightlife({...base,key:'xx_limited',citySlug:'limited'},safety,{force:true});assert.equal(refreshed.venues.length,priorLimited.venues.length);assert.equal(refreshed.sources.find(s=>s.id==='osm').status,'error');assert.equal(refreshed.sources.find(s=>s.id==='osm').fetchedAt,priorLimited.sources.find(s=>s.id==='osm').fetchedAt)

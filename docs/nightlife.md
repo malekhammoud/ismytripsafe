@@ -34,7 +34,16 @@ after-4am opening shares, the nightlife venue mix, density and late venue
 volume. These are transparent editorial indices, never customer-rating or
 review averages. `FORMULA_VERSION=nightlife-v1.1-editorial`;
 `node scripts/nightlife.cjs --rescore-all` regenerates every published report
-without refetching upstream sources. Booking content stays absent until there are actual links; it never affects ratings. Half-star icons
+without refetching upstream sources.
+
+If Wikidata has no single city boundary (or points at a road route), OSM
+`is_in()` selects the enclosing administrative/local-authority area and the
+report explicitly says so. The fallback preserves the city's own population
+when it exists, otherwise uses the area population from OSM or Wikidata.
+Scenes with three to nine mapped venues publish as limited **small-scene**
+reports with a small-scene Variety estimate and a visible "Limits" note;
+fewer than three venues still withholds. This keeps every supported city
+publishable without pretending a three-venue map is a complete scene. Booking content stays absent until there are actual links; it never affects ratings. Half-star icons
 accompany precise numeric subscores; the overall displays one decimal.
 
 The `/nightlife` globe is deliberately its own night palette: a near-black

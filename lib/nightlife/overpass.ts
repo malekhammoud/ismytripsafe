@@ -12,6 +12,12 @@ export interface OsmResponse { elements: OsmElement[]; remark?: string; osm3s?: 
 export interface OsmCollection {
   boundary: OsmResponse; venues: OsmResponse; geometry?: OsmResponse
   geometryNote?: string
+  /** Used when Wikidata has no single city boundary but a containing area exists. */
+  fallbackArea?: {
+    areaId: number; relationId: number; name: string; adminLevel: string
+    boundaryKind: string; population: number | null; wikidataId: string | null
+    note: string
+  }
   requests: { operation: string; provider: string; fetchedAt: string; elapsedMs: number }[]
 }
 // The public French instance is the default because it is reachable from the
@@ -146,24 +152,86 @@ export function verifiedVenues(raw: OsmResponse, areaId: number): OsmElement[] {
   if (!countsOk || new Set(venues.map(e => `${e.type}/${e.id}`)).size !== venues.length) throw new Error("Overpass venue response failed completeness checks")
   return venues
 }
+const AREA_BOUNDARY_KINDS = new Set(["administrative", "local_authority"])
+const areaName = (element: OsmElement) => [element.tags?.name, element.tags?.["name:en"]].filter(Boolean).join(" ").toLowerCase()
+const plainAreaName = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+export function fallbackAreaQuery(city: City) {
+  return `${header(25)}is_in(${city.lat},${city.lon});out tags;`
+}
+export function chooseFallbackArea(city: City, raw: OsmResponse): OsmElement | null {
+  if (raw.remark || !Array.isArray(raw.elements)) return null
+  const target = plainAreaName(city.city)
+  const levelRank: Record<string, number> = { "7": 0, "6": 1, "8": 2, "5": 3, "4": 4 }
+  const candidates = raw.elements.filter(element => element.type === "area"
+    && AREA_BOUNDARY_KINDS.has(element.tags?.boundary ?? "")
+    && element.tags?.admin_level != null && /^[4-8]$/.test(element.tags.admin_level))
+  return candidates.sort((a, b) => {
+    const aName = plainAreaName(areaName(a)), bName = plainAreaName(areaName(b))
+    const aMatch = aName.includes(target) ? 0 : 1, bMatch = bName.includes(target) ? 0 : 1
+    return aMatch - bMatch || (levelRank[a.tags!.admin_level] ?? 9) - (levelRank[b.tags!.admin_level] ?? 9)
+  })[0] ?? null
+}
+async function collectAreaFallback(client: ReturnType<typeof createOverpassClient>, city: City, geometry: boolean): Promise<OsmCollection | null> {
+  const raw = await client.query(fallbackAreaQuery(city), "OpenStreetMap enclosing-area lookup", 30000)
+  const area = chooseFallbackArea(city, raw)
+  if (!area) return null
+  const venues = await client.query(venueQuery(area.id), "OpenStreetMap area venue lookup", 45000)
+  verifiedVenues(venues, area.id)
+  const tags = area.tags ?? {}, relationId = area.id - 3600000000
+  const population = Number(tags.population)
+  const name = tags["name:en"] ?? tags.name ?? `${city.city} area`
+  const adminLevel = tags.admin_level ?? "?"
+  const boundaryNote = `No single city boundary is available; using the enclosing ${name} area (${tags.boundary}, admin ${adminLevel}). Venue counts and density are approximate against this area.`
+  return {
+    boundary: { elements: [{ type: "relation", id: relationId, tags }, area], osm3s: venues.osm3s },
+    venues,
+    requests: client.requests,
+    fallbackArea: {
+      areaId: area.id,
+      relationId,
+      name,
+      adminLevel,
+      boundaryKind: tags.boundary ?? "area",
+      population: Number.isFinite(population) && population > 0 ? population : null,
+      wikidataId: /^Q\d+$/.test(tags.wikidata ?? "") ? tags.wikidata! : null,
+      note: boundaryNote,
+    },
+    ...(geometry ? { geometryNote: "Area fallback; boundary geometry is unavailable." } : {}),
+  }
+}
 export async function collectOsm(city: City, geometry = false): Promise<OsmCollection> {
   const client = createOverpassClient()
-  const raw = await client.query(collectionQuery(city), "OpenStreetMap city and venue lookup", 50000)
-  const verified = verifiedCollection(city, raw)
-  const count = raw.elements.find(e => e.type === "count")!
-  // Keep the cached shape the rest of the pipeline expects: a verified
-  // boundary response and a verified venue response with a trailing count.
-  const boundary: OsmResponse = { elements: [verified.boundary, verified.area], osm3s: raw.osm3s }
-  const venues: OsmResponse = { elements: [verified.area, ...verified.venues, count], osm3s: raw.osm3s }
-  const result: OsmCollection = { boundary, venues, requests: client.requests }
-  // Detailed geometry only helps clip unmatched Foursquare venues. Its failure
-  // must not discard a complete, boundary-scoped OSM venue list.
-  if (geometry) {
-    try {
-      const geom = await client.query(`${header(10)}rel(${verified.boundary.id});out geom;`, "OpenStreetMap optional geometry", 20000, AbortSignal.timeout(20000))
-      if (!geom.elements.some(e => e.type === "relation" && e.id === verified.boundary.id && BOUNDARY_KINDS.has(e.tags?.boundary ?? ""))) throw new Error("Geometry belongs to a different city")
-      result.geometry = geom
-    } catch { result.geometryNote = "Boundary geometry unavailable; only matched Foursquare venues can join the OSM count." }
+  try {
+    const raw = await client.query(collectionQuery(city), "OpenStreetMap city and venue lookup", 50000)
+    const verified = verifiedCollection(city, raw)
+    const count = raw.elements.find(e => e.type === "count")!
+    // Keep the cached shape the rest of the pipeline expects: a verified
+    // boundary response and a verified venue response with a trailing count.
+    const boundary: OsmResponse = { elements: [verified.boundary, verified.area], osm3s: raw.osm3s }
+    const venues: OsmResponse = { elements: [verified.area, ...verified.venues, count], osm3s: raw.osm3s }
+    const result: OsmCollection = { boundary, venues, requests: client.requests }
+    // Detailed geometry only helps clip unmatched Foursquare venues. Its failure
+    // must not discard a complete, boundary-scoped OSM venue list.
+    if (geometry) {
+      try {
+        const geom = await client.query(`${header(10)}rel(${verified.boundary.id});out geom;`, "OpenStreetMap optional geometry", 20000, AbortSignal.timeout(20000))
+        if (!geom.elements.some(e => e.type === "relation" && e.id === verified.boundary.id && BOUNDARY_KINDS.has(e.tags?.boundary ?? ""))) throw new Error("Geometry belongs to a different city")
+        result.geometry = geom
+      } catch { result.geometryNote = "Boundary geometry unavailable; only matched Foursquare venues can join the OSM count." }
+    }
+    return result
+  } catch (error) {
+    // A missing or broken city relation is the common failure for islands,
+    // city-provinces and places where Wikidata points at a road route. The
+    // containing administrative area is a transparent, clearly-labelled
+    // fallback; it never turns a transport outage into a fake boundary.
+    if (!(error instanceof SourceUnavailable)) throw error
+    console.warn(`[nightlife] ${city.key}: boundary unavailable (${error.message}); trying enclosing area`)
+    const fallback = await collectAreaFallback(client, city, geometry).catch(fallbackError => {
+      console.warn(`[nightlife] ${city.key}: enclosing-area fallback failed: ${fallbackError instanceof Error ? fallbackError.message : "unknown error"}`)
+      return null
+    })
+    if (fallback) return fallback
+    throw error
   }
-  return result
 }

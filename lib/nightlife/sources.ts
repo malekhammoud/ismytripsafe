@@ -47,8 +47,10 @@ export async function resolveCity(seed: City, force = false, interactive = false
 }
 export async function fetchOsm(city: City, force = false) {
   const geometryNeeded = !!process.env.FOURSQUARE_API_KEY && process.env.FOURSQUARE_DURABLE_STORAGE_LICENSED === "1" && !!process.env.FOURSQUARE_CATEGORY_IDS
-  const result = await cached(city.key, "osm", 30, () => collectOsm(city, geometryNeeded), force, `osm-v5:${city.wikidataId}:${city.relationId ?? "discover"}:${geometryNeeded ? "geometry" : "venues"}`)
-  const { boundary, areaId } = verifiedArea(city, result.data.boundary)
+  const result = await cached(city.key, "osm", 30, () => collectOsm(city, geometryNeeded), force, `osm-v6:${city.wikidataId}:${city.relationId ?? "discover"}:${geometryNeeded ? "geometry" : "venues"}`)
+  const fallback = result.data.fallbackArea
+  const verified = fallback ? null : verifiedArea(city, result.data.boundary)
+  const areaId = fallback?.areaId ?? verified!.areaId
   const elements = verifiedVenues(result.data.venues, areaId)
   const venues: Venue[] = elements.flatMap(e => {
     const t = e.tags ?? {}, loc = e.center ?? { lat: e.lat, lon: e.lon }
@@ -62,7 +64,9 @@ export async function fetchOsm(city: City, force = false) {
     if (t.lgbtq === "primary" || t["gay:men"] === "primary" || t["gay:women"] === "primary") hint = "lgbtq bar"
     return [{ id: `osm-${e.type}-${e.id}`, name: t.name, lat: loc.lat!, lon: loc.lon!, type: venueType(hint ?? ""), hours: t.opening_hours, neighborhood: t["addr:suburb"] ?? t["addr:district"], tags: t, sources: [{ id: "osm" as const, url: `https://www.openstreetmap.org/${e.type}/${e.id}` }] }]
   })
-  return { venues, relationId: boundary.id, boundary: boundaryFromMembers(result.data.geometry?.elements.find(e => e.type === "relation" && e.id === boundary.id)?.members), source: { ...result.source, url: `https://www.openstreetmap.org/relation/${boundary.id}`, note: `${result.source.status === "error" ? "Refresh failed; showing the last successful city query. " : "Complete city-boundary and venue query. "}Mapped venues are a lower bound, not a census. ${result.data.geometryNote ?? ""}` } }
+  const relationId = fallback?.relationId ?? verified!.boundary.id
+  const boundary = fallback ? null : boundaryFromMembers(result.data.geometry?.elements.find(e => e.type === "relation" && e.id === verified!.boundary.id)?.members)
+  return { venues, relationId, boundary, population: fallback?.population ?? null, fallbackArea: fallback, source: { ...result.source, url: `https://www.openstreetmap.org/relation/${relationId}`, note: `${result.source.status === "error" ? "Refresh failed; showing the last successful city query. " : fallback ? "Area-fallback query. " : "Complete city-boundary and venue query. "}${fallback?.note ? `${fallback.note} ` : ""}Mapped venues are a lower bound, not a census. ${result.data.geometryNote ?? ""}` } }
 }
 interface FsqPlace { fsq_place_id: string; name: string; latitude: number; longitude: number; date_closed?: string; categories?: { name: string }[]; rating?: number; popularity?: number; price?: number; stats?: { total_ratings?: number }; location?: { neighborhood?: string[] } }
 export async function fetchFoursquare(city: City, force = false) {

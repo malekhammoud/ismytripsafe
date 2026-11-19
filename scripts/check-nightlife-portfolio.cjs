@@ -55,15 +55,21 @@ async function main() {
     if (report.pipelineVersion !== PIPELINE_VERSION) add(summary.city.key, `pipeline ${report.pipelineVersion ?? 'missing'} != ${PIPELINE_VERSION}`)
     if (!report.city.boundaryVerified) add(summary.city.key, 'city boundary is not verified')
     if (!(Number(report.city.population) > 0)) add(summary.city.key, 'city population is missing')
-    if (report.venues.length < 10) add(summary.city.key, `only ${report.venues.length} venues`)
+    if (report.venues.length < 3) add(summary.city.key, `only ${report.venues.length} venues`)
+    else if (report.venues.length < 10) warnings.push(`${summary.city.key}: small-scene report with ${report.venues.length} venues`)
     for (const key of ['density', 'quality', 'variety', 'vibe', 'safety']) {
       if (report.scores.find(score => score.key === key)?.value == null) add(summary.city.key, `${key} score is missing`)
     }
-    for (const id of ['wikidata', 'osm', 'safety']) {
+    for (const id of ['osm', 'safety']) {
       const source = report.sources.find(item => item.id === id)
       if (!source) add(summary.city.key, `${id} source is missing`)
       else if (source.status !== 'ok') add(summary.city.key, `${id} source is ${source.status}`)
     }
+    // A containing-area fallback can publish without a city Wikidata item, but
+    // only when OSM and a finite area population make density meaningful.
+    const wikidata = report.sources.find(item => item.id === 'wikidata')
+    if (!wikidata) add(summary.city.key, 'wikidata source is missing')
+    else if (wikidata.status !== 'ok' && !(report.city.boundaryVerified && Number(report.city.population) > 0)) add(summary.city.key, `wikidata source is ${wikidata.status}`)
     if (report.sources.some(source => source.status === 'error')) add(summary.city.key, 'contains an error source')
     if (!report.refresh?.venues || !Number.isFinite(Date.parse(report.refresh.venues))) add(summary.city.key, 'venue refresh date is missing')
     if (report.lateness.total !== report.venues.length) add(summary.city.key, 'lateness denominator does not match venues')

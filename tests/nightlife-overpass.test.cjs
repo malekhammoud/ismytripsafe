@@ -1,7 +1,7 @@
 require('../scripts/typescript-worker.cjs')
 const {test}=require('node:test')
 const assert=require('node:assert/strict')
-const {createOverpassClient,boundaryQuery,venueQuery,collectionQuery,verifiedArea,verifiedVenues,verifiedCollection,usesPublicOverpass}=require('../lib/nightlife/overpass.ts')
+const {createOverpassClient,boundaryQuery,venueQuery,collectionQuery,verifiedArea,verifiedVenues,verifiedCollection,chooseFallbackArea,fallbackAreaQuery,usesPublicOverpass}=require('../lib/nightlife/overpass.ts')
 const {SourceHttpError,SourceOperationError,SourceUnavailable,sourceFailure}=require('../lib/nightlife/source-errors.ts')
 const {fetchJson}=require('../lib/nightlife/http.ts')
 const city={wikidataId:'Q994',relationId:1996871}
@@ -28,6 +28,23 @@ test('ceremonial and political city boundaries are valid venue areas',()=>{
  const placeBoundary={type:'relation',id:5750005,tags:{wikidata:'Q3130',boundary:'place',place:'city'}}
  const placeArea={type:'area',id:3605750005,tags:{wikidata:'Q3130',boundary:'place',place:'city'}}
  assert.deepEqual(verifiedArea(placeCity,{elements:[placeBoundary,placeArea]}),{boundary:placeBoundary,areaId:placeArea.id})
+})
+test('a containing administrative area is selected only when the city boundary is unavailable',()=>{
+ const mumbai={...city,city:'Mumbai',lat:19.0758,lon:72.8775}
+ const areas={elements:[
+  {type:'area',id:3607964375,tags:{name:'Mumbai Suburban District',boundary:'administrative',admin_level:'5'}},
+  {type:'area',id:3613312356,tags:{name:'Mumbai Metropolitan Region',boundary:'local_authority',admin_level:'7',population:'26237000'}},
+  {type:'area',id:3607885380,tags:{name:'L Ward',boundary:'administrative',admin_level:'10'}},
+ ]}
+ assert.equal(chooseFallbackArea(mumbai,areas).id,3613312356)
+ const santorini={...city,city:'Santorini',lat:36.4,lon:25.4}
+ const greek={elements:[
+  {type:'area',id:3605318852,tags:{name:'Δήμος Θήρας',boundary:'administrative',admin_level:'7'}},
+  {type:'area',id:3605323612,tags:{name:'Περιφερειακή Ενότητα Θήρας',boundary:'administrative',admin_level:'6'}},
+ ]}
+ assert.equal(chooseFallbackArea(santorini,greek).id,3605318852)
+ assert.equal(fallbackAreaQuery(mumbai),'[out:json][timeout:25][maxsize:67108864];is_in(19.0758,72.8775);out tags;')
+ assert.equal(chooseFallbackArea(mumbai,{elements:[]}),null)
 })
 test('complete venue queries retain nodes, ways and relations',()=>{
  assert.equal(verifiedVenues(response(),area.id).length,3)

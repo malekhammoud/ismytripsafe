@@ -119,7 +119,7 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
           <h2>About this report</h2>
           <p>{r.venues.length.toLocaleString("en")} venues are mapped inside the verified {c.city} boundary. Mapped places are a lower bound, not a census, and opening hours can change. The operator or venue should be checked before a late trip.</p>
           <p className="nl-data-coverage"><strong>Coverage:</strong> mapped venues, venue types, opening hours, neighbourhood clusters, population density and after-dark safety. Quality and Vibe are labelled editorial estimates unless licensed ratings or enough traveler mentions are connected; event listings, prices and traveler quotes appear automatically when those sources are available.</p>
-          {reasons.length > 0 && <p className="nl-data-gaps"><strong>Not scored:</strong> {reasons.map(plainCopy).join(" ")}</p>}
+          {reasons.length > 0 && <p className="nl-data-gaps"><strong>Limits:</strong> {reasons.map(plainCopy).join(" ")}</p>}
           <ul>{r.sources.filter(s => s.status === "ok" && s.fetchedAt).map(s => <li key={s.id}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.name} ↗</a><span>{dateLabel(s.fetchedAt)}</span><small>{plainCopy(s.note)}</small></li>)}</ul>
         </section>
         {nearby.length > 0 && <section className="nl-section"><h2>Nearby cities</h2><div className="nl-nearby">{nearby.map(n => <Link href={nightlifePath(n)} key={n.city.key}><span>{n.city.country}</span><h3>{n.city.city} <ArrowUpRight size={18}/></h3><Stars value={n.overall}/><small>{Math.round(distance(c, n.city) / 1000).toLocaleString()} km away</small></Link>)}</div></section>}

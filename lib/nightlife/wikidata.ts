@@ -116,6 +116,14 @@ async function linkedCity(seed: City): Promise<City> {
   }
   throw new SourceUnavailable("No verified city match is available through the linked-data lookup.")
 }
+/** Population for a containing area selected by the OSM fallback. */
+export async function lookupPopulation(id: string): Promise<{ population: number; date: string } | null> {
+  if (!/^Q\d+$/.test(id)) return null
+  const params = new URLSearchParams({ action: "wbgetentities", ids: id, props: "claims", format: "json" })
+  const raw = await fetchJson<{ entities: Record<string, Entity> }>(`https://www.wikidata.org/w/api.php?${params}`, {}, { operation: "Wikidata area population" })
+  const entity = raw.entities?.[id]
+  return entity ? latestPopulation(entity.claims?.P1082 ?? []) : null
+}
 export async function lookupCity(seed: City, interactive = false): Promise<City> {
   try {
     const params = parameters({ action: "wbsearchentities", search: seed.city, language: "en", type: "item", limit: "12" }, interactive)

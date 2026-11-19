@@ -87,8 +87,8 @@ export function scoreReport(city: City, venues: Venue[], mentions: Mention[], sa
         ? { method: "editorial-scene-index", rawIndex: editorialQualityRaw, venues: active.length, effectiveTypes: effective, lateAfter2: late2Share, nightlifeShare, densityScore, documentation, hoursShare, websiteShare, phoneShare, neighbourhoodShare }
         : { method: "licensed-ratings", rated: rated.length, usable: usable.length, selected: popular.length, cityMean: rated.length ? average : null, priorVotes: 20, median: ratedQuality },
       sourceIds: ratedQuality == null ? ["osm", "wikidata"] : ["foursquare"] },
-    { key: "variety", label: "Variety", value: active.length < 10 || classified < 10 ? null : (effective < 2 ? 1 : effective < 3 ? 2 : effective < 4.5 ? 3 : effective < 6 ? 4 : 5),
-      bullets: [`${classified < 10 ? `Only ${classified} classified venues; at least 10 are needed. ` : ""}${counts.filter(n => n > 0).length} venue types; ${effective.toFixed(1)} effective types after balancing their shares.`, `${active.length - classified} unclassified venues excluded from the mix.`], inputs: { classified, effectiveTypes: effective, distinctTypes: counts.filter(n => n > 0).length }, sourceIds: ["osm", "foursquare"] },
+    { key: "variety", label: "Variety", value: classified < 3 ? null : active.length < 10 ? clamp(editorialScore(effective / 6), 1, 5) : (effective < 2 ? 1 : effective < 3 ? 2 : effective < 4.5 ? 3 : effective < 6 ? 4 : 5),
+      bullets: [`${classified < 10 ? `Only ${classified} classified venues; this is a small-scene editorial estimate. ` : ""}${counts.filter(n => n > 0).length} venue types; ${effective.toFixed(1)} effective types after balancing their shares.`, `${active.length - classified} unclassified venues excluded from the mix.`], inputs: { classified, effectiveTypes: effective, distinctTypes: counts.filter(n => n > 0).length, method: classified < 10 ? "small-scene editorial" : "effective types" }, sourceIds: ["osm", "foursquare"] },
     { key: "vibe", label: "Vibe", value: vibeValue,
       bullets: mentionShare == null
         ? [`${Math.round(late2Share * 100)}% of interpretable hours stay open past 2am; ${Math.round(late4Share * 100)}% past 4am.`, `${Math.round(nightlifeShare * 100)}% are bars, pubs, clubs or live-music venues.`, "Editorial night-energy index from mapped hours and venue mix; traveler mentions replace it when enough are available."]
@@ -102,7 +102,7 @@ export function scoreReport(city: City, venues: Venue[], mentions: Mention[], sa
   ]
   const available = scores.filter(s => s.value != null)
   const reasons = scores.filter(s => s.value == null).map(s => `${s.label}: ${s.bullets[0]}`)
-  if (active.length < 10) reasons.unshift(`Only ${active.length} venues; at least 10 are required.`)
-  const outcome: NightlifeReport["outcome"] = active.length < 10 || available.length < 3 ? "withheld" : available.length < 5 ? "limited" : "full"
+  if (active.length < 10) reasons.unshift(`Only ${active.length} mapped venues; this is a small-scene report and counts are a lower bound.`)
+  const outcome: NightlifeReport["outcome"] = active.length < 3 || available.length < 3 ? "withheld" : active.length < 10 || available.length < 5 ? "limited" : "full"
   return { scores, outcome, reasons, overall: outcome === "withheld" ? null : available.reduce((sum, s) => sum + s.value!, 0) / available.length }
 }
