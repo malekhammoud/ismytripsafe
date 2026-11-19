@@ -91,6 +91,6 @@ export function NightlifeDirectory({ cities }: { cities: DirectoryCity[] }) {
     </li>)}</ul> : <div className="nld-no-results"><h3>{cities.length ? "No cities found." : "No cities available yet."}</h3><p>{cities.length ? "Try a different spelling or the country name." : "Start with a destination’s safety report."}</p>{cities.length > 0 && <button type="button" onClick={reset}>Clear the filters</button>}<Link href="/destinations">Browse all destinations ↗</Link></div>}
 
     {filtered.length > limit && <button type="button" className="nld-more" onClick={() => setLimit(value => value + 24)}>Show more cities <span>↓</span></button>}
-    <div className="nld-fine-print"><p>Opening a city starts its nightlife research if needed. The first report can take a few minutes; saved reports load straight away.</p><p>Ratings cover density, quality, variety, vibe and safety. Every report includes its sources and any gaps in the data.</p></div>
+    <div className="nld-fine-print"><p>Opening a cold city starts its nightlife research. The first report usually takes under a minute; saved reports load straight away.</p><p>Published guides cover mapped venues, opening hours, density, variety and after-dark safety. Every report states its sources and any gaps in the data.</p></div>
   </section>
 }
