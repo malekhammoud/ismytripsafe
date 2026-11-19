@@ -433,8 +433,11 @@ deferred or busy, the queued request is the fallback.
 **ahead of** due refreshes, still under the same 25-city batch cap. After a
 build the script marks the request `done` with the outcome it reached —
 `full`, `limited` or `withheld`. A withheld city is therefore not retried
-every night on the strength of one ask. `--requests` runs the pending queue
-on its own; `--audit` prints the queue alongside the report states.
+every night on the strength of one ask, **unless the report still carries a
+source error**: an outage is not a verdict, so the ask stays pending for the
+next run. Immediate research applies the same rule through
+`requestAnswered()`. `--requests` runs the pending queue on its own;
+`--audit` prints the queue alongside the report states.
 
 Safeguards: same-origin POSTs only, a hidden honeypot, four asks per IP per
 ten minutes, and 40 new cities per 24 hours across the site. The IP is hashed

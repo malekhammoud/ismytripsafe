@@ -18,6 +18,7 @@ const {
   noteRequestAttempt,
   countRequestsSince,
   hashIp,
+  requestAnswered,
 } = require("../lib/nightlife/requests.ts")
 
 const munich = { key: "de_munich", path: "/germany/munich", city: "Munich", country: "Germany" }
@@ -93,4 +94,11 @@ test("the per-IP limiter allows a person and stops a script", async () => {
 test("the daily count uses the last time a city was asked for", async () => {
   assert.equal(await countRequestsSince(Date.now() - 60_000), 2)
   assert.equal(await countRequestsSince(Date.now() - 86_400_000), 2)
+})
+
+test("a source outage is not a withheld verdict", () => {
+  assert.equal(requestAnswered("full", false), true)
+  assert.equal(requestAnswered("limited", true), true, "a published small-scene guide answers the ask")
+  assert.equal(requestAnswered("withheld", false), true, "a clean evidence gap is a final answer")
+  assert.equal(requestAnswered("withheld", true), false, "an outage must stay in the queue")
 })

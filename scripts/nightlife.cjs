@@ -9,7 +9,7 @@ const { usesPublicOverpass } = require('../lib/nightlife/overpass.ts')
 const { countrySlugFor } = require('../lib/reports.ts')
 const { slug } = require('../lib/cache.ts')
 const { listNightlife, NIGHTLIFE_DIR, writeJson } = require('../lib/nightlife/store.ts')
-const { listNightlifeRequests, completeNightlifeRequest } = require('../lib/nightlife/requests.ts')
+const { listNightlifeRequests, completeNightlifeRequest, requestAnswered } = require('../lib/nightlife/requests.ts')
 const rawArgs = process.argv.slice(2)
 const limitArg = rawArgs.find(arg => arg.startsWith('--limit='))
 const LIMIT = limitArg ? Math.max(1, Number(limitArg.split('=')[1]) || 0) : null
@@ -106,7 +106,7 @@ async function main() {
       // leave it pending so the next run tries again.
       const requestSourceFailed = report.sources.some(source => source.status === 'error')
       if (pendingRequests.some(request => request.key === city.key)
-        && (report.outcome !== 'withheld' || !requestSourceFailed)) {
+        && requestAnswered(report.outcome, requestSourceFailed)) {
         await completeNightlifeRequest(city.key, report.outcome)
       }
       const summary = { city: report.city.city, outcome: report.outcome, overall: report.overall, venues: report.venues.length, reasons: report.reasons, sources: report.sources.map(s => ({ id: s.id, status: s.status })) }

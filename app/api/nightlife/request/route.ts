@@ -5,6 +5,7 @@ import { findNightlife, readNightlife } from "@/lib/nightlife/store"
 import {
   completeNightlifeRequest,
   countRequestsSince,
+  requestAnswered,
   hashIp,
   noteRequestAttempt,
   queueNightlifeRequest,
@@ -152,12 +153,9 @@ export async function POST(request: Request) {
       const report = await readNightlife(meta.key)
       if (!report) return // the build threw; leave the ask pending
       const sourceFailed = report.sources.some((source) => source.status === "error")
-      if (status.state === "ready") {
-        // full or limited: published, so the ask is answered.
+      const settled = status.state === "ready" || status.state === "unavailable"
+      if (settled && requestAnswered(report.outcome, sourceFailed)) {
         await completeNightlifeRequest(meta.key, report.outcome)
-      } else if (status.state === "unavailable" && !sourceFailed) {
-        // a real "not enough evidence" verdict, not an outage.
-        await completeNightlifeRequest(meta.key, "withheld")
       }
       // A failed source leaves the request pending for the nightly retry.
     })

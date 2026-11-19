@@ -109,6 +109,17 @@ export async function listNightlifeRequests(status: "pending" | "done" | "all" =
     .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
 }
 
+/**
+ * Does this outcome answer the ask?
+ *
+ * A published (full/limited) report always does. A withheld report only does
+ * when its sources were healthy — otherwise it is an outage dressed as a
+ * verdict, and the request should stay in the queue for another run.
+ */
+export function requestAnswered(outcome: RequestOutcome, sourceFailed: boolean): boolean {
+  return outcome !== "withheld" || !sourceFailed
+}
+
 export async function completeNightlifeRequest(key: string, outcome: RequestOutcome): Promise<void> {
   const existing = await readNightlifeRequest(key)
   if (!existing) return
