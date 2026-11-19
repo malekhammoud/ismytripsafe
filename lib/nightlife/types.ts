@@ -19,6 +19,15 @@ export interface Mention {
   themes: string[]; relevant: boolean
   recommendedVenues?: string[] // Explicit positive recommendations, verified against source text
 }
+export interface Testimonial {
+  id: string
+  quote: string
+  source: string
+  url: string
+  publishedAt: string | null
+  sentiment: "positive" | "mixed" | "negative"
+  kind: "article" | "search snippet" | "travel guide"
+}
 export interface City {
   key: string; city: string; country: string; countrySlug: string; citySlug: string
   safetyPath: string; lat: number; lon: number; countryCode: string
@@ -42,7 +51,7 @@ export interface Lateness { known: number; total: number; afterMidnight: number;
 export interface NightlifeReport {
   version: 1; formulaVersion: string; pipelineVersion?: string; city: City; updatedAt: string
   outcome: "full" | "limited" | "withheld"; reasons: string[]; overall: number | null
-  scores: Score[]; venues: Venue[]; mentions: Mention[]; events: NightEvent[]
+  scores: Score[]; venues: Venue[]; mentions: Mention[]; testimonials?: Testimonial[]; events: NightEvent[]
   beer: BeerPrices | null; safety: SafetyInput | null; lateness: Lateness; sources: Source[]
-  refresh: { venues: string; events: string; population: string; beer: string }
+  refresh: { venues: string; events: string; population: string; beer: string; testimonials?: string }
 }

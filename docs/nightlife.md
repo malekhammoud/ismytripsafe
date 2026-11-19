@@ -26,6 +26,17 @@ three-stop night plan, shortlist, late hours, events, beer, traveler themes,
 safety, answered questions, and a source ledger. Every published report now
 has five non-null scores.
 
+Every report also carries a **What people are saying** section: short,
+attributed excerpts from Wikivoyage travel guides and public travel articles,
+with source links and a publication date when available. The collector uses
+the keyless Wikivoyage API, slices the Drink/Nightlife section including
+neighbourhood subsections, reads listing `content` fields when a section has
+only templates, and falls back to the country guide for small places. Reddit,
+TripAdvisor, Yelp and booking sites are deliberately excluded. Testimonials
+are context, not score inputs; a missing quote is recorded as no suitable
+public excerpt rather than invented. `node scripts/nightlife.cjs
+--testimonials-all` recomputes them without refetching venue data.
+
 Quality and Vibe use licensed ratings and enough independent traveler mentions
 when those sources exist. Without them, the report uses a labelled **Editorial
 estimate**: Quality combines effective venue types, late-night opening,

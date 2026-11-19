@@ -41,7 +41,7 @@ async function main() {
   const summaries = await listNightlife(true)
   const reports = []
   let published = 0, withheld = 0
-  const coverage = { venues: 0, withHours: 0, withNeighborhood: 0, lateKnown: 0, quality: 0, vibe: 0, density: 0, safety: 0, events: 0, beer: 0, mentions: 0 }
+  const coverage = { venues: 0, withHours: 0, withNeighborhood: 0, lateKnown: 0, quality: 0, vibe: 0, density: 0, safety: 0, events: 0, beer: 0, mentions: 0, testimonials: 0, testimonialReports: 0 }
   for (const summary of summaries) {
     const report = await readNightlife(summary.city.key)
     if (!report) { add(summary.city.key, 'report file is missing or unreadable'); continue }
@@ -73,6 +73,12 @@ async function main() {
     if (report.sources.some(source => source.status === 'error')) add(summary.city.key, 'contains an error source')
     if (!report.refresh?.venues || !Number.isFinite(Date.parse(report.refresh.venues))) add(summary.city.key, 'venue refresh date is missing')
     if (report.lateness.total !== report.venues.length) add(summary.city.key, 'lateness denominator does not match venues')
+    const testimonials = report.testimonials ?? []
+    if (!testimonials.length) {
+      if (report.venues.length < 10) warnings.push(`${summary.city.key}: no suitable public testimonial for this small scene`)
+      else add(summary.city.key, 'no public testimonials')
+    } else coverage.testimonialReports++
+    coverage.testimonials += testimonials.length
     coverage.venues += report.venues.length
     coverage.withHours += report.venues.filter(venue => !!venue.hours).length
     coverage.withNeighborhood += report.venues.filter(venue => !!venue.neighborhood).length
@@ -93,7 +99,7 @@ async function main() {
       try {
         const page = await get(origin + path)
         if (page.status !== 200) { add(report.city.key, `page HTTP ${page.status}`); return }
-        for (const id of ['the-stars', 'venues', 'data-notes']) if (!page.text.includes(`id="${id}"`)) add(report.city.key, `page missing #${id}`)
+        for (const id of ['the-stars', 'venues', ...(report.testimonials?.length ? ['testimonials'] : []), 'data-notes']) if (!page.text.includes(`id="${id}"`)) add(report.city.key, `page missing #${id}`)
         if (!page.text.includes(`rel="canonical" href="${canonical}"`) && !page.text.includes(`rel="canonical" href="${canonical.replace(/&/g, '&amp;')}"`)) add(report.city.key, 'canonical URL does not match the nightlife origin')
         if (requireIndex && !/<meta[^>]+name="robots"[^>]+content="[^"]*index/.test(page.text)) add(report.city.key, 'page is not indexable')
         if (!page.text.includes('"@type":"BreadcrumbList"')) add(report.city.key, 'missing breadcrumb JSON-LD')
@@ -110,6 +116,7 @@ async function main() {
   console.log(`Reports: ${summaries.length} total, ${published} published, ${withheld} withheld`)
   console.log(`Venues: ${totalVenues.toLocaleString('en')}; hours ${coverage.withHours.toLocaleString('en')}; neighbourhood labels ${coverage.withNeighborhood.toLocaleString('en')}; interpretable late hours ${coverage.lateKnown.toLocaleString('en')}`)
   console.log(`Scored: density ${coverage.density}, safety ${coverage.safety}, quality ${coverage.quality}, vibe ${coverage.vibe}`)
+  console.log(`Testimonials: ${coverage.testimonials} quotes across ${coverage.testimonialReports} reports`)
   console.log(`Optional data: events ${coverage.events}, beer prices ${coverage.beer}, mentions ${coverage.mentions}`)
   if (origin) console.log(`Live: ${liveOk} pages and ${dataOk} ODbL exports checked on ${origin}`)
   if (warnings.length) console.log(`Warnings:\n${warnings.map(line => `  - ${line}`).join('\n')}`)

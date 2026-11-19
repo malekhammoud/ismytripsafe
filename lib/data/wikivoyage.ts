@@ -37,7 +37,7 @@ interface WvParseWikitext {
 }
 
 /** Strip wiki markup down to readable plain text. */
-function cleanWikitext(raw: string): string {
+export function cleanWikitext(raw: string): string {
   return (
     raw
       // drop templates ({{...}}, possibly nested one level) & HTML comments

@@ -31,7 +31,7 @@ export function needsNightlifeRefresh(r: NightlifeReport, now = Date.now()) {
   // A retained stale source is already disclosed on the report. Rebuilding on
   // every visit because that source errored turned one upstream outage into a
   // permanent queue of slow jobs. The data-age rules below are the retry clock.
-  return r.pipelineVersion !== PIPELINE_VERSION || r.formulaVersion !== FORMULA_VERSION || older(r.refresh.venues || r.updatedAt, 30) || older(r.refresh.population || r.updatedAt, 180) || older(r.updatedAt, 30)
+  return r.pipelineVersion !== PIPELINE_VERSION || r.formulaVersion !== FORMULA_VERSION || older(r.refresh.venues || r.updatedAt, 30) || older(r.refresh.testimonials || r.updatedAt, 30) || older(r.refresh.population || r.updatedAt, 180) || older(r.updatedAt, 30)
     || (!!process.env.TICKETMASTER_API_KEY && older(r.refresh.events, 7))
     || (!!process.env.NUMBEO_API_KEY && process.env.NUMBEO_STORAGE_LICENSED === "1" && older(r.refresh.beer, 180))
 }

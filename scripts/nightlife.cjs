@@ -64,13 +64,13 @@ async function main() {
   const allFiles = (await fs.readdir(CACHE_DIR)).filter(f => f.endsWith('.json') && !f.includes('.tmp'))
   const due = args.includes('--refresh-due') ? (await listNightlife(true)).filter(r => !NON_CITY_KEYS.has(r.city.key))
     .filter(r => !r.refresh.venues || Date.now() - Date.parse(r.refresh.venues) > 30 * 86400000 || (!!process.env.TICKETMASTER_API_KEY && (!r.refresh.events || Date.now() - Date.parse(r.refresh.events) > 7 * 86400000))) : []
-  const rescoreAll = args.includes('--rescore-all')
-  const selected = rescoreAll ? (await listNightlife(true)).filter(r => r.outcome !== 'withheld').map(r => r.city.key)
+  const rescoreAll = args.includes('--rescore-all'), testimonialsAll = args.includes('--testimonials-all'), testimonialsOnly = args.includes('--testimonials-only')
+  const selected = rescoreAll || testimonialsAll ? (await listNightlife(true)).filter(r => r.outcome !== 'withheld').map(r => r.city.key)
     : args.includes('--refresh-due') ? due.map(r => r.city.key) : args.includes('--tier1') ? await tier1Keys(allFiles) : args.includes('--test-batch') ? BATCH : args.filter(a => !a.startsWith('--'))
   const keys = LIMIT ? selected.slice(0, LIMIT) : selected
-  if ((args.includes('--refresh-due') || args.includes('--tier1') || rescoreAll) && !keys.length) { console.log(args.includes('--tier1') ? 'No TIER1 nightlife reports are missing' : rescoreAll ? 'No published nightlife reports to rescore' : 'No nightlife reports are due for refresh'); return }
-  if (!keys.length) throw new Error('Usage: npm run nightlife -- <cache-key> [...] | --tier1 [--limit=N] | --refresh-due | --rescore-all | --test-batch | --audit | <key> --rescore | <key> --events-only')
-  if (!rescoreAll && keys.length > 25 && usesPublicOverpass()) throw new Error('Public Overpass batch limited to 25 cities per run; use --limit=25 or configure a private OVERPASS_URL before scaling')
+  if ((args.includes('--refresh-due') || args.includes('--tier1') || rescoreAll || testimonialsAll) && !keys.length) { console.log(args.includes('--tier1') ? 'No TIER1 nightlife reports are missing' : rescoreAll ? 'No published nightlife reports to rescore' : testimonialsAll ? 'No published nightlife reports to search' : 'No nightlife reports are due for refresh'); return }
+  if (!keys.length) throw new Error('Usage: npm run nightlife -- <cache-key> [...] | --tier1 [--limit=N] | --refresh-due | --rescore-all | --testimonials-all | --test-batch | --audit | <key> --rescore | <key> --events-only | <key> --testimonials-only')
+  if (!rescoreAll && !testimonialsAll && !testimonialsOnly && keys.length > 25 && usesPublicOverpass()) throw new Error('Public Overpass batch limited to 25 cities per run; use --limit=25 or configure a private OVERPASS_URL before scaling')
   const failures = []
   const results = []
   for (const key of keys) {
@@ -90,7 +90,7 @@ async function main() {
       const city = { key: file.slice(0, -5), city: r.geo.city, country: r.geo.country, countryCode: r.geo.countryCode, countrySlug, citySlug, safetyPath: `/${countrySlug}/${citySlug}`, lat: r.geo.lat, lon: r.geo.lon, wikidataId: null, population: r.geo.population ?? null, populationDate: null, relationId: null, boundaryVerified: false }
       const prior = due.find(d => d.city.key === city.key)
       const onlyEvents = prior && prior.refresh.venues && Date.now() - Date.parse(prior.refresh.venues) < 30 * 86400000
-      const report = await buildNightlife(city, r, { force: args.includes('--force'), rescore: args.includes('--rescore') || rescoreAll, eventsOnly: args.includes('--events-only') || !!onlyEvents })
+      const report = await buildNightlife(city, r, { force: args.includes('--force'), rescore: args.includes('--rescore') || rescoreAll, eventsOnly: args.includes('--events-only') || !!onlyEvents, testimonialsOnly: testimonialsOnly || testimonialsAll })
       const summary = { city: report.city.city, outcome: report.outcome, overall: report.overall, venues: report.venues.length, reasons: report.reasons, sources: report.sources.map(s => ({ id: s.id, status: s.status })) }
       results.push(summary)
       if (report.sources.some(s => s.status === 'error')) failures.push({ key, error: report.sources.filter(s => s.status === 'error').map(s => s.name + ': ' + s.note).join('; ') })
