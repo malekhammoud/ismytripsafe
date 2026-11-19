@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { PHOTO_POOL, SUPPLIED_POOL, type PoolPhoto } from "@/lib/photos"
+import { creditThumb, PHOTO_POOL, SUPPLIED_POOL, type PoolPhoto } from "@/lib/photos"
 import { Breadcrumbs, SectionHeading, SeoFooter, SiteHeader } from "@/components/seo/shared"
 
 export const metadata: Metadata = {
@@ -105,7 +105,7 @@ function Credit({ photo: p }: { photo: PoolPhoto }) {
     <li className="card flex items-center gap-4 overflow-hidden p-3">
       <span className="photo-frame block h-16 w-24 shrink-0 sm:h-[4.5rem] sm:w-28">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={p.file} alt="" loading="lazy" decoding="async" />
+        <img src={creditThumb(p.file)} alt="" loading="lazy" decoding="async" width={320} height={214} />
       </span>
       <span className="min-w-0 flex-1">
         {illustration ? (

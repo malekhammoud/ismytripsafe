@@ -70,6 +70,12 @@ for (const slug of POOL) {
     .webp({ quality: 78, effort: 6 })
     .toFile(dest)
   out(dest)
+  const thumb = `public/photos/opt/${slug}-320.webp`
+  await sharp(src)
+    .resize(320, null, { withoutEnlargement: true })
+    .webp({ quality: 75, effort: 6 })
+    .toFile(thumb)
+  out(thumb)
 }
 
 // ── Commissioned set ──────────────────────────────────────────────────
@@ -81,6 +87,7 @@ for (const name of readdirSync(SUPPLIED)) {
   if (!name.endsWith(".webp") || name.includes("-960")) continue
   const base = path.join(SUPPLIED, name.replace(/\.webp$/, ""))
   await webp(`${base}.webp`, `${base}-960.webp`, 960, 78, 640)
+  await webp(`${base}.webp`, `${base}-320.webp`, 320, 75, 214)
 }
 
 console.log("\nDone.")

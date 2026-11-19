@@ -335,3 +335,18 @@ export function wikimediaThumb(url: string, prefer: 960 | 1280): string | null {
 export function sized(url: string, prefer: 960 | 1280 = 960): string {
   return wikimediaThumb(url, prefer) ?? url
 }
+
+/**
+ * The 96×64 thumbnail on /credits. Loading the 1280px pool rendition (or the
+ * 1440px supplied one) for that frame made the credits page 2.5 MB; the 320w
+ * variant is enough for a 2× screen and takes the page under 400 KB.
+ */
+export function creditThumb(file: string): string {
+  if (file.startsWith("/photos/opt/") && file.endsWith("-1280.webp")) {
+    return file.replace(/-1280\.webp$/, "-320.webp")
+  }
+  if (file.startsWith("/photos/supplied/") && file.endsWith(".webp") && !/-\d+\.webp$/.test(file)) {
+    return file.replace(/\.webp$/, "-320.webp")
+  }
+  return file
+}
