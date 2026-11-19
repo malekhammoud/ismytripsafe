@@ -99,6 +99,7 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
         <section id="data-notes" className="nl-section nl-data-notes" aria-label="About this report">
           <h2>About this report</h2>
           <p>{r.venues.length.toLocaleString("en")} venues are mapped inside the verified {c.city} boundary. Mapped places are a lower bound, not a census, and opening hours can change. The operator or venue should be checked before a late trip.</p>
+          <p className="nl-data-coverage"><strong>Coverage:</strong> mapped venues, venue mix, opening hours, population density and after-dark safety. Licensed venue ratings, event listings, prices and traveler sentiment appear when those sources are connected.</p>
           {reasons.length > 0 && <p className="nl-data-gaps"><strong>Not scored:</strong> {reasons.map(plainCopy).join(" ")}</p>}
           <ul>{r.sources.filter(s => s.status === "ok" && s.fetchedAt).map(s => <li key={s.id}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.name} ↗</a><span>{dateLabel(s.fetchedAt)}</span></li>)}</ul>
         </section>

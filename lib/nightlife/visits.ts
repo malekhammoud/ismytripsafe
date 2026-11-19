@@ -24,7 +24,7 @@ interface Dependencies {
   limit: number
 }
 export function cityFromSafety({ meta }: CitySafety): City {
-  return { key: meta.key, city: meta.city, country: meta.country, countryCode: meta.countryCode, countrySlug: meta.countrySlug, citySlug: meta.citySlug, safetyPath: meta.path, lat: meta.lat, lon: meta.lon, wikidataId: null, population: null, populationDate: null, relationId: null, boundaryVerified: false }
+  return { key: meta.key, city: meta.city, country: meta.country, countryCode: meta.countryCode, countrySlug: meta.countrySlug, citySlug: meta.citySlug, safetyPath: meta.path, lat: meta.lat, lon: meta.lon, wikidataId: null, population: meta.population, populationDate: null, relationId: null, boundaryVerified: false }
 }
 export function needsNightlifeRefresh(r: NightlifeReport, now = Date.now()) {
   const older = (date: string, days: number) => !date || !Number.isFinite(Date.parse(date)) || now - Date.parse(date) >= days * DAY

@@ -78,7 +78,7 @@ async function main() {
       const r = JSON.parse(await fs.readFile(path.join(CACHE_DIR, file), 'utf8'))
       const countrySlug = countrySlugFor(r.geo.countryCode, r.geo.country), citySlug = slug(r.geo.city)
       if (countrySlug === citySlug) throw new Error('Country-level report cannot seed a city')
-      const city = { key: file.slice(0, -5), city: r.geo.city, country: r.geo.country, countryCode: r.geo.countryCode, countrySlug, citySlug, safetyPath: `/${countrySlug}/${citySlug}`, lat: r.geo.lat, lon: r.geo.lon, wikidataId: null, population: null, populationDate: null, relationId: null, boundaryVerified: false }
+      const city = { key: file.slice(0, -5), city: r.geo.city, country: r.geo.country, countryCode: r.geo.countryCode, countrySlug, citySlug, safetyPath: `/${countrySlug}/${citySlug}`, lat: r.geo.lat, lon: r.geo.lon, wikidataId: null, population: r.geo.population ?? null, populationDate: null, relationId: null, boundaryVerified: false }
       const prior = due.find(d => d.city.key === city.key)
       const onlyEvents = prior && prior.refresh.venues && Date.now() - Date.parse(prior.refresh.venues) < 30 * 86400000
       const report = await buildNightlife(city, r, { force: args.includes('--force'), rescore: args.includes('--rescore'), eventsOnly: args.includes('--events-only') || !!onlyEvents })

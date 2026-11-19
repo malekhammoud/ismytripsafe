@@ -54,8 +54,9 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   ])
   await options.onProgress?.("resolve")
   const resolved = await collect("wikidata", () => resolveCity(seed, options.force, options.interactive))
-  let city: City = resolved?.data ?? { ...seed, population: null, populationDate: null, boundaryVerified: false }
-  if (resolved) sources.push({ ...resolved.source, url: `https://www.wikidata.org/wiki/${city.wikidataId}`, note: `${resolved.source.status === "error" ? "Refresh failed; using the last verified city match. " : ""}${city.resolutionMethod === "linked-data" ? "Verified through Wikipedia’s linked item and Wikidata entity JSON. " : ""}Matched settlement type, name, country and coordinates. ${city.population ? "Latest dated population for this city." : "No dated population is available."}` })
+  let city: City = resolved?.data ?? { ...seed, population: seed.population, populationDate: null, boundaryVerified: false }
+  if (city.population == null && seed.population != null) city = { ...city, population: seed.population }
+  if (resolved) sources.push({ ...resolved.source, url: `https://www.wikidata.org/wiki/${city.wikidataId}`, note: `${resolved.source.status === "error" ? "Refresh failed; using the last verified city match. " : ""}${city.resolutionMethod === "linked-data" ? "Verified through Wikipedia’s linked item and Wikidata entity JSON. " : ""}Matched settlement type, name, country and coordinates. ${city.population ? city.populationDate ? "Latest dated population for this city." : "Population from the existing city safety report." : "No dated population is available."}` })
   await options.onProgress?.("venues")
   const zonesTask = safety ? resolveSafetyZones(city, safety).catch(() => safety!) : Promise.resolve(null)
   const osm = await collect("osm", () => fetchOsm(city, options.force))

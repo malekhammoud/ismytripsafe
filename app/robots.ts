@@ -2,6 +2,11 @@ import type { MetadataRoute } from "next"
 import { absUrl } from "@/lib/site"
 import { NIGHTLIFE_INDEXABLE, nightlifeUrl } from "@/lib/nightlife/store"
 
+// Read NIGHTLIFE_INDEXABLE at request time; the service environment is not
+// present during the production build, so a prerendered robots.txt would
+// silently omit the nightlife sitemap.
+export const dynamic = "force-dynamic"
+
 // Everything public is crawlable. AI *search* crawlers (the ones that cite
 // pages in answers) are explicitly welcomed — ChatGPT search is fed by Bing,
 // so Bingbot matters as much as Googlebot. /api/ is workers-only.
