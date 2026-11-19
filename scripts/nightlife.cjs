@@ -19,6 +19,13 @@ const BATCH = ['hu_budapest', 'gb_london', 'ge_tbilisi', 'al_shkoder', 'pl_gdans
 // withheld placeholders. Explicit keys can still be requested by hand.
 const NON_CITY_KEYS = new Set(['gr_santorini', 'in_goa', 'jo_petra'])
 const COUNTRY_ALIASES = { turkey: 'TR', 'republic of turkey': 'TR' }
+const normalizeCity = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/\bst\.?\b/g, 'saint').replace(/[^a-z0-9]+/g, ' ').trim()
+const cityVariants = (value) => {
+  const base = normalizeCity(value), variants = new Set([base])
+  for (const suffix of ['city', 'town', 'municipality']) if (base.endsWith(` ${suffix}`)) variants.add(base.slice(0, -suffix.length - 1))
+  return variants
+}
 // Best nightlife coverage first: TIER1 destinations that have a safety report
 // but no published nightlife report yet. Match on city plus ISO country code,
 // never city name alone: "Cappadocia, Turkey" must not resolve to the Italian
@@ -32,7 +39,7 @@ async function tier1Keys(allFiles) {
     try {
       const r = JSON.parse(await fs.readFile(path.join(CACHE_DIR, file), 'utf8')), key = file.slice(0, -5)
       byPlace.set(`${r.geo.city}, ${r.geo.country}`.toLowerCase(), key)
-      if (r.geo.countryCode) byCityCode.set(`${r.geo.city.toLowerCase()}|${r.geo.countryCode.toUpperCase()}`, key)
+      if (r.geo.countryCode) for (const name of cityVariants(r.geo.city)) byCityCode.set(`${name}|${r.geo.countryCode.toUpperCase()}`, key)
       if (r.geo.city.toLowerCase() === r.geo.country.toLowerCase()) countryLevel.add(key)
     } catch { /* Ignore a corrupt safety cache entry; the next file may match. */ }
   }
@@ -41,7 +48,7 @@ async function tier1Keys(allFiles) {
   for (const place of TIER1) {
     const [city, ...rest] = place.split(','), country = rest.join(',').trim().toLowerCase()
     const code = codeByName.get(country) ?? COUNTRY_ALIASES[country]
-    const key = byPlace.get(place.toLowerCase()) ?? (code ? byCityCode.get(`${city.trim().toLowerCase()}|${code}`) : null)
+    const key = byPlace.get(place.toLowerCase()) ?? (code ? [...cityVariants(city.trim())].map(name => byCityCode.get(`${name}|${code}`)).find(Boolean) : null)
     // Country-level reports (Singapore, Hong Kong) cannot seed the two-segment
     // nightlife route. Skip them rather than throwing mid-batch.
     if (!key || countryLevel.has(key) || NON_CITY_KEYS.has(key) || published.has(key)) continue
