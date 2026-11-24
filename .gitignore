@@ -50,3 +50,4 @@ next-env.d.ts
 
 # Optional nightlife worker dependencies
 /workers/nightlife/node_modules/
+.deploy-sha
