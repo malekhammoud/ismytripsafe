@@ -5,7 +5,7 @@
  */
 
 import { constants } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -13,6 +13,7 @@ export const dynamic = "force-dynamic";
 
 const REPORT_DIR = process.env.REPORT_CACHE_DIR ?? "/var/lib/ismytripsafe/reports";
 const REFDATA = "/var/lib/ismytripsafe/refdata.json";
+const RELEASE_FILE = "/opt/ismytripsafe/.deploy-sha";
 
 async function writable(path: string): Promise<boolean> {
   try {
@@ -40,6 +41,10 @@ export async function GET(request: Request): Promise<Response> {
     }
   }
   const [reports, refdata] = await Promise.all([writable(REPORT_DIR), readable(REFDATA)]);
+  let release = process.env.DEPLOY_SHA ?? "";
+  if (release.length === 0) {
+    release = (await readFile(RELEASE_FILE, "utf8").catch(() => "")).trim().slice(0, 80);
+  }
   const checks = {
     reportsDir: reports,
     refdata,
@@ -50,7 +55,7 @@ export async function GET(request: Request): Promise<Response> {
     {
       ok,
       app: "ismytripsafe",
-      release: process.env.DEPLOY_SHA ?? "",
+      release,
       uptime: Math.floor(process.uptime()),
       memory: process.memoryUsage().rss,
       checks,
