@@ -1,6 +1,8 @@
 "use client"
 
 import "./globals.css"
+import { useEffect } from "react"
+import { reportClientError } from "@/lib/ops/client"
 
 // Only reached when the root layout itself fails, so it replaces the layout
 // entirely — own <html>/<body>, own styles, no shared chrome to lean on.
@@ -11,6 +13,9 @@ export default function GlobalError({
   error: Error & { digest?: string }
   unstable_retry: () => void
 }) {
+  useEffect(() => {
+    reportClientError(error, "global.error")
+  }, [error])
   return (
     <html lang="en">
       <body style={{ background: "#fbf4e6", color: "#1d2f38" }}>

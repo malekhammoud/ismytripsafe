@@ -24,6 +24,9 @@ export default function Error({
 
   useEffect(() => {
     console.error(error)
+    void import("@/lib/ops/client").then(({ reportClientError }) => {
+      reportClientError(error, "app.error")
+    })
     if (!STALE.test(error.message || "")) return
     // Once per session: if the fresh build throws too, it isn't staleness and
     // reloading again would just spin.

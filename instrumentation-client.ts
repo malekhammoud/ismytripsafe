@@ -10,6 +10,10 @@
 // The key and host are inlined at build time; this file only ever runs in the
 // browser.
 
+import { installClientReporter } from "./lib/ops/client";
+
+installClientReporter();
+
 const POSTHOG_KEY =
   process.env.NEXT_PUBLIC_POSTHOG_KEY ||
   "phc_BL8wa5sXcYHPTNHbDsxfXiQHTZSgxBZ9UCrSZfPyM7cB"
