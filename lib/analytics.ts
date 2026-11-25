@@ -21,12 +21,14 @@ const SENSITIVE_KEY =
 const PATH_KEYS = /(page|path|url|referr?er|href)/i;
 const SAFE_SYSTEM_KEY = new Set(["$current_url", "$pathname", "$referrer", "$referring_domain"]);
 const MAX_QUEUE = 40;
+const GLOBAL_CLIENT_KEY = "__ismytripsafePosthog";
+const GLOBAL_QUEUE_KEY = "__ismytripsafeGrowthQueue";
 
 type AnalyticsProps = Record<string, unknown>;
+type QueuedEvent = { event: string; props: AnalyticsProps };
 
 let client: PostHog | null = null;
 let starting: Promise<PostHog | null> | null = null;
-let queue: Array<{ event: string; props: AnalyticsProps }> = [];
 let lastPageview = { path: "", at: 0 };
 let scrollMarks = new Set<number>();
 let scrollQueued = false;
@@ -88,6 +90,22 @@ function page(): string {
   return safePath(window.location.pathname);
 }
 
+function sharedWindow(): Window & Record<string, unknown> {
+  return window as unknown as Window & Record<string, unknown>;
+}
+
+function sharedClient(): PostHog | null {
+  if (client) return client;
+  const candidate = sharedWindow()[GLOBAL_CLIENT_KEY];
+  return candidate && typeof (candidate as PostHog).capture === "function" ? (candidate as PostHog) : null;
+}
+
+function sharedQueue(): QueuedEvent[] {
+  const w = sharedWindow();
+  if (!Array.isArray(w[GLOBAL_QUEUE_KEY])) w[GLOBAL_QUEUE_KEY] = [];
+  return w[GLOBAL_QUEUE_KEY] as QueuedEvent[];
+}
+
 function beforeSend(event: CaptureResult | null): CaptureResult | null {
   if (!event) return event;
   const properties = (event.properties && typeof event.properties === "object"
@@ -114,7 +132,11 @@ function beforeSend(event: CaptureResult | null): CaptureResult | null {
 
 async function start(): Promise<PostHog | null> {
   if (typeof window === "undefined") return null;
-  if (client) return client;
+  const existing = sharedClient();
+  if (existing) {
+    client = existing;
+    return existing;
+  }
   if (starting) return starting;
   const privacy = navigator as Navigator & { globalPrivacyControl?: boolean };
   if (privacy.doNotTrack === "1" || privacy.globalPrivacyControl === true) return null;
@@ -142,10 +164,11 @@ async function start(): Promise<PostHog | null> {
         before_send: beforeSend,
       });
       posthog.register({ product: PRODUCT });
+      sharedWindow()[GLOBAL_CLIENT_KEY] = posthog;
       client = posthog;
-      const pending = queue;
-      queue = [];
-      for (const item of pending) posthog.capture(item.event, item.props);
+      const pending = sharedQueue();
+      const batch = pending.splice(0);
+      for (const item of batch) posthog.capture(item.event, item.props);
       return posthog;
     })
     .catch(() => null)
@@ -177,11 +200,13 @@ export function initAnalytics(): void {
 export function capture(event: string, props: AnalyticsProps = {}): void {
   if (!/^[a-z0-9_$]{1,80}$/i.test(event)) return;
   const clean = sanitizeProps({ ...props, product: PRODUCT });
-  if (client) {
-    client.capture(event, clean);
+  const active = sharedClient();
+  if (active) {
+    active.capture(event, clean);
     return;
   }
-  if (queue.length < MAX_QUEUE) queue.push({ event, props: clean });
+  const pending = sharedQueue();
+  if (pending.length < MAX_QUEUE) pending.push({ event, props: clean });
 }
 
 export function trackPageview(path = page()): void {
