@@ -4,6 +4,7 @@ import { Newsreader } from "next/font/google"
 import { Azeret_Mono } from "next/font/google"
 import { SITE_URL } from "@/lib/site"
 import { BetaRibbon, IS_BETA } from "@/components/beach/BetaRibbon"
+import { AnalyticsPageview } from "@/components/AnalyticsPageview"
 import "./globals.css"
 
 // Three faces, and each one has a job it never leaves.
@@ -114,6 +115,7 @@ export default function RootLayout({
         }}
       />
       <body className="min-h-full">
+        <AnalyticsPageview />
         <BetaRibbon />
         {children}
       </body>

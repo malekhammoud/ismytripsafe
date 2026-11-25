@@ -552,6 +552,8 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2.5">
               <a
                 href={`/map?place=${encodeURIComponent(`${geo.city}, ${geo.country}`)}`}
+                data-cta="district_map"
+                data-surface="city_report"
                 className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(238,242,248,0.38)] bg-[rgba(238,242,248,0.1)] px-4 py-2 text-[0.8rem] font-semibold text-white transition-colors hover:bg-[rgba(238,242,248,0.22)]"
               >
                 <MapPin size={13} strokeWidth={2.2} />
@@ -560,6 +562,8 @@ export function TrafficReport({ bundle, images, intel, profile = null, prose, se
               {!profile && permalink && (
                 <a
                   href={`/?place=${encodeURIComponent(`${geo.city}, ${geo.country}`)}`}
+                  data-cta="personalize_report"
+                  data-surface="city_report"
                   className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[0.8rem] font-semibold text-white"
                   style={{ background: "var(--orange-deep)" }}
                 >

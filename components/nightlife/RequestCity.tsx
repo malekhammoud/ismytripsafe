@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, type FormEvent } from "react"
+import { capture } from "@/lib/analytics"
 import Link from "next/link"
 import { ArrowUpRight, Check, Loader2, MapPin } from "lucide-react"
 import type { DirectoryCity } from "./Directory"
@@ -90,6 +91,7 @@ export function RequestCity({ cities }: { cities: DirectoryCity[] }) {
       return
     }
 
+    capture("nightlife_city_requested", { page: window.location.pathname })
     setStatus({ kind: "pending" })
     try {
       const response = await fetch("/api/nightlife/request", {

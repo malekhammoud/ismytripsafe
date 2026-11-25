@@ -26,6 +26,7 @@ const TopNav = dynamic(
   () => import("@/components/report/TopNav").then((m) => m.TopNav),
   { ssr: false },
 )
+import { capture } from "@/lib/analytics"
 import { useReport } from "@/lib/store"
 import { profileFromParams, profileToParams, type TravelerProfile } from "@/lib/profile"
 import type { HomeDemo } from "@/lib/home-demo"
@@ -105,6 +106,7 @@ export function HomeClient({
   }
 
   const startReport = (q: SafetyQuery, p: TravelerProfile | null) => {
+    capture("report_started", { page: window.location.pathname, has_profile: Boolean(p) })
     const params = new URLSearchParams({ place: q.place })
     if (p) profileToParams(p, params)
     router.replace(`/?${params.toString()}`)

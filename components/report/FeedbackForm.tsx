@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { Star, CheckCircle2 } from "lucide-react"
+import { capture } from "@/lib/analytics"
 
 type Category = "bug" | "feature" | "other"
 
@@ -53,6 +54,14 @@ export function FeedbackForm({ place, page }: { place: string; page?: string }) 
           release: process.env.NEXT_PUBLIC_RELEASE,
         }),
       })
+      if (res.ok) {
+        capture("feedback_submitted", {
+          category,
+          rating,
+          has_comment: comment.trim().length > 0,
+          page: page ?? window.location.pathname,
+        })
+      }
       setState(res.ok ? "done" : "error")
     } catch {
       setState("error")

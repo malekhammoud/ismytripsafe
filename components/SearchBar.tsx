@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { capture } from "@/lib/analytics"
 import { MapPin, ShieldQuestion } from "lucide-react"
 import { CityAutocomplete } from "./CityAutocomplete"
 import type { SafetyQuery, GeoPoint } from "@/lib/types"
@@ -23,6 +24,7 @@ export function SearchBar({ onSubmit, loading, compact = false }: SearchBarProps
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!place.trim()) return
+    capture("search_submitted", { page: window.location.pathname })
     onSubmit({ place, placeGeo })
   }
 

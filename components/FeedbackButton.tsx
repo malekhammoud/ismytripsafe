@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { CheckCircle2, MessageSquare, Star, X } from "lucide-react"
+import { capture } from "@/lib/analytics"
 
 type Category = "bug" | "feature" | "other"
 
@@ -54,6 +55,14 @@ export function FeedbackButton({ className = "" }: { className?: string }) {
           release: process.env.NEXT_PUBLIC_RELEASE,
         }),
       })
+      if (res.ok) {
+        capture("feedback_submitted", {
+          category,
+          rating,
+          has_comment: comment.trim().length > 0,
+          page: window.location.pathname,
+        })
+      }
       setState(res.ok ? "done" : "error")
     } catch {
       setState("error")
@@ -64,7 +73,10 @@ export function FeedbackButton({ className = "" }: { className?: string }) {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          capture("feedback_opened", { page: window.location.pathname })
+          setOpen(true)
+        }}
         className={`inline-flex items-center gap-1.5 text-[0.8rem] font-medium text-[var(--accent-deep)] hover:underline ${className}`}
       >
         <MessageSquare size={13} strokeWidth={2.2} />

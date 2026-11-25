@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { capture } from "@/lib/analytics"
 import {
   User,
   Heart,
@@ -193,14 +194,20 @@ export function ProfileSetup({
       <div className="mt-7 flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={onSkip}
+          onClick={() => {
+            capture("profile_skipped", { page: window.location.pathname })
+            onSkip()
+          }}
           className="text-[0.8rem] font-medium text-[var(--ink-faint)] underline-offset-2 transition-colors hover:text-[var(--ink-soft)] hover:underline"
         >
           Skip — general report
         </button>
         <button
           type="button"
-          onClick={() => onConfirm({ party, gender, age, style })}
+          onClick={() => {
+            capture("profile_completed", { page: window.location.pathname, has_profile: true })
+            onConfirm({ party, gender, age, style })
+          }}
           className="btn inline-flex items-center gap-2 px-5 py-2.5 text-sm"
         >
           <SlidersHorizontal size={14} />

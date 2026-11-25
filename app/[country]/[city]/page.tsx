@@ -210,6 +210,8 @@ export default async function CityReportPage({
               per line: no wall of text, four quick promises. */}
           <Link prefetch={false}
             href={personalizeHref}
+            data-cta="personalize_report"
+            data-surface="city_report_hero"
             className="group mt-5 block rounded-[16px] bg-[var(--orange-deep)] px-6 py-5 text-center transition-transform hover:-translate-y-0.5 hover:bg-[#c03f21]"
             style={{
               color: "#fff8ec",
