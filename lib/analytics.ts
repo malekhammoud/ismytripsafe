@@ -108,26 +108,22 @@ function sharedQueue(): QueuedEvent[] {
 
 function beforeSend(event: CaptureResult | null): CaptureResult | null {
   if (!event) return event;
-  const properties = (event.properties && typeof event.properties === "object"
+  const source = (event.properties && typeof event.properties === "object"
     ? event.properties
     : {}) as Record<string, unknown>;
-  delete properties.$set;
-  delete properties.$set_once;
-  delete properties.$ip;
-  delete properties.$search;
-  for (const key of Object.keys(properties)) {
-    if (SENSITIVE_KEY.test(key) && !SAFE_SYSTEM_KEY.has(key)) {
-      delete properties[key];
-      continue;
-    }
-    if (typeof properties[key] === "string" && (key === "page" || key === "path" || key === "$pathname" || key === "href_path")) {
-      properties[key] = stripPath(properties[key] as string);
-    } else if (PATH_KEYS.test(key) && typeof properties[key] === "string") {
-      properties[key] = stripUrl(properties[key] as string);
+  const properties: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (key === "$set" || key === "$set_once" || key === "$ip" || key === "$search") continue;
+    if (SENSITIVE_KEY.test(key) && !SAFE_SYSTEM_KEY.has(key)) continue;
+    if (typeof value === "string" && (key === "page" || key === "path" || key === "$pathname" || key === "href_path")) {
+      properties[key] = stripPath(value);
+    } else if (typeof value === "string" && PATH_KEYS.test(key)) {
+      properties[key] = stripUrl(value);
+    } else {
+      properties[key] = value;
     }
   }
-  event.properties = properties as CaptureResult["properties"];
-  return event;
+  return { ...event, properties } as CaptureResult;
 }
 
 async function start(): Promise<PostHog | null> {
