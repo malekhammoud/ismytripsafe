@@ -42,9 +42,10 @@ The Nightlife Report feature is now on both `main` and `origin/beta`: pages at `
 
 `components/planmytrip/PlanMyTripRail.tsx` is the sister-site funnel to PlanMyTrip.health. It
 renders a fixed right rail on city safety reports, country hubs, and published nightlife
-reports. City and country reports show it at `min-width: 1280px`; nightlife reports show it at
-`min-width: 1600px` because their content shell is wider. It is hidden on phones and tablets,
-so it never competes with the report or the orange personalize action.
+reports. City and country reports show it at `min-width: 1280px`; nightlife reports show a
+compact rail at `min-width: 1400px` and the full rail at `min-width: 1600px`, because their
+content shell is wider. It is hidden on phones and tablets, so it never competes with the report
+or the orange personalize action.
 
 The card names the report's city/country and links to
 `https://planmytrip.health/sign-up?redirect_url=...` with the destination return path plus
