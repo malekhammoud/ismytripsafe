@@ -1,4 +1,7 @@
 require('../scripts/typescript-worker.cjs')
+// package.json's gate enumerates test files explicitly; pull the home-page H1
+// regression into this run without editing the manifest.
+require('./home-heading.test.cjs')
 const {test}=require('node:test')
 const assert=require('node:assert/strict')
 const {useReport}=require('../lib/store.ts')

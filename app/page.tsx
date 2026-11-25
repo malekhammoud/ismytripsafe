@@ -4,6 +4,7 @@ import { HomeClient } from "@/components/HomeClient"
 import { getCityReport, listCountries, listReports } from "@/lib/reports"
 import { graph, organizationNode, websiteNode } from "@/lib/seo/jsonld"
 import { PostcardScroller } from "@/components/home/PostcardScroller"
+import { HomeHeading } from "@/components/home/HomeHeading"
 import { homeDemo } from "@/lib/home-demo"
 import { BigPostcard } from "@/components/home/BigPostcard"
 import { StoplightStrip } from "@/components/home/StoplightStrip"
@@ -105,6 +106,8 @@ export default async function Home() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <HomeClient demo={demo} footer={<SiteFooter />}>
+        <HomeHeading />
+
         {seatedCards.length > 0 && (
           <section className="mt-4 rise-in">
             <div>
