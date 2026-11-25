@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Mail } from "lucide-react"
+import { FeedbackButton } from "@/components/FeedbackButton"
 import { Logo } from "@/components/Logo"
 import { humanDate } from "@/lib/site"
 
@@ -44,13 +45,16 @@ export function SiteFooter({ updatedAt, simplePunctuation = false }: { updatedAt
             One place, one click, one report. Up-to-date, personalised travel safety for
             anywhere you&apos;re thinking of going{simplePunctuation ? ". Free, every time." : " — free, every time."}
           </p>
-          <a
-            href="mailto:malek@ismytripsafe.com"
-            className="mt-3.5 inline-flex items-center gap-1.5 text-[0.8rem] font-medium text-[var(--accent-deep)] hover:underline"
-          >
-            <Mail size={13} strokeWidth={2.2} />
-            malek@ismytripsafe.com
-          </a>
+          <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <a
+              href="mailto:malek@ismytripsafe.com"
+              className="inline-flex items-center gap-1.5 text-[0.8rem] font-medium text-[var(--accent-deep)] hover:underline"
+            >
+              <Mail size={13} strokeWidth={2.2} />
+              malek@ismytripsafe.com
+            </a>
+            <FeedbackButton />
+          </div>
         </div>
 
         {/* Routes out */}
