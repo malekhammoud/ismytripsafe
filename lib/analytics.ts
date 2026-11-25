@@ -114,7 +114,7 @@ function beforeSend(event: CaptureResult | null): CaptureResult | null {
   const properties: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(source)) {
     if (key === "$set" || key === "$set_once" || key === "$ip" || key === "$search") continue;
-    if (SENSITIVE_KEY.test(key) && !SAFE_SYSTEM_KEY.has(key)) continue;
+    if (SENSITIVE_KEY.test(key) && !SAFE_SYSTEM_KEY.has(key) && key !== "token") continue;
     if (typeof value === "string" && (key === "page" || key === "path" || key === "$pathname" || key === "href_path")) {
       properties[key] = stripPath(value);
     } else if (typeof value === "string" && PATH_KEYS.test(key)) {
