@@ -37,3 +37,20 @@ Next.js 16.2.9 / React 19 / TypeScript strict / Tailwind v4 (App Router). No tes
 ## Beta branch — nightlife reports
 
 The Nightlife Report feature is now on both `main` and `origin/beta`: pages at `/{country}/{city}/nightlife`, pipeline in `lib/nightlife/*`, batch entry `scripts/nightlife.cjs`, worker under `workers/nightlife/`. Records are shared at `/var/lib/ismytripsafe/nightlife` (`NIGHTLIFE_CACHE_DIR`): `outcome: limited` publishes with a "Limited data" label, `withheld` publishes nothing. Production is canonical; beta must remain noindex for nightlife and canonical to `https://ismytripsafe.com`. The nightly refresh still runs from the beta checkout against the shared cache.
+
+## PlanMyTrip cross-sell rail
+
+`components/planmytrip/PlanMyTripRail.tsx` is the sister-site funnel to PlanMyTrip.health. It
+renders a fixed right rail on city safety reports, country hubs, and published nightlife
+reports. City and country reports show it at `min-width: 1280px`; nightlife reports show it at
+`min-width: 1600px` because their content shell is wider. It is hidden on phones and tablets,
+so it never competes with the report or the orange personalize action.
+
+The card names the report's city/country and links to
+`https://planmytrip.health/sign-up?redirect_url=...` with the destination return path plus
+`utm_source=ismytripsafe`; the "See how it works" link goes to the PlanMyTrip landing page.
+PlanMyTrip's root reads `?destination=` and prefills onboarding after sign-up. Ad anchors carry
+`data-cta="planmytrip"` / `planmytrip_learn` and `data-surface`, so the PostHog CTA listener and
+stored outbound-click event measure the funnel. No health profile, query string, or free text is
+added to analytics.
+
