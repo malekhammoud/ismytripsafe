@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/navigation"
 import { SiteHeader } from "@/components/SiteHeader"
@@ -73,6 +73,7 @@ export function HomeClient({
   // only starts once the profile is confirmed (or skipped).
   const [pending, setPending] = useState<SafetyQuery | null>(null)
   const [profile, setProfile] = useState<TravelerProfile | null>(null)
+  const reportReadyRef = useRef<string | null>(null)
 
   const loading = status === "loading"
   const started = status !== "idle"
@@ -100,6 +101,14 @@ export function HomeClient({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (status !== "done" || geo === null) return;
+    const key = reportPath ?? geo.city;
+    if (reportReadyRef.current === key) return;
+    reportReadyRef.current = key;
+    capture("report_ready", { page: window.location.pathname });
+  }, [status, geo, reportPath])
 
   const search = (q: SafetyQuery) => {
     setPending(q)
