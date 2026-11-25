@@ -1,0 +1,223 @@
+/*
+ * PlanMyTrip.health side rail.
+ * The report column is 640px inside a 896px shell; on wide screens the right
+ * margin is empty. The rail lives there only when it fits and never covers the
+ * reading column. Hidden on phones and tablets.
+ */
+
+.pmt-rail {
+  display: none;
+}
+
+@media (min-width: 1280px) {
+  .pmt-rail:not(.pmt-rail--night) {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 96px;
+    right: 24px;
+    z-index: 30;
+    width: 280px;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    padding: 22px 22px 20px;
+    border: 1px solid rgba(255, 248, 236, 0.2);
+    border-radius: 4px;
+    background: var(--ink);
+    color: #fff8ec;
+    box-shadow: var(--shadow-float);
+    text-align: left;
+  }
+}
+
+@media (min-width: 1600px) {
+  .pmt-rail--night {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 84px;
+    right: 24px;
+    z-index: 30;
+    width: 200px;
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+    padding: 18px 16px 16px;
+    border: 1px solid rgba(255, 248, 236, 0.2);
+    border-radius: 4px;
+    background: var(--night);
+    color: #fff9ed;
+    box-shadow: var(--shadow-float);
+    text-align: left;
+  }
+}
+
+.pmt-rail::before {
+  content: "";
+  display: block;
+  width: 34px;
+  height: 3px;
+  margin-bottom: 13px;
+  background: var(--orange);
+}
+
+.pmt-rail-kicker {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--orange-bright);
+}
+
+.pmt-rail-sister {
+  margin: 5px 0 0;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  color: rgba(255, 248, 236, 0.56);
+}
+
+.pmt-rail-city {
+  margin: 22px 0 0;
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 400;
+  line-height: 0.9;
+  letter-spacing: -0.035em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  color: #fff8ec;
+}
+
+.pmt-rail--night .pmt-rail-city {
+  font-size: 31px;
+}
+
+.pmt-rail-headline {
+  margin: 15px 0 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  color: #fff8ec;
+}
+
+.pmt-rail--night .pmt-rail-headline {
+  font-size: 18px;
+}
+
+.pmt-rail-copy {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: rgba(255, 248, 236, 0.72);
+}
+
+.pmt-rail-list {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(255, 248, 236, 0.16);
+}
+
+.pmt-rail-list li {
+  position: relative;
+  margin: 0;
+  padding: 7px 0 7px 13px;
+  border-bottom: 1px solid rgba(255, 248, 236, 0.12);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  color: rgba(255, 248, 236, 0.8);
+}
+
+.pmt-rail-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--orange-bright);
+}
+
+.pmt-rail-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: var(--orange-deep);
+  color: #fff8ec;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: center;
+  text-decoration: none;
+}
+
+.pmt-rail-cta:hover {
+  background: #c03f21;
+}
+
+.pmt-rail-learn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  margin-top: 4px;
+  color: rgba(255, 248, 236, 0.76);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pmt-rail-learn:hover {
+  color: #fff8ec;
+}
+
+.pmt-rail-fine {
+  margin: 6px 0 0;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1.5;
+  color: rgba(255, 248, 236, 0.45);
+}
+
+.pmt-rail-cta:focus-visible,
+.pmt-rail-learn:focus-visible {
+  outline: 3px solid var(--sun);
+  outline-offset: 3px;
+}
+
+@media (min-width: 1600px) {
+  .pmt-rail--night .pmt-rail-list li {
+    font-size: 8px;
+  }
+}
+
+@media (max-height: 700px) {
+  .pmt-rail,
+  .pmt-rail--night {
+    top: 72px;
+    max-height: calc(100vh - 84px);
+  }
+
+  .pmt-rail-city {
+    font-size: 34px;
+  }
+
+  .pmt-rail--night .pmt-rail-city {
+    font-size: 27px;
+  }
+}

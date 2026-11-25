@@ -28,6 +28,7 @@ import { TrafficReport } from "@/components/report/TrafficReport"
 import { RelatedGrid } from "@/components/seo/DestinationCards"
 import { wikimediaThumb } from "@/lib/photos"
 import { SectionNav, BackToTopPill } from "@/components/report/SectionNav"
+import { PlanMyTripRail } from "@/components/planmytrip/PlanMyTripRail"
 import type { CachedReport } from "@/lib/cache"
 import { ArrowRight, Check, Globe2, Map as MapIcon, SlidersHorizontal } from "lucide-react"
 
@@ -174,6 +175,12 @@ export default async function CityReportPage({
   return (
     <>
       <SiteHeader />
+      <PlanMyTripRail
+        city={meta.city}
+        country={meta.country}
+        context="city"
+        placement="city_report_rail"
+      />
 
       {/* The trust band — the home page's promise, carried onto every report.
           It is the first thing a reader sees after the nav: fast, reliable,

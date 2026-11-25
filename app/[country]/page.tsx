@@ -30,6 +30,7 @@ import {
   type Crumb,
 } from "@/components/seo/shared"
 import { TrafficReport } from "@/components/report/TrafficReport"
+import { PlanMyTripRail } from "@/components/planmytrip/PlanMyTripRail"
 import { wikimediaThumb } from "@/lib/photos"
 import type { SafetySignal } from "@/lib/types"
 import { ArrowRight, SlidersHorizontal } from "lucide-react"
@@ -235,6 +236,11 @@ export default async function CountryHubPage({
   return (
     <>
       <SiteHeader />
+      <PlanMyTripRail
+        city={hub.country}
+        context="country"
+        placement="country_report_rail"
+      />
       <main className="relative z-10 mx-auto max-w-4xl px-4 py-7 sm:px-6">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
         <div className="mx-auto max-w-[640px]">

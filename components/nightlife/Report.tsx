@@ -2,6 +2,7 @@ import Link from "next/link"
 import { ArrowUpRight, AudioLines, Beer, Building2, CalendarDays, Clock3, Info, MapPin, Moon, ShieldCheck, Sparkles } from "lucide-react"
 import { SiteHeader } from "@/components/SiteHeader"
 import { SiteFooter } from "@/components/SiteFooter"
+import { PlanMyTripRail } from "@/components/planmytrip/PlanMyTripRail"
 import { Stars } from "./Stars"
 import { VenueMap } from "./VenueMap"
 import { SafetyMap } from "./SafetyMap"
@@ -34,6 +35,12 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
   const source = r.sources.find(s => s.id === "numbeo" && s.fetchedAt)
   return <div className="nl-page nl-report">
     <SiteHeader />
+    <PlanMyTripRail
+      city={c.city}
+      country={c.country}
+      context="nightlife"
+      placement="nightlife_report_rail"
+    />
     <main>
       <header className="nl-report-hero">
         {photo && <img className="nl-night-photo" src={photo.url} alt="" fetchPriority="high"/>}
