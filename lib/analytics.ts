@@ -106,6 +106,26 @@ function sharedQueue(): QueuedEvent[] {
   return w[GLOBAL_QUEUE_KEY] as QueuedEvent[];
 }
 
+function sanitizePropertyValue(key: string, value: unknown, depth = 0): unknown {
+  if (typeof value === "string") {
+    if (key === "page" || key === "path" || key === "$pathname" || key === "href_path") return stripPath(value);
+    if (PATH_KEYS.test(key)) return stripUrl(value);
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map((item) => sanitizePropertyValue(key, item, depth + 1));
+  }
+  if (value !== null && typeof value === "object" && depth < 3) {
+    const output: Record<string, unknown> = {};
+    for (const [childKey, childValue] of Object.entries(value)) {
+      if (SENSITIVE_KEY.test(childKey) && !SAFE_SYSTEM_KEY.has(childKey) && childKey !== "token") continue;
+      output[childKey] = sanitizePropertyValue(childKey, childValue, depth + 1);
+    }
+    return output;
+  }
+  return value;
+}
+
 function beforeSend(event: CaptureResult | null): CaptureResult | null {
   if (!event) return event;
   const source = (event.properties && typeof event.properties === "object"
@@ -115,13 +135,7 @@ function beforeSend(event: CaptureResult | null): CaptureResult | null {
   for (const [key, value] of Object.entries(source)) {
     if (key === "$set" || key === "$set_once" || key === "$ip" || key === "$search") continue;
     if (SENSITIVE_KEY.test(key) && !SAFE_SYSTEM_KEY.has(key) && key !== "token") continue;
-    if (typeof value === "string" && (key === "page" || key === "path" || key === "$pathname" || key === "href_path")) {
-      properties[key] = stripPath(value);
-    } else if (typeof value === "string" && PATH_KEYS.test(key)) {
-      properties[key] = stripUrl(value);
-    } else {
-      properties[key] = value;
-    }
+    properties[key] = sanitizePropertyValue(key, value);
   }
   return { ...event, properties } as CaptureResult;
 }
