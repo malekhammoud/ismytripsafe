@@ -227,7 +227,7 @@ export async function fetchWikivoyage(city: City, force = false) {
     ...(city.city.toLowerCase() === city.country.toLowerCase() ? [city.country] : []),
   ])]
   const result = await cached(city.key, "wikivoyage", CACHE_DAYS, async () => {
-    let lastError: unknown = null
+    let lastError: unknown = null, sawPage = false
     for (const title of titles) {
       try {
         const data = await fetchJson<WvPage>(
@@ -237,15 +237,19 @@ export async function fetchWikivoyage(city: City, force = false) {
         )
         const raw = data.parse?.wikitext ?? "", pageTitle = data.parse?.title
         if (!raw || !pageTitle) continue
+        sawPage = true
         const picks = parseWikivoyageListings(raw, pageTitle)
         if (picks.length) return { picks, pageTitle, url: `https://en.wikivoyage.org/wiki/${encodeURIComponent(pageTitle.replace(/ /g, "_"))}` }
       } catch (error) {
+        // MediaWiki reports a missing page as HTTP 200 with a missingtitle
+        // error document. That is a coverage answer, not an outage.
+        if (error instanceof SourceHttpError && ([400, 404].includes(error.status) || ["missingtitle", "invalidtitle"].includes(error.code ?? ""))) continue
         lastError = error
       }
     }
-    // A missing page (404) is a coverage answer, not an outage. A transport or
-    // server failure is an outage and should be visible in the source ledger.
-    if (lastError && !(lastError instanceof SourceHttpError && [400, 404].includes(lastError.status))) throw lastError
+    // A page that exists but has no structured listings is a coverage answer.
+    // Only an outage with no readable page at all is a source error.
+    if (!sawPage && lastError) throw lastError
     return { picks: [] as GuidePick[], pageTitle: null as string | null, url: null as string | null }
   }, force, `wikivoyage-listings-${VERSION}:${city.wikidataId ?? city.key}`)
   const count = result.data.picks.length

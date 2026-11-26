@@ -9,7 +9,7 @@ async function run() {
   process.env.NIGHTLIFE_CACHE_DIR = await fs.mkdtemp(path.join(os.tmpdir(), 'nightlife-sources-'))
   const { parseWikivoyageListings, listingVenues, splitTemplateParams } = require('../lib/nightlife/wikivoyage.ts')
   const { upcomingHolidays } = require('../lib/nightlife/holidays.ts')
-  const { venueQuery } = require('../lib/nightlife/overpass.ts')
+  const { venueQuery, collectionQuery } = require('../lib/nightlife/overpass.ts')
   const { mergeVenues, venueType } = require('../lib/nightlife/venues.ts')
 
   const guide = `
@@ -85,6 +85,10 @@ async function run() {
   const query = venueQuery(3600000123)
   for (const tag of ['amenity=casino', 'amenity=stripclub', 'amenity=hookah_lounge', 'leisure=dance', 'out count']) {
     assert.ok(query.includes(tag), `venue query must include ${tag}`)
+  }
+  const cityQuery = collectionQuery({ wikidataId: 'Q1', relationId: 123 })
+  for (const tag of ['amenity=casino', 'amenity=stripclub', 'amenity=hookah_lounge', 'leisure=dance', 'out count']) {
+    assert.ok(cityQuery.includes(tag), `main city query must include ${tag}`)
   }
 
   assert.equal(venueType('casino'), 'Casino')
