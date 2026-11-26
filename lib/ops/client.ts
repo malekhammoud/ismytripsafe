@@ -12,6 +12,17 @@ interface ClientEvent {
 const seen = new Map<string, number>();
 let installed = false;
 
+// Browser-generated ResizeObserver notices surface through window.error but are
+// not application failures. They fire whenever a watched element resizes during
+// observation (the Leaflet map on /map is a common source) and reporting them
+// buries real client errors.
+const BENIGN_CLIENT_ERROR =
+  /^(?:uncaught\s+)?(?:error:\s*)?resizeobserver loop (?:completed with undelivered notifications|limit exceeded)\.?$/i;
+
+export function isBenignClientError(message: string): boolean {
+  return BENIGN_CLIENT_ERROR.test(message.trim());
+}
+
 function send(event: ClientEvent): void {
   if (typeof window === "undefined") return;
   const now = Date.now();
@@ -47,9 +58,13 @@ function send(event: ClientEvent): void {
 
 export function reportClientError(error: unknown, boundary = "client"): void {
   if (error instanceof Error) {
-    send({ message: error.message || error.name, stack: error.stack, boundary });
+    const message = error.message || error.name;
+    if (isBenignClientError(message)) return;
+    send({ message, stack: error.stack, boundary });
   } else {
-    send({ message: String(error).slice(0, 2_000), boundary });
+    const message = String(error).slice(0, 2_000);
+    if (isBenignClientError(message)) return;
+    send({ message, boundary });
   }
 }
 

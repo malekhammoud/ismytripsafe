@@ -1,8 +1,10 @@
 require('../scripts/typescript-worker.cjs')
-// package.json's gate enumerates test files explicitly; pull the home-page H1
-// and SEO metadata regressions into this run without editing the manifest.
+// package.json's gate enumerates test files explicitly; pull the home-page H1,
+// SEO metadata and client-error filter regressions into this run without
+// editing the manifest.
 require('./home-heading.test.cjs')
 require('./seo-metadata-overrides.test.cjs')
+require('./client-error-filter.test.cjs')
 const {test}=require('node:test')
 const assert=require('node:assert/strict')
 const {useReport}=require('../lib/store.ts')
