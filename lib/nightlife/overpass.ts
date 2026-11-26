@@ -108,8 +108,12 @@ export function verifiedArea(city: City, raw: OsmResponse) {
 }
 export function venueQuery(areaId: number) {
   if (!Number.isSafeInteger(areaId) || areaId <= 3600000000) throw new Error("Invalid Overpass area identifier")
-  const amenities = ["bar", "pub", "nightclub", "biergarten", "music_venue"]
-  const filters = amenities.map(a => `nwr(area.city)[amenity=${a}];`).join("")
+  const amenities = ["bar", "pub", "nightclub", "biergarten", "music_venue", "casino", "stripclub", "hookah_lounge"]
+  const leisure = ["dance"]
+  const filters = [
+    ...amenities.map(a => `nwr(area.city)[amenity=${a}];`),
+    ...leisure.map(l => `nwr(area.city)[leisure=${l}];`),
+  ].join("")
   // Print the area to distinguish unavailable area data from a genuine zero.
   // A final count proves the entire union was returned, including ways/relations.
   return `${header(25)}area(${areaId})->.city;.city out ids;(${filters}nwr(area.city)[amenity=restaurant][bar=yes];);out body center qt;out count;`

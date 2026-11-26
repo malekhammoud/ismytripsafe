@@ -1,7 +1,7 @@
-export const VENUE_TYPES = ["Cocktail bar", "Pub", "Restaurant bar", "Dive / casual bar", "Wine bar", "Beer bar / brewery", "Sports bar", "Nightclub", "Live music", "Karaoke", "LGBTQ+ bar", "Beer garden", "Other"] as const
+export const VENUE_TYPES = ["Cocktail bar", "Pub", "Restaurant bar", "Dive / casual bar", "Wine bar", "Beer bar / brewery", "Sports bar", "Nightclub", "Live music", "Karaoke", "LGBTQ+ bar", "Beer garden", "Casino", "Dance hall", "Hookah lounge", "Adult entertainment", "Other"] as const
 export type VenueType = typeof VENUE_TYPES[number]
 export type ScoreKey = "density" | "quality" | "variety" | "vibe" | "safety"
-export type SourceId = "osm" | "foursquare" | "wikidata" | "ticketmaster" | "numbeo" | "reddit" | "blogs" | "safety"
+export type SourceId = "osm" | "foursquare" | "wikidata" | "ticketmaster" | "numbeo" | "reddit" | "blogs" | "safety" | "wikivoyage" | "holidays"
 export interface Source {
   id: SourceId; name: string; url: string; fetchedAt: string | null
   status: "ok" | "unavailable" | "error"; note: string; licence: string
@@ -46,12 +46,24 @@ export interface SafetyInput {
   zones: { name: string; level: "safe" | "caution" | "avoid"; note: string; lat?: number; lon?: number; geojson?: unknown }[]
 }
 export interface NightEvent { id: string; name: string; date: string; venue: string; url: string }
+/**
+ * A structured listing from a public travel guide. It is context and a
+ * starting point, never a score input: guide text can be stale and is not a
+ * customer rating.
+ */
+export interface GuidePick {
+  id: string; name: string; type: VenueType; description: string
+  address?: string; hours?: string; price?: string; phone?: string; url?: string
+  lat?: number; lon?: number; sourceUrl: string
+}
+export interface PublicHoliday { date: string; name: string; localName?: string }
 export interface BeerPrices { meal?: number | null; taxiStart?: number | null; taxiPerKm?: number | null; currency: string; domestic: number | null; imported: number | null; domesticUsd: number | null; importedUsd: number | null; updatedAt: string }
 export interface Lateness { known: number; total: number; afterMidnight: number; after2: number; after4: number; note: string }
 export interface NightlifeReport {
   version: 1; formulaVersion: string; pipelineVersion?: string; city: City; updatedAt: string
   outcome: "full" | "limited" | "withheld"; reasons: string[]; overall: number | null
-  scores: Score[]; venues: Venue[]; mentions: Mention[]; testimonials?: Testimonial[]; events: NightEvent[]
+  scores: Score[]; venues: Venue[]; mentions: Mention[]; testimonials?: Testimonial[]
+  guidePicks?: GuidePick[]; holidays?: PublicHoliday[]; events: NightEvent[]
   beer: BeerPrices | null; safety: SafetyInput | null; lateness: Lateness; sources: Source[]
-  refresh: { venues: string; events: string; population: string; beer: string; testimonials?: string }
+  refresh: { venues: string; events: string; population: string; beer: string; testimonials?: string; guides?: string; holidays?: string }
 }

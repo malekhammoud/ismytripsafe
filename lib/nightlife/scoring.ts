@@ -61,7 +61,7 @@ export function scoreReport(city: City, venues: Venue[], mentions: Mention[], sa
   const lateKnown = lateness?.known ?? 0
   const late2Share = lateKnown ? lateness!.after2 / lateKnown : 0
   const late4Share = lateKnown ? lateness!.after4 / lateKnown : 0
-  const nightlifeShare = share(v => ["Cocktail bar", "Pub", "Dive / casual bar", "Wine bar", "Beer bar / brewery", "Sports bar", "Nightclub", "Live music", "Karaoke", "LGBTQ+ bar", "Beer garden"].includes(v.type))
+  const nightlifeShare = share(v => ["Cocktail bar", "Pub", "Dive / casual bar", "Wine bar", "Beer bar / brewery", "Sports bar", "Nightclub", "Live music", "Karaoke", "LGBTQ+ bar", "Beer garden", "Casino", "Dance hall", "Hookah lounge", "Adult entertainment"].includes(v.type))
   const densityScore = density == null ? 0 : clamp(density / 60, 0, 1)
   const documentation = 0.4 * hoursShare + 0.25 * websiteShare + 0.15 * phoneShare + 0.2 * neighbourhoodShare
   const typeScore = Math.min(1, effective / 6)

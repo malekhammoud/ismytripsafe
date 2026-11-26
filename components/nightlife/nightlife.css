@@ -57,3 +57,17 @@
 @media(max-width:700px){.nl-report-jump{gap:6px 12px;overflow-x:auto;flex-wrap:nowrap;white-space:nowrap}.nl-numbers-grid{grid-template-columns:1fr 1fr;gap:7px}.nl-number{min-height:86px;padding:11px}.nl-number>strong{font-size:22px}.nl-know ul{grid-template-columns:1fr}.nl-plan-cards{grid-template-columns:1fr}}
 @media(max-width:1000px){.nl-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.nl-area-breakdown{grid-template-columns:1fr}}
 @media(max-width:700px){.nl-brief-lede{font-size:14px}.nl-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.nl-stat-card{padding:14px;min-height:96px}.nl-stat-card>strong{font-size:23px}.nl-stat-card>span{font-size:8px}.nl-trait-row{font-size:10px}.nl-report .nl-score-points{font-size:9px}}
+
+.nl-guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.nl-guide-card{display:flex;flex-direction:column;gap:7px;padding:18px 19px;border:1px solid #e3e0d3;border-radius:6px;background:#fffcf4}
+.nl-guide-type{font-family:var(--font-mono);font-size:8px;text-transform:uppercase;letter-spacing:.06em;color:#7d8e72}
+.nl-guide-card h3{font:500 19px/1.3 var(--font-display);margin:0}
+.nl-guide-card h3 a{display:inline-flex;gap:5px;align-items:baseline;text-decoration:none}
+.nl-guide-card h3 a:hover{text-decoration:underline;text-underline-offset:3px}
+.nl-guide-card p{font-size:11px;line-height:1.7;color:#59635b;margin:0}
+.nl-guide-address{display:flex;gap:5px;align-items:flex-start;color:#7d847b!important}
+.nl-guide-meta{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:10px;color:#687266}
+.nl-guide-meta>span{display:inline-flex;gap:5px;align-items:center}
+.nl-guide-card small{margin-top:auto;font-size:9px}
+.nl-guide-card small a{color:#4b6745;text-decoration:underline}
+@media(max-width:1000px){.nl-guide-grid{grid-template-columns:1fr}}

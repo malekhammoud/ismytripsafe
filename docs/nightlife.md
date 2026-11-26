@@ -14,8 +14,9 @@ production; the branch targets `origin/beta`. Use an explicit `HEAD:beta` push.
 - `/nightlife/testimonials`: searchable index of every attributed traveler
   quote by text, city and tone. The first 24 results are server-rendered; the
   full 403-quote set is filtered client-side.
-- `/{country}/{city}/nightlife`: sourced, server-rendered report, including a
-  **What people are saying** section.
+- `/{country}/{city}/nightlife`: sourced, server-rendered report, including
+  **What people are saying**, **Local picks from the travel guide**, and
+  upcoming **Public holidays** sections when those sources return data.
 - `/{country}/{city}/nightlife/data.json`: ODbL venue export, excluding all
   proprietary ratings, popularity, review counts, tips, and sentiment labels.
 - Existing city safety pages start nightlife research on a real browser visit and show a teaser even before the first report qualifies.
@@ -40,6 +41,35 @@ TripAdvisor, Yelp and booking sites are deliberately excluded. Testimonials
 are context, not score inputs; a missing quote is recorded as no suitable
 public excerpt rather than invented. `node scripts/nightlife.cjs
 --testimonials-all` recomputes them without refetching venue data.
+
+### Additional keyless sources (November 26)
+
+The first source audit showed that Foursquare, Ticketmaster, Numbeo, and
+Reddit were all unconnected, leaving OSM and Wikidata as the only working
+venue sources. Three keyless additions now broaden coverage without adding
+credentials:
+
+- **Wikivoyage listings** — the same keyless city guide used for quotes is
+  parsed for `{{drink}}` and `{{listing}}` templates. The parser reads name,
+  address, coordinates, hours, price, phone, URL, and a short description,
+  then stores at most 30 picks. A listing with valid coordinates inside the
+  verified city boundary is merged into the mapped venue list (and enriches an
+  existing OSM match); unmapped picks stay in the **Local picks** section and
+  never affect venue counts or scores. Only short attributed excerpts and
+  links are stored, never the full article.
+- **Expanded OSM categories** — the Overpass query now also collects
+  `amenity=casino`, `amenity=stripclub`, `amenity=hookah_lounge`, and
+  `leisure=dance`, with matching venue types. This is still ODbL data and is
+  included in the public data export.
+- **Nager.Date public holidays** — country-wide holidays in the next 120 days
+  are shown as planning context. Subnational holidays are excluded because the
+  report has no county-level match. Holidays are not venue data and do not
+  affect scores.
+
+All three are optional: a failure is recorded in the source ledger, keeps the
+last successful response when one exists, and never replaces a published
+report with a withheld one. Wikivoyage and holiday failures do not reduce score
+coverage, so they cannot block a refresh on their own.
 
 Quality and Vibe use licensed ratings and enough independent traveler mentions
 when those sources exist. Without them, the report uses a labelled **Editorial

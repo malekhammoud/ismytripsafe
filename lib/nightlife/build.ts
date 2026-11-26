@@ -5,6 +5,8 @@ import { scoreReport, FORMULA_VERSION } from "./scoring"
 import { distance, mergeVenues, normalizeName } from "./venues"
 import { withinBoundary } from "./boundary"
 import { fetchBeer, fetchEvents, fetchFoursquare, fetchOsm, importedMentions, resolveCity, SOURCE_INFO, unavailable } from "./sources"
+import { fetchHolidays } from "./holidays"
+import { fetchWikivoyage, listingVenues } from "./wikivoyage"
 import { lookupPopulation } from "./wikidata"
 import { lateness } from "./hours"
 import { resolveSafetyZones } from "./zones"
@@ -66,6 +68,7 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   const independent = Promise.all([
     collect("foursquare", () => fetchFoursquare(seed, options.force)), collect("ticketmaster", () => fetchEvents(seed, options.force)),
     collect("numbeo", () => fetchBeer(seed, options.force)), importedMentions(seed.key),
+    collect("wikivoyage", () => fetchWikivoyage(seed, options.force)), collect("holidays", () => fetchHolidays(seed, options.force)),
   ])
   await options.onProgress?.("resolve")
   const resolved = await collect("wikidata", () => resolveCity(seed, options.force, options.interactive))
@@ -88,7 +91,9 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   const zoned = await zonesTask
   if (zoned) safety = zoned
   await options.onProgress?.("details")
-  const [fsq, tm, prices, imported] = await independent
+  const [fsq, tm, prices, imported, guides, holidayData] = await independent
+  const guidePicks = guides?.picks ?? []
+  const guideVenues = listingVenues(guidePicks, osm?.boundary ?? null, osm?.venues ?? [])
   const collected = await collect("blogs", () => collectMentions(city, fsq?.venues ?? [], options.force))
   if (collected?.errors.length && !sources.some(s => s.id === "blogs")) sources.push({ ...unavailable("blogs", collected.errors.join("; ")), status: "error" })
   const testimonials = await testimonialTask
@@ -108,6 +113,14 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   else if (!sources.some(s => s.id === "ticketmaster")) sources.push(unavailable("ticketmaster", "Event listings are not connected for this report."))
   if (prices) sources.push(prices.source)
   else if (!sources.some(s => s.id === "numbeo")) sources.push(unavailable("numbeo", "Licensed beer-price data is not available for this report."))
+  if (guides) {
+    const mapped = guideVenues.length
+    sources.push({ ...guides.source, note: `${guides.source.note}${mapped ? ` ${mapped} listing${mapped === 1 ? "" : "s"} linked to the mapped venue list.` : ""}` })
+  } else if (!sources.some(s => s.id === "wikivoyage")) {
+    sources.push(unavailable("wikivoyage", "No structured nightlife listings were found in the available Wikivoyage guide."))
+  }
+  if (holidayData) sources.push(holidayData.source)
+  else if (!sources.some(s => s.id === "holidays")) sources.push(unavailable("holidays", "Public-holiday data is not available for this report."))
   for (const id of ["reddit", "blogs"] as const) {
     const imported = mentions.filter(m => m.source === id)
     if (sources.some(s => s.id === id)) continue
@@ -117,13 +130,15 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   // Clip radius-selected records to the real admin polygon. If geometry is
   // incomplete, only confidently matched boundary-scoped OSM venues qualify.
   const inBoundary = (fsq?.venues ?? []).filter(f => osm?.boundary ? withinBoundary(f, osm.boundary) : (osm?.venues ?? []).some(o => distance(o, f) <= 50 && normalizeName(o.name) === normalizeName(f.name)))
-  const venues: Venue[] = mergeVenues(osm?.venues ?? [], inBoundary)
+  // Merge licensed/optional venue data first, then guide markers. A guide
+  // listing may legitimately enrich a venue that Foursquare already matched.
+  const venues: Venue[] = mergeVenues(mergeVenues(osm?.venues ?? [], inBoundary), guideVenues)
   const peers = (await peersTask).flatMap(r => { const d = r.density; return r.city.population && typeof d === "number" ? [{ key: r.city.key, population: r.city.population, density: d }] : [] })
   await options.onProgress?.("score")
   const latenessData = lateness(venues, city)
   const scores = scoreReport(city, venues, mentions, safety, new Date(), peers, latenessData)
   const dateFor = (id: SourceId) => sources.find(s => s.id === id)?.fetchedAt ?? ""
-  const next: NightlifeReport = { version: 1, formulaVersion: FORMULA_VERSION, pipelineVersion: PIPELINE_VERSION, city, updatedAt: new Date().toISOString(), ...scores, venues, mentions, testimonials: testimonials.testimonials, events: tm?.data.events ?? [], beer: prices?.data.beer ?? null, safety, lateness: latenessData, sources, refresh: { venues: dateFor("osm"), events: dateFor("ticketmaster"), population: dateFor("wikidata"), beer: dateFor("numbeo"), testimonials: testimonials.fetchedAt ?? "" } }
+  const next: NightlifeReport = { version: 1, formulaVersion: FORMULA_VERSION, pipelineVersion: PIPELINE_VERSION, city, updatedAt: new Date().toISOString(), ...scores, venues, mentions, testimonials: testimonials.testimonials, guidePicks, holidays: holidayData?.holidays ?? [], events: tm?.data.events ?? [], beer: prices?.data.beer ?? null, safety, lateness: latenessData, sources, refresh: { venues: dateFor("osm"), events: dateFor("ticketmaster"), population: dateFor("wikidata"), beer: dateFor("numbeo"), testimonials: testimonials.fetchedAt ?? "", guides: dateFor("wikivoyage"), holidays: dateFor("holidays") } }
   // Never replace a published report with an upstream-outage artifact.
   if (previous && previous.outcome !== "withheld" && sources.some(s => s.status === "error") && (next.outcome === "withheld" || next.scores.filter(s => s.value != null).length < previous.scores.filter(s => s.value != null).length)) throw new Error("Refresh failed publication checks after a source error; kept the previous published report")
   await saveNightlife(next)

@@ -47,6 +47,8 @@ async function run() {
   else if(url.hostname==='places-api.foursquare.com')data={results:fsq?Array.from({length:12},(_,i)=>({fsq_place_id:`f${i}`,name:`Venue ${i}`,latitude:42+i*.001,longitude:10+(i%4)*.001,categories:[{name:['Pub','Cocktail Bar','Nightclub','Jazz Club'][i%4]}],rating:7.5+i*.1,popularity:.9-i*.01,stats:{total_ratings:40+i},location:{neighborhood:['Old Town']}})).concat([{fsq_place_id:'inside-extra',name:'Extra live music',latitude:42.02,longitude:10.02,categories:[{name:'Jazz Club'}],rating:8,popularity:.8,stats:{total_ratings:30}},{fsq_place_id:'outside-extra',name:'Wrong city club',latitude:50,longitude:20,categories:[{name:'Nightclub'}],rating:9,popularity:.9,stats:{total_ratings:100}}]):[]}
   else if(url.hostname==='app.ticketmaster.com')data={_embedded:{events:[{id:'event-1',name:'Preview jazz night',url:'https://www.ticketmaster.com/event/example',dates:{start:{dateTime:new Date(Date.now()+86400000*3).toISOString(),localDate:'2026-10-22'},status:{code:'onsale'}},_embedded:{venues:[{name:'Preview music hall'}]}}]}}
   else if(url.hostname==='www.numbeo.com')data={currency:url.searchParams.get('currency')||'EUR',yearLastUpdate:2026,monthLastUpdate:10,prices:[{item_id:1,average_price:12},{item_id:1001,item_name:'Taxi Start (Normal Tariff), Transportation',average_price:4},{item_id:1002,item_name:'Taxi 1km (Normal Tariff), Transportation',average_price:1.5},{item_id:1003,item_name:'Taxi 1 mile (Normal Tariff), Transportation',average_price:99},{item_id:4,average_price:4},{item_id:5,average_price:5}]}
+  else if(url.hostname==='en.wikivoyage.org')data={parse:{title:'Preview City',wikitext:'==Drink==\n{{drink|name=Venue 0|lat=42|long=10|address=Old Town|hours=Mo-Su 20:00-03:00|content=Cocktail bar with live music.}}'}}
+  else if(url.hostname==='date.nager.at')data=[]
   else throw new Error('Unexpected network '+url)
   return new Response(JSON.stringify(data),{headers:{'content-type':'application/json'}})
  }
@@ -56,6 +58,7 @@ async function run() {
  const imports=Array.from({length:12},(_,i)=>({id:`m${i}`,group:`article-${i%4}`,source:'blogs',url:`https://example.com/article-${i%4}`,publishedAt:'2026-09-01',sentiment:'positive',themes:['Lively weekends'],relevant:true}))
  await fs.writeFile(path.join(process.env.NIGHTLIFE_MENTIONS_DIR,'xx_preview.json'),JSON.stringify(imports))
  const full=await buildNightlife(base,safety,{force:true});assert.equal(full.outcome,'full');assert.equal(full.venues.length,25);assert.ok(full.venues.some(v=>v.name==='Extra live music'));assert.ok(!full.venues.some(v=>v.name==='Wrong city club'));assert.equal(full.events.length,1);assert.equal(full.beer.domestic,4);assert.equal(full.beer.meal,12);assert.equal(full.beer.taxiStart,4);assert.equal(full.beer.taxiPerKm,1.5);assert.equal(full.city.population,100000);assert.equal(full.city.boundaryVerified,true)
+ assert.equal(full.guidePicks.length,1);assert.ok(full.venues.find(v=>v.name==='Venue 0').sources.some(s=>s.id==='wikivoyage'));assert.ok(Array.isArray(full.holidays))
  searchDown=true;overpassDown=true
  const recovered=await buildNightlife({...base,key:'xx_recovered',citySlug:'recovered'},safety,{force:true,interactive:true})
  assert.equal(recovered.outcome,'full');assert.equal(recovered.city.resolutionMethod,'linked-data');assert.equal(recovered.venues.length,25);assert.equal(recovered.sources.find(s=>s.id==='wikidata').status,'ok')
@@ -73,7 +76,7 @@ async function run() {
  assert.equal(publicQueries.length,1);assert.ok(publicQueries.every(c=>!new URLSearchParams(c.init.body).get('data').includes('out geom')))
  process.env.FOURSQUARE_API_KEY=fsqKey
  const raw=await fs.readFile(path.join(root,'raw','xx_preview','foursquare.json'),'utf8');assert.ok(!raw.includes('secret-'));assert.ok(JSON.parse(raw).data.results.length)
- const exported=await GET(new Request('http://localhost/example/preview/nightlife/data.json'),{params:Promise.resolve({country:'example',city:'preview'})});const payload=await exported.json();assert.equal(payload.venues.length,24);assert.equal(payload.venues[0].rating,undefined);assert.equal(payload.venues[0].popularity,undefined);assert.equal(payload.licence,'ODbL 1.0')
+ const exported=await GET(new Request('http://localhost/example/preview/nightlife/data.json'),{params:Promise.resolve({country:'example',city:'preview'})});const payload=await exported.json();assert.equal(payload.venues.length,24);assert.equal(payload.venues[0].rating,undefined);assert.equal(payload.venues[0].popularity,undefined);assert.equal(payload.licence,'ODbL 1.0');assert.equal(payload.venues.find(v=>v.name==='Venue 0').tags?.['wv:guide'],undefined,'CC BY-SA guide markers must not enter the ODbL export')
  const missing=await GET(new Request('http://localhost/missing'),{params:Promise.resolve({country:'missing',city:'missing'})});assert.equal(missing.status,404)
  fsq=false;await fs.unlink(path.join(process.env.NIGHTLIFE_MENTIONS_DIR,'xx_preview.json'))
  const editorial=await buildNightlife({...base,key:'xx_limited',citySlug:'limited'},safety,{force:true});assert.equal(editorial.outcome,'full');assert.equal(editorial.scores.filter(s=>s.value==null).length,0)
@@ -88,7 +91,7 @@ async function run() {
  let retryCalls=0;global.fetch=async()=>{retryCalls++;throw new Error('Simulated Reddit outage')}
  const failedMentions=await collectMentions(base,[]),retriedMentions=await collectMentions(base,[])
  assert.ok(failedMentions.errors.length);assert.ok(retriedMentions.errors.length);assert.equal(retryCalls,4,'A failed sentiment fetch must not be cached as a successful monthly fetch')
- console.log('PASS: full/editorial/withheld pipeline, eight source statuses, current FSQ contract, raw caches, stale-source dates, safety weighting, and licence-safe public export')
+ console.log('PASS: full/editorial/withheld pipeline, ten source statuses, current FSQ contract, raw caches, stale-source dates, safety weighting, and licence-safe public export')
  console.log('Preview fixture store: '+root)
 }
 run().catch(e=>{console.error(e);process.exitCode=1})
