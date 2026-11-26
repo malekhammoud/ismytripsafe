@@ -106,17 +106,17 @@ export function verifiedArea(city: City, raw: OsmResponse) {
   if (areas.length !== 1) throw new SourceUnavailable("OpenStreetMap has the city boundary but its searchable area is not available yet.")
   return { boundary, areaId: areas[0].id }
 }
+const VENUE_AMENITIES = ["bar", "pub", "nightclub", "biergarten", "music_venue", "casino", "stripclub", "hookah_lounge"]
+const VENUE_LEISURE = ["dance"]
+const venueFilters = (scope: string) => [
+  ...VENUE_AMENITIES.map(a => `nwr(${scope})[amenity=${a}];`),
+  ...VENUE_LEISURE.map(l => `nwr(${scope})[leisure=${l}];`),
+].join("")
 export function venueQuery(areaId: number) {
   if (!Number.isSafeInteger(areaId) || areaId <= 3600000000) throw new Error("Invalid Overpass area identifier")
-  const amenities = ["bar", "pub", "nightclub", "biergarten", "music_venue", "casino", "stripclub", "hookah_lounge"]
-  const leisure = ["dance"]
-  const filters = [
-    ...amenities.map(a => `nwr(area.city)[amenity=${a}];`),
-    ...leisure.map(l => `nwr(area.city)[leisure=${l}];`),
-  ].join("")
   // Print the area to distinguish unavailable area data from a genuine zero.
   // A final count proves the entire union was returned, including ways/relations.
-  return `${header(25)}area(${areaId})->.city;.city out ids;(${filters}nwr(area.city)[amenity=restaurant][bar=yes];);out body center qt;out count;`
+  return `${header(25)}area(${areaId})->.city;.city out ids;(${venueFilters("area.city")}nwr(area.city)[amenity=restaurant][bar=yes];);out body center qt;out count;`
 }
 // One round trip resolves the boundary, its searchable area and every venue.
 // The old pipeline made two sequential Overpass calls; this returns the same
@@ -125,9 +125,7 @@ export function collectionQuery(city: City) {
   if (!city.wikidataId || !/^Q\d+$/.test(city.wikidataId)) throw new SourceUnavailable("A verified city identity is needed before mapping venues.")
   if (city.relationId != null && (!Number.isSafeInteger(city.relationId) || city.relationId <= 0)) throw new SourceUnavailable("Invalid city boundary identifier.")
   const selection = city.relationId ? `rel(${city.relationId})` : `rel[wikidata="${city.wikidataId}"]${BOUNDARY_FILTER}`
-  const amenities = ["bar", "pub", "nightclub", "biergarten", "music_venue"]
-  const filters = amenities.map(a => `nwr(area.area)[amenity=${a}];`).join("")
-  return `${header(45)}${selection}->.boundary;.boundary out tags;.boundary map_to_area->.area;.area out tags;(${filters}nwr(area.area)[amenity=restaurant][bar=yes];);out tags center qt;out count;`
+  return `${header(45)}${selection}->.boundary;.boundary out tags;.boundary map_to_area->.area;.area out tags;(${venueFilters("area.area")}nwr(area.area)[amenity=restaurant][bar=yes];);out tags center qt;out count;`
 }
 export function verifiedCollection(city: City, raw: OsmResponse) {
   if (raw.remark || !Array.isArray(raw.elements)) throw new Error("Overpass returned an incomplete city query")

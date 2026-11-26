@@ -113,11 +113,14 @@ export async function buildNightlife(seed: City, safetyReport: CachedReport | nu
   else if (!sources.some(s => s.id === "ticketmaster")) sources.push(unavailable("ticketmaster", "Event listings are not connected for this report."))
   if (prices) sources.push(prices.source)
   else if (!sources.some(s => s.id === "numbeo")) sources.push(unavailable("numbeo", "Licensed beer-price data is not available for this report."))
-  if (guides) {
+  if (guides?.picks.length) {
     const mapped = guideVenues.length
     sources.push({ ...guides.source, note: `${guides.source.note}${mapped ? ` ${mapped} listing${mapped === 1 ? "" : "s"} linked to the mapped venue list.` : ""}` })
   } else if (!sources.some(s => s.id === "wikivoyage")) {
-    sources.push(unavailable("wikivoyage", "No structured nightlife listings were found in the available Wikivoyage guide."))
+    sources.push({
+      ...unavailable("wikivoyage", guides?.source.note ?? "No structured nightlife listings were found in the available Wikivoyage guide."),
+      ...(guides?.source.fetchedAt ? { fetchedAt: guides.source.fetchedAt } : {}),
+    })
   }
   if (holidayData) sources.push(holidayData.source)
   else if (!sources.some(s => s.id === "holidays")) sources.push(unavailable("holidays", "Public-holiday data is not available for this report."))
