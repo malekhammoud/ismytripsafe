@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import "leaflet/dist/leaflet.css"
-import type { Map as LMap, FeatureGroup } from "leaflet"
+import type { Map as LMap, FeatureGroup, PathOptions } from "leaflet"
 import type { ZoneLevel } from "@/lib/types"
 
 export interface MapZonePoint {
@@ -18,6 +18,12 @@ const ZONE_COLOR: Record<ZoneLevel, string> = {
   safe: "#2f9e6f",
   caution: "#e0a13b",
   avoid: "#d4503a",
+}
+
+type ZoneShape = { name: string; update: (active: boolean) => void }
+
+function zoneStyle(color: string, active: boolean): PathOptions {
+  return { color, weight: active ? 3 : 1.6, fillColor: color, fillOpacity: active ? 0.4 : 0.2 }
 }
 
 function escapeHtml(s: string): string {
@@ -51,9 +57,12 @@ export function CityMap({
   const elRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<LMap | null>(null)
   const layerRef = useRef<FeatureGroup | null>(null)
+  const shapesRef = useRef<ZoneShape[]>([])
   const fittedRef = useRef(false)
   const onSelectRef = useRef(onSelect)
+  const selectedRef = useRef(selected)
   onSelectRef.current = onSelect
+  selectedRef.current = selected
 
   useEffect(() => {
     let cancelled = false
@@ -81,13 +90,13 @@ export function CityMap({
         ).addTo(map)
         layerRef.current = L.featureGroup().addTo(map)
         mapRef.current = map
-        setTimeout(() => map.invalidateSize(), 150)
       }
 
       const map = mapRef.current
       const layer = layerRef.current
       if (!map || !layer) return
       layer.clearLayers()
+      shapesRef.current = []
 
       // City centre marker
       L.circleMarker(center, {
@@ -102,14 +111,8 @@ export function CityMap({
 
       // Zones — real polygon where we have one, else a small circle.
       for (const z of zones) {
-        const active = selected === z.name
         const color = ZONE_COLOR[z.level]
-        const style = {
-          color,
-          weight: active ? 3 : 1.6,
-          fillColor: color,
-          fillOpacity: active ? 0.4 : 0.2,
-        }
+        const style = zoneStyle(color, selectedRef.current === z.name)
         const popup = `<strong>${escapeHtml(z.name)}</strong><br/>${escapeHtml(z.note)}`
         let shape
         if (z.geojson) {
@@ -120,6 +123,10 @@ export function CityMap({
         shape.bindPopup(popup)
         shape.on("click", () => onSelectRef.current?.(z))
         shape.addTo(layer)
+        shapesRef.current.push({
+          name: z.name,
+          update: (active) => shape.setStyle(zoneStyle(color, active)),
+        })
       }
 
       // Frame everything once, the first time zones load.
@@ -135,7 +142,30 @@ export function CityMap({
     return () => {
       cancelled = true
     }
-  }, [center, zoom, city, zones, selected])
+  }, [center, zoom, city, zones])
+
+  // Selection only restyles the existing zones; rebuilding every shape on each
+  // click caused needless Leaflet work and resize churn.
+  useEffect(() => {
+    for (const { name, update } of shapesRef.current) update(selected === name)
+  }, [selected])
+
+  // Recalculate Leaflet's size when the grid cell changes, but defer the work
+  // out of the observer callback so its notifications cannot loop.
+  useEffect(() => {
+    const el = elRef.current
+    if (!el || typeof ResizeObserver === "undefined") return
+    let frame = 0
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => mapRef.current?.invalidateSize())
+    })
+    observer.observe(el)
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
+  }, [])
 
   useEffect(
     () => () => {
