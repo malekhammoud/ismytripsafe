@@ -73,6 +73,40 @@ const TEMPLATES: Record<string, MetadataTemplate> = {
     description:
       "Is Hyderabad safe in {year}? Safety score {score}/100, current city crime rates, areas to avoid, scams and live Indian travel advisories for Hyderabad.",
   },
+  // Each of these five ranks on page one for a question the shared template
+  // does not echo. The rewrite keeps the same safety facts, but leads with the
+  // wording searchers actually use.
+  "/canada/montreal": {
+    // Query: "old montreal" — the neighbourhood is part of Montreal, so the
+    // report's city-wide safety data applies. The copy says so explicitly.
+    title: "Is Old Montreal Safe in {year}? Safety Guide",
+    description:
+      "Old Montreal sits inside Montreal. In {year} the city scores {score}/100 for safety, with crime rates, areas to avoid, scams and live Canadian advisories.",
+  },
+  "/cyprus/larnaca": {
+    // Query: "a larnaka" — the Turkish spelling of the same city.
+    title: "Is Larnaca (Larnaka) Safe in {year}?",
+    description:
+      "Is Larnaca safe in {year}? Larnaca (also spelled Larnaka) scores {score}/100, with crime rates, areas to avoid, scams and live Cypriot travel advisories.",
+  },
+  "/china/hong-kong": {
+    // Query: "czy jest bezpieczny" — Polish for "is it safe".
+    title: "Hong Kong Safety {year}: Is Hong Kong Safe?",
+    description:
+      "Is Hong Kong safe in {year}? Its safety score is {score}/100, with current crime data, areas to avoid, scams and live travel advisories for Hong Kong.",
+  },
+  "/south-africa/george": {
+    // Query: unknown — keep the generic safety question, disambiguated.
+    title: "Is George, South Africa Safe in {year}?",
+    description:
+      "Is George safe in {year}? This South African city scores {score}/100, with crime rates, areas to avoid, scams and live travel advisories for George, South Africa.",
+  },
+  "/poland/gdansk": {
+    // Query: "güvenli mi" — Turkish for "is it safe".
+    title: "Is Gdańsk Safe in {year}? Safety Score",
+    description:
+      "Is Gdańsk safe in {year}? The city's safety score is {score}/100, with current crime rates, areas to avoid, scams and live Polish travel advisories for Gdańsk.",
+  },
 }
 
 export interface CityMetadataCopy {
