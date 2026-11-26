@@ -4,7 +4,9 @@ export const TYPE_RULES: [RegExp, VenueType][] = [
   [/lgbt|gay bar|lesbian/, "LGBTQ+ bar"], [/karaoke/, "Karaoke"], [/cocktail/, "Cocktail bar"],
   [/wine bar/, "Wine bar"], [/sports bar/, "Sports bar"], [/beer garden|biergarten/, "Beer garden"],
   [/brewery|beer bar|taproom|brewpub/, "Beer bar / brewery"], [/nightclub|night club|dance club|disco/, "Nightclub"],
-  [/live music|music venue|jazz|rock club/, "Live music"], [/\bpub\b|irish pub/, "Pub"], [/restaurant bar|restaurant/, "Restaurant bar"], [/dive|casual|\bbar\b/, "Dive / casual bar"],
+  [/dance hall|dancehall/, "Dance hall"], [/live music|music venue|jazz|rock club/, "Live music"],
+  [/casino/, "Casino"], [/hookah|shisha/, "Hookah lounge"], [/strip ?club|adult entertainment/, "Adult entertainment"],
+  [/\bpub\b|irish pub/, "Pub"], [/restaurant bar|restaurant/, "Restaurant bar"], [/dive|casual|\bbar\b/, "Dive / casual bar"],
 ]
 export function venueType(text: string): VenueType { return TYPE_RULES.find(([r]) => r.test(text.toLowerCase().replace(/_/g, " ")))?.[1] ?? "Other" }
 export function normalizeName(s: string) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\b(the|bar)\b/g, "").replace(/[^\p{L}\p{N}]/gu, "") }
@@ -29,7 +31,22 @@ export function mergeVenues(osm: Venue[], fsq: Venue[]): Venue[] {
     if (match) {
       matched.add(match.id)
       if (v.closed) { match.closed = true; continue }
-      Object.assign(match, { rating: v.rating, votes: v.votes, popularity: v.popularity, price: v.price, neighborhood: v.neighborhood ?? match.neighborhood, type: v.type === "Other" ? match.type : v.type, sources: [...match.sources, ...v.sources] })
+      // Enrich only with fields the second source actually publishes. A guide
+      // listing has no rating or popularity, so assigning those wholesale
+      // would erase what OSM already knew (and vice versa).
+      // A matched guide listing may add its source marker, but it must not
+      // replace OSM hours or taxonomy: those fields are also republished in
+      // the ODbL export.
+      const guide = v.tags?.["wv:guide"] === "yes"
+      if (v.rating !== undefined) match.rating = v.rating
+      if (v.votes !== undefined) match.votes = v.votes
+      if (v.popularity !== undefined) match.popularity = v.popularity
+      if (v.price !== undefined) match.price = v.price
+      if (!guide && v.hours !== undefined) match.hours = v.hours
+      if (v.neighborhood) match.neighborhood = v.neighborhood
+      if (!guide && v.type !== "Other") match.type = v.type
+      if (v.tags) match.tags = { ...match.tags, ...v.tags }
+      match.sources = [...match.sources, ...v.sources]
     } else if (!v.closed) out.push(v)
   }
   // Also deduplicate OSM node/way representations; retain distinct branches.

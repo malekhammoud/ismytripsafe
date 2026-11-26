@@ -21,6 +21,7 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
   const traits = venueTraits(r), clusterInfo = nightlifeClusters(r), clusters = clusterInfo.items, clusterKind = clusterInfo.kind, clusterPublished = clusterInfo.published
   const summary = sceneSummary(r), documented = ranked.length ? [] : documentedVenues(r), reasons = r.reasons ?? [], mapVenues = venueMapSample(r.venues)
   const numbers = sceneNumbers(r), plan = nightPlan(r), know = goodToKnow(r), faqs = faqItems(r), testimonials = r.testimonials ?? []
+  const guides = r.guidePicks ?? [], holidays = r.holidays ?? []
   const areaLevel = (level: "safe" | "caution" | "avoid" | null) => level === "safe" ? "Safer" : level === "avoid" ? "Avoid" : level === "caution" ? "Caution" : null
   const themeCounts = new Map<string, typeof mentions>()
   for (const m of mentions) for (const theme of m.themes) themeCounts.set(theme, [...(themeCounts.get(theme) ?? []), m])
@@ -51,7 +52,7 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
       </header>
       <div className="nl-container nl-report-body">
         <nav className="nl-report-breadcrumb" aria-label="Breadcrumb"><Link prefetch={false} href="/nightlife">Nightlife reports</Link><span aria-hidden="true">/</span><Link prefetch={false} href={c.safetyPath}>{c.city} safety report</Link></nav>
-        <nav className="nl-report-jump" aria-label="In this guide"><a href="#the-stars">Ratings</a><a href="#scene-brief">At a glance</a><a href="#numbers">By the numbers</a>{testimonials.length > 0 && <a href="#testimonials">What people say</a>}<a href="#venues">Venues</a><a href="#plan">Plan a night</a><a href="#late">Opening hours</a><a href="#night-safety">Safety</a><a href="#faq">Questions</a><a href="#data-notes">Data</a></nav>
+        <nav className="nl-report-jump" aria-label="In this guide"><a href="#the-stars">Ratings</a><a href="#scene-brief">At a glance</a><a href="#numbers">By the numbers</a>{testimonials.length > 0 && <a href="#testimonials">What people say</a>}{guides.length > 0 && <a href="#guide-picks">Local picks</a>}<a href="#venues">Venues</a><a href="#plan">Plan a night</a>{holidays.length > 0 && <a href="#holidays">Holidays</a>}<a href="#late">Opening hours</a><a href="#night-safety">Safety</a><a href="#faq">Questions</a><a href="#data-notes">Data</a></nav>
         <section id="the-stars" className="nl-ratings" aria-label="The five ratings">
           <div className="nl-score-grid">{r.scores.map(score => { const Icon = ICONS[score.key], editorial = score.inputs.method === "editorial-scene-index" || score.inputs.method === "editorial-night-energy"; return <article key={score.key} className={`nl-score ${score.value == null ? "nl-score-missing" : ""}`}><Icon size={19}/><h2>{score.label}</h2><p className="nl-score-question">{DESCRIPTIONS[score.key]}</p>{editorial && <span className="nl-score-method" title="A transparent editorial index, not a customer-rating or review average.">Editorial estimate</span>}<div className="nl-score-reading"><Stars value={score.value}/>{score.value != null && <span>{score.value.toFixed(1)}<small>/5</small></span>}</div>{score.bullets.length > 0 && <ul className="nl-score-points">{score.bullets.slice(0, 3).map(bullet => <li key={bullet}>{plainCopy(bullet)}</li>)}</ul>}</article> })}</div>
         </section>
@@ -83,6 +84,22 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
             <figcaption><a href={item.url} target="_blank" rel="noopener noreferrer">{item.source} ↗</a><span>{item.kind === "travel guide" ? "Travel guide" : item.kind === "search snippet" ? "Search result" : "Article"} · {item.publishedAt ? dateLabel(item.publishedAt) : "Undated"} · {item.sentiment === "positive" ? "Positive" : item.sentiment === "negative" ? "Critical" : "Mixed"}</span></figcaption>
           </figure>)}</div>
           <p className="nl-count-note"><Link prefetch={false} href="/nightlife/testimonials">Search every traveler quote →</Link></p>
+        </section>}
+        {guides.length > 0 && <section id="guide-picks" className="nl-section nl-guides">
+          <h2>Local picks from the travel guide</h2>
+          <p className="nl-count-note">Curated bars, clubs and music venues from the Wikivoyage city guide. These are short attributed descriptions, not a ranking or a verified review. Check current hours and prices before you go.</p>
+          <div className="nl-guide-grid">{guides.slice(0, 12).map(pick => <article key={pick.id} className="nl-guide-card">
+            <span className="nl-guide-type">{pick.type === "Other" ? "Nightlife" : pick.type}</span>
+            <h3><a href={pick.url ?? pick.sourceUrl} target="_blank" rel="noopener noreferrer">{plainCopy(pick.name)} <ArrowUpRight size={14}/></a></h3>
+            {pick.address && <p className="nl-guide-address"><MapPin size={13}/>{plainCopy(pick.address)}</p>}
+            {pick.description && <p>{plainCopy(pick.description)}</p>}
+            <div className="nl-guide-meta">
+              {pick.hours && <span><Clock3 size={13}/>{plainCopy(pick.hours)}</span>}
+              {pick.price && <span>{plainCopy(pick.price)}</span>}
+              {pick.phone && <span>{plainCopy(pick.phone)}</span>}
+            </div>
+            <small><a href={pick.sourceUrl} target="_blank" rel="noopener noreferrer">Wikivoyage ↗</a></small>
+          </article>)}</div>
         </section>}
         {r.venues.length > 0 && <section id="venues" className="nl-section nl-scene" aria-label="Venue mix">
           <div className="nl-scene-grid"><div className="nl-venue-total"><Beer size={26}/><strong>{r.venues.length.toLocaleString()}</strong><h2>places to start the evening</h2></div><div className="nl-breakdown">{counts.map(({ type, count }) => <div key={type} className="nl-bar-row"><div><span>{type}</span><strong>{count}</strong></div><div className="nl-bar-track"><span style={{ width: `${count / r.venues.length * 100}%` }}/></div></div>)}</div></div>
@@ -121,6 +138,10 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
         {r.events.length > 0 && <section className="nl-section" id="whats-on"><h2>What&rsquo;s on</h2>
           <ul className="nl-events">{r.events.slice(0, 8).map(event => <li key={event.id}><time dateTime={event.date}>{new Date(event.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}</time><div><a href={event.url} target="_blank" rel="noopener noreferrer">{plainCopy(event.name)} ↗</a><p>{plainCopy(event.venue)}</p></div></li>)}</ul>
         </section>}
+        {holidays.length > 0 && <section className="nl-section" id="holidays"><h2>Public holidays coming up</h2>
+          <p className="nl-count-note">Nationwide public holidays in the next 120 days. They can make bars and clubs busier, and some venues or transport services close. Local and county holidays are not included.</p>
+          <ul className="nl-events">{holidays.map(holiday => <li key={`${holiday.date}-${holiday.name}`}><time dateTime={holiday.date}>{new Date(`${holiday.date}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })}</time><div><strong>{plainCopy(holiday.name)}</strong>{holiday.localName && <p>{plainCopy(holiday.localName)}</p>}</div></li>)}</ul>
+        </section>}
         {r.lateness.known > 0 && <section id="late" className="nl-section"><h2>How Late Does {c.city} Keep Partying?</h2>
           <div className="nl-late-grid">{[["00:00", "Past midnight", r.lateness.afterMidnight], ["02:00", "Past 2 am", r.lateness.after2], ["04:00", "Past 4 am", r.lateness.after4]].map(([time, label, count]) => <div className="nl-late-card" key={time}><Clock3 size={18}/><span className="nl-clock">{time}</span><h3>{label}</h3><strong>{Math.round(Number(count) / r.lateness.known * 100)}%</strong><div className="nl-late-meter"><span style={{width:`${Number(count) / r.lateness.known * 100}%`}}/></div></div>)}</div>
         </section>}
@@ -134,7 +155,7 @@ export function NightlifeReportPage({ report: r, nearby }: { report: NightlifeRe
         <section id="data-notes" className="nl-section nl-data-notes" aria-label="About this report">
           <h2>About this report</h2>
           <p>{r.venues.length.toLocaleString("en")} venues are mapped inside the verified {c.city} boundary. Mapped places are a lower bound, not a census, and opening hours can change. The operator or venue should be checked before a late trip.</p>
-          <p className="nl-data-coverage"><strong>Coverage:</strong> mapped venues, venue types, opening hours, neighbourhood clusters, population density and after-dark safety. Quality and Vibe are labelled editorial estimates unless licensed ratings or enough traveler mentions are connected; event listings, prices and traveler quotes appear automatically when those sources are available.</p>
+          <p className="nl-data-coverage"><strong>Coverage:</strong> mapped venues, venue types, opening hours, neighbourhood clusters, population density and after-dark safety. Quality and Vibe are labelled editorial estimates unless licensed ratings or enough traveler mentions are connected. Guide picks, event listings, public holidays, prices and traveler quotes appear automatically when those sources are available.</p>
           {reasons.length > 0 && <p className="nl-data-gaps"><strong>Limits:</strong> {reasons.map(plainCopy).join(" ")}</p>}
           <ul>{r.sources.filter(s => s.status === "ok" && s.fetchedAt).map(s => <li key={s.id}><a href={s.url} target="_blank" rel="noopener noreferrer">{s.name} ↗</a><span>{dateLabel(s.fetchedAt)}</span><small>{plainCopy(s.note)}</small></li>)}</ul>
         </section>

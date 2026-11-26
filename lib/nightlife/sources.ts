@@ -20,6 +20,8 @@ export const SOURCE_INFO: Record<SourceId, Pick<Source, "name" | "url" | "licenc
   numbeo: { name: "Numbeo", url: "https://www.numbeo.com/api/doc.jsp", licence: "Licensed Data API; attribution required" },
   reddit: { name: "Reddit", url: "https://redditinc.com/policies/data-api-terms", licence: "Commercial and analysis rights required" },
   blogs: { name: "Travel guides & articles", url: "https://ismytripsafe.com/methodology/nightlife", licence: "Short attributed excerpts and links only; no republished text" },
+  wikivoyage: { name: "Wikivoyage", url: "https://en.wikivoyage.org/wiki/Wikivoyage:Copyrights", licence: "CC BY-SA; short attributed excerpts and links only" },
+  holidays: { name: "Nager.Date", url: "https://date.nager.at", licence: "Public holiday data; country-wide holidays only" },
   safety: { name: "IsMyTripSafe", url: "https://ismytripsafe.com/methodology", licence: "Internal safety report" },
 }
 export function unavailable(id: SourceId, note: string): Source { return { id, ...SOURCE_INFO[id], fetchedAt: null, status: "unavailable", note } }
@@ -47,7 +49,7 @@ export async function resolveCity(seed: City, force = false, interactive = false
 }
 export async function fetchOsm(city: City, force = false) {
   const geometryNeeded = !!process.env.FOURSQUARE_API_KEY && process.env.FOURSQUARE_DURABLE_STORAGE_LICENSED === "1" && !!process.env.FOURSQUARE_CATEGORY_IDS
-  const result = await cached(city.key, "osm", 30, () => collectOsm(city, geometryNeeded), force, `osm-v6:${city.wikidataId}:${city.relationId ?? "discover"}:${geometryNeeded ? "geometry" : "venues"}`)
+  const result = await cached(city.key, "osm", 30, () => collectOsm(city, geometryNeeded), force, `osm-v7:${city.wikidataId}:${city.relationId ?? "discover"}:${geometryNeeded ? "geometry" : "venues"}`)
   const fallback = result.data.fallbackArea
   const verified = fallback ? null : verifiedArea(city, result.data.boundary)
   const areaId = fallback?.areaId ?? verified!.areaId
@@ -58,6 +60,10 @@ export async function fetchOsm(city: City, force = false) {
     // Restaurants tagged with a bar count as nightlife venues; previously they
     // all fell into "Other" because "restaurant" matches no type rule.
     let hint = t.amenity === "restaurant" && t.bar === "yes" ? "restaurant bar" : t.amenity
+    if (t.leisure === "dance" && !t.amenity) hint = "dance hall"
+    if (t.amenity === "casino") hint = "casino"
+    if (t.amenity === "stripclub") hint = "adult entertainment"
+    if (t.amenity === "hookah_lounge") hint = "hookah lounge"
     if (t["bar:type"]) hint = t["bar:type"]
     if (t.microbrewery === "yes" || t.brewery === "yes") hint = "brewery"
     if (t.live_music === "yes" || (t.music && /live|jazz/.test(t.music))) hint = "live music"
