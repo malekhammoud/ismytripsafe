@@ -7,6 +7,7 @@ import { readCacheAnyAge, type CachedReport } from "@/lib/cache"
 import { LEVELS } from "@/lib/safety-display"
 import { rescoreSignals } from "@/lib/scoring"
 import { absUrl, humanDate, monthYear } from "@/lib/site"
+import { countryTitleOverride } from "@/lib/seo/country-metadata"
 import {
   breadcrumbNode,
   graph,
@@ -93,7 +94,9 @@ export async function generateMetadata({
   const { hub, sample } = data
   const year = new Date(hub.updatedAt).getFullYear()
   const adv = sample?.bundle.safety.advisories.find((a) => a.sourceShort === "US")
-  const title = `Is ${hub.country} Safe in ${year}? Advisories, Crime Data & City Scores`
+  const title =
+    countryTitleOverride(`/${hub.countrySlug}`, { year }) ??
+    `Is ${hub.country} Safe in ${year}? Advisories, Crime Data & City Scores`
   const description =
     `${hub.country} travel safety: ${adv ? `US advisory Level ${adv.level} (${adv.levelLabel}). ` : ""}` +
     `Safety scores for ${hub.cities.length || "its"} destination${hub.cities.length === 1 ? "" : "s"}, ` +
