@@ -6,6 +6,7 @@ import { cache } from "react"
 import { findCityElsewhere, getCityReport, getRelated, listReports } from "@/lib/reports"
 import { computeFinalScore, LEVELS } from "@/lib/safety-display"
 import { absUrl, humanDate, monthYear } from "@/lib/site"
+import { cityMetadataOverride } from "@/lib/seo/city-metadata"
 import {
   breadcrumbNode,
   graph,
@@ -95,14 +96,18 @@ export async function generateMetadata({
   if (!hit) return { title: "Report not found" }
   const { report, meta } = hit
   const year = new Date(report.cachedAt).getFullYear()
-  const title = `Is ${meta.city} Safe in ${year}? Safety Score ${meta.score}/100`
+  // A few high-impression reports get search-result copy matched to the
+  // question they rank for; every other report keeps the shared template.
+  const override = cityMetadataOverride(meta.path, { year, score: meta.score })
+  const title = override?.title ?? `Is ${meta.city} Safe in ${year}? Safety Score ${meta.score}/100`
+  const description = override?.description ?? metaDescription(report)
   return {
     title,
-    description: metaDescription(report),
+    description,
     alternates: { canonical: meta.path },
     openGraph: {
       title,
-      description: metaDescription(report),
+      description,
       url: absUrl(meta.path),
       siteName: "IsMyTripSafe",
       type: "article",
